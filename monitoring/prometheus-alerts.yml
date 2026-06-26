@@ -1,0 +1,48 @@
+groups:
+- name: healthcare-stack-alerts
+  rules:
+  - alert: Neo4jProbeDown
+    expr: probe_success{job="neo4j_probe", instance="http://neo4j:7474"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      service: neo4j
+    annotations:
+      summary: "Neo4j probe is down"
+      description: "Blackbox probe to Neo4j (http://neo4j:7474) has been failing for 2 minutes."
+  - alert: QdrantTargetDown
+    expr: up{job="qdrant"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      service: qdrant
+    annotations:
+      summary: "Qdrant target is down"
+      description: "Prometheus cannot scrape Qdrant metrics endpoint (qdrant:6333/metrics)."
+  - alert: Neo4jProbeLatencyHigh
+    expr: probe_duration_seconds{job="neo4j_probe", instance="http://neo4j:7474"} > 1
+    for: 5m
+    labels:
+      severity: warning
+      service: neo4j
+    annotations:
+      summary: "Neo4j probe latency is high"
+      description: "Neo4j probe duration has been above 1s for 5 minutes."
+  - alert: KafkaProbeDown
+    expr: probe_success{job="kafka_probe", instance="kafka:29092"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      service: kafka
+    annotations:
+      summary: "Kafka broker probe is down"
+      description: "TCP probe to Kafka broker (kafka:29092) has been failing for 2 minutes."
+  - alert: FlinkJobManagerProbeDown
+    expr: probe_success{job="flink_probe", instance="http://flink-jobmanager:8081"} == 0
+    for: 2m
+    labels:
+      severity: critical
+      service: flink
+    annotations:
+      summary: "Flink JobManager probe is down"
+      description: "HTTP probe to Flink JobManager (http://flink-jobmanager:8081) has been failing for 2 minutes."

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Healthcare Provider RAG Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="card">
+        <h1>Healthcare Provider RAG Console</h1>
+        <p class="subtext">Query the Healthcare Hybrid GraphRAG API with patient context.</p>
+
+        <form id="queryForm" class="form">
+          <label>
+            API Base URL
+            <input id="apiBase" type="url" value="http://localhost:8000" required />
+          </label>
+
+          <label>
+            Patient ID (optional)
+            <input id="patientId" type="text" placeholder="patient-0001" />
+          </label>
+
+          <label>
+            Clinical Question
+            <textarea id="question" rows="4" placeholder="Enter a clinical evidence question..." required></textarea>
+          </label>
+
+          <button id="submitBtn" type="submit">Run Query</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Answer</h2>
+        <pre id="answer" class="answer">No query yet.</pre>
+      </section>
+
+      <section class="card">
+        <h2>Vector Context</h2>
+        <pre id="vectorContext">[]</pre>
+      </section>
+
+      <section class="card">
+        <h2>Graph Context</h2>
+        <pre id="graphContext">[]</pre>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

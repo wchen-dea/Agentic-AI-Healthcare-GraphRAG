@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "MedicalEvent",
+  "namespace": "com.healthcare.graphrag",
+  "fields": [
+    {"name": "event_id", "type": "string"},
+    {"name": "event_ts", "type": "string"},
+    {"name": "source_system", "type": "string"},
+    {"name": "source_type", "type": "string"},
+    {"name": "event_type", "type": "string"},
+    {"name": "patient_id", "type": ["null", "string"], "default": null},
+    {"name": "encounter_id", "type": ["null", "string"], "default": null},
+    {"name": "provider_id", "type": ["null", "string"], "default": null},
+    {"name": "payload_json", "type": "string"},
+    {"name": "schema_version", "type": "string", "default": "1.0.0"}
+  ]
+}
