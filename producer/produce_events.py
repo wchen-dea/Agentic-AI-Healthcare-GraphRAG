@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 
 import requests
 from confluent_kafka import Producer
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.avro import AvroSerializer
+from confluent_kafka.serialization import MessageField, SerializationContext
 from faker import Faker
 
 fake = Faker()
@@ -53,6 +56,20 @@ def register_schema():
             print(f"Schema registration subject={subject} status={r.status_code} response={r.text[:200]}")
         except Exception as ex:
             print(f"Schema registration failed subject={subject}: {ex}")
+
+
+def build_avro_serializer():
+    with open("schemas/medical_event.avsc", "r", encoding="utf-8") as f:
+        schema = f.read()
+
+    sr_client = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
+
+    # Identity conversion because event_envelope already returns a dict matching the schema fields.
+    return AvroSerializer(
+        schema_registry_client=sr_client,
+        schema_str=schema,
+        to_dict=lambda obj, ctx: obj,
+    )
 
 
 def event_envelope(source_system, source_type, event_type, patient_id, encounter_id, provider_id, payload):
@@ -215,6 +232,7 @@ REFERENCE_GENERATORS = [
 ]
 
 register_schema()
+avro_serializer = build_avro_serializer()
 
 while True:
     if random.random() < 0.2:
@@ -222,7 +240,8 @@ while True:
     else:
         topic, event = random.choice(GENERATORS)()
     key = event["patient_id"] or event["event_id"]
-    producer.produce(topic, key=key.encode("utf-8"), value=json.dumps(event).encode("utf-8"))
+    avro_payload = avro_serializer(event, SerializationContext(topic, MessageField.VALUE))
+    producer.produce(topic, key=key.encode("utf-8"), value=avro_payload)
     producer.flush()
     print(f"Produced {event['event_type']} to {topic}: {event['event_id']}")
     time.sleep(INTERVAL)

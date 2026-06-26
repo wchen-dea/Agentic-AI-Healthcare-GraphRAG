@@ -27,25 +27,53 @@ Source file: schemas/medical_event.avsc
 
 Producer behavior in producer/produce_events.py:
 
-- Registers the same Avro envelope under topic-value subjects for all transactional and reference topics.
+- Registers the Avro envelope under topic-value subjects for transactional and reference topics.
 - Uses POST /subjects/{subject}/versions.
-- Continues processing even if one registration attempt fails.
+- Serializes values with Confluent AvroSerializer using subject resolution from topic context.
 
 Operational implication:
 
-- Contract is documented and versionable through Schema Registry.
-- Wire payload currently remains JSON, not Avro binary.
+- Contract is enforced through Schema Registry subjects.
+- Kafka value payloads carry Confluent wire framing (magic byte + schema ID + Avro binary payload).
 
-## Wire Format (Current MVP)
+## Wire Format
 
 Current producer wire encoding:
 
 - key: UTF-8 bytes from patient_id when present, otherwise event_id
-- value: UTF-8 JSON string containing the full envelope
+- value: Confluent Avro binary payload with schema ID from Schema Registry
 
-Current consumers decode JSON directly.
+Current consumers deserialize values with Confluent AvroDeserializer and then parse payload_json for domain details.
 
-This keeps local debugging simple while preserving a schema contract for future hardening.
+## Conduktor Display And Masking Notes
+
+If Conduktor topic view is set to `Bytes` for value deserialization, Avro payloads cannot be decoded for field-level operations.
+
+Use this Conduktor setup for this project:
+
+- Key deserializer: `String`
+- Value deserializer: `Avro (Schema Registry)`
+- Schema Registry URL: `http://schema-registry:8081`
+
+Common error:
+
+- `Message cannot be displayed. The data masking rules cannot be applied with bytes deserializer.`
+
+Root cause:
+
+- Value deserializer is `Bytes` instead of `Avro`.
+
+Fix:
+
+1. Switch topic value deserializer to `Avro (Schema Registry)`.
+1. Refresh topic view.
+1. Reopen messages.
+
+Important limitation in current schema design:
+
+- `payload_json` is defined as a `string` field in `schemas/medical_event.avsc`.
+- Field-level masking can apply to top-level envelope fields.
+- Field-level masking cannot target nested JSON attributes inside `payload_json` unless that payload is migrated to structured Avro fields.
 
 ## Topic Topology
 
@@ -199,8 +227,9 @@ Consequences:
 
 Recommended next steps:
 
-- Move wire format to Avro or Protobuf serialization with strict compatibility mode.
+- Enforce Schema Registry compatibility mode explicitly per subject (for example backward or full).
 - Add producer-side payload validation and schema evolution tests in CI.
 - Implement DLQ writes for parse, enrich, or sink failures.
 - Add explicit event lineage metadata (trace_id, tenant_id, producer_version).
 - Add replay governance for large topic retention scenarios.
+- Consider schema v2 with structured payload records (instead of `payload_json` string) for stronger validation and finer masking controls.

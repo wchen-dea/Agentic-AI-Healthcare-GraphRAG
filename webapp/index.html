@@ -14,6 +14,14 @@
 
         <form id="queryForm" class="form">
           <label>
+            API Mode
+            <select id="apiMode">
+              <option value="rag" selected>RAG REST (/query)</option>
+              <option value="mcp">FastMCP Tool (/mcp)</option>
+            </select>
+          </label>
+
+          <label>
             API Base URL
             <input id="apiBase" type="url" value="http://localhost:8000" required />
           </label>

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-server-config
+  namespace: healthcare-ai
+data:
+  MCP_SERVER_NAME: "HealthcareGraphRAG MCP"
+  MCP_REQUIRE_AUTH: "true"
+  MCP_TOOL_POLICY_PATH: "/app/config/tool_policies.json"
+  MCP_AUDIT_LOG_PATH: "/app/logs/mcp_audit.log"
+  MCP_TRANSPORT: "streamable-http"
+  MCP_HOST: "0.0.0.0"
+  MCP_PORT: "8010"
+  RAG_API_BASE_URL: "http://rag-api:8000"
+  RAG_API_TIMEOUT_SECONDS: "30"

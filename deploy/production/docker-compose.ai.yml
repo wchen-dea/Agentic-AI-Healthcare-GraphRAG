@@ -1,0 +1,30 @@
+services:
+  rag-api:
+    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-rag-api:latest
+    container_name: healthcare-rag-api
+    env_file:
+      - ./rag-api.env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  provider-web:
+    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest
+    container_name: healthcare-provider-web
+    depends_on:
+      - rag-api
+    ports:
+      - "8088:80"
+    restart: unless-stopped
+
+  mcp-server:
+    profiles: ["standalone-mcp"]
+    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-mcp-server:latest
+    container_name: healthcare-mcp-server
+    env_file:
+      - ./mcp-server.env
+    depends_on:
+      - rag-api
+    ports:
+      - "8010:8010"
+    restart: unless-stopped

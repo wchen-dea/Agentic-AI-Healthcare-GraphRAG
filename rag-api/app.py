@@ -1,9 +1,12 @@
 import hashlib
 import os
+from contextlib import asynccontextmanager
+
 import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
+from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
 from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
@@ -16,8 +19,19 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "healthcare123")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
 VECTOR_SIZE = 384
+MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", "HealthcareGraphRAG MCP")
 
-app = FastAPI(title="Healthcare Hybrid GraphRAG API")
+mcp = FastMCP(MCP_SERVER_NAME)
+mcp_http_app = mcp.streamable_http_app()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    async with mcp.session_manager.run():
+        yield
+
+
+app = FastAPI(title="Healthcare Hybrid GraphRAG API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,6 +46,22 @@ neo4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 class QueryRequest(BaseModel):
     question: str
     patient_id: str | None = None
+
+
+def run_query(question: str, patient_id: str | None = None) -> dict:
+    vctx = vector_context(question, patient_id)
+    patient_ids = list({item["patient_id"] for item in vctx if item.get("patient_id")})
+    if patient_id:
+        patient_ids = list(set(patient_ids + [patient_id]))
+    gctx = graph_context(patient_ids) if patient_ids else []
+    answer = ask_ollama(question, vctx, gctx)
+    return {
+        "question": question,
+        "patients": patient_ids,
+        "vector_context": vctx,
+        "graph_context": gctx,
+        "answer": answer,
+    }
 
 
 def stable_embedding(text: str, dim: int = VECTOR_SIZE):
@@ -180,6 +210,19 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/mcp/health")
+def mcp_health():
+    return {
+        "status": "ok",
+        "mcp": {
+            "enabled": True,
+            "transport": "streamable-http",
+            "endpoint": "/mcp",
+            "note": "Diagnostic route only; use /mcp for MCP protocol traffic.",
+        },
+    }
+
+
 @app.get("/")
 def root():
     return RedirectResponse(url="/docs", status_code=307)
@@ -193,16 +236,107 @@ def favicon():
 
 @app.post("/query")
 def query(req: QueryRequest):
-    vctx = vector_context(req.question, req.patient_id)
-    patient_ids = list({item["patient_id"] for item in vctx if item.get("patient_id")})
-    if req.patient_id:
-        patient_ids = list(set(patient_ids + [req.patient_id]))
-    gctx = graph_context(patient_ids) if patient_ids else []
-    answer = ask_ollama(req.question, vctx, gctx)
+    return run_query(req.question, req.patient_id)
+
+
+@mcp.tool()
+def patient_context_get(
+    patient_id: str,
+    include_claims: bool = True,
+    include_interactions: bool = True,
+) -> dict:
+    result = run_query("Return patient graph context for review.", patient_id)
+    graph_ctx = result.get("graph_context", [])
+
+    if not include_claims:
+        for item in graph_ctx:
+            item.pop("claims", None)
+    if not include_interactions:
+        for item in graph_ctx:
+            item.pop("interactions", None)
+
     return {
-        "question": req.question,
-        "patients": patient_ids,
-        "vector_context": vctx,
-        "graph_context": gctx,
-        "answer": answer,
+        "patient_id": patient_id,
+        "graph_context": graph_ctx,
     }
+
+
+@mcp.tool()
+def vector_evidence_search(
+    question: str,
+    patient_id: str | None = None,
+    top_k: int = 5,
+) -> dict:
+    result = run_query(question, patient_id)
+    return {
+        "question": question,
+        "vector_context": result.get("vector_context", [])[:top_k],
+    }
+
+
+@mcp.tool()
+def graphrag_answer_generate(
+    question: str,
+    patient_id: str | None = None,
+    response_style: str = "concise",
+) -> dict:
+    style_prefix = {
+        "concise": "Answer concisely. ",
+        "clinical": "Use clinically oriented language. ",
+        "audit": "Include evidence traceability details. ",
+    }
+    merged_question = style_prefix.get(response_style, "") + question
+    result = run_query(merged_question, patient_id)
+    return {
+        "answer": result.get("answer", ""),
+        "patients": result.get("patients", []),
+        "vector_context": result.get("vector_context", []),
+        "graph_context": result.get("graph_context", []),
+    }
+
+
+@mcp.tool()
+def risk_summary_generate(
+    patient_id: str,
+    time_window_hours: int = 72,
+) -> dict:
+    prompt = (
+        f"Generate a risk summary for patient {patient_id} "
+        f"over the last {time_window_hours} hours using available evidence."
+    )
+    result = run_query(prompt, patient_id)
+    risk_signals = []
+    for item in result.get("vector_context", []):
+        event_type = item.get("event_type")
+        if event_type and event_type not in risk_signals:
+            risk_signals.append(event_type)
+
+    return {
+        "patient_id": patient_id,
+        "summary": result.get("answer", ""),
+        "risk_signals": risk_signals,
+    }
+
+
+@mcp.tool()
+def evidence_bundle_export(
+    question: str,
+    patient_id: str | None = None,
+    include_raw_payload: bool = False,
+) -> dict:
+    result = run_query(question, patient_id)
+    bundle = {
+        "question": question,
+        "patients": result.get("patients", []),
+        "vector_context": result.get("vector_context", []),
+        "graph_context": result.get("graph_context", []),
+        "answer": result.get("answer", ""),
+    }
+    if not include_raw_payload:
+        for item in bundle["vector_context"]:
+            item.pop("text", None)
+    return bundle
+
+
+# Mount MCP as a fallback ASGI app so /mcp is served by the AI API process.
+app.mount("/", mcp_http_app)

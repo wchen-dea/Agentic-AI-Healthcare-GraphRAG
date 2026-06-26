@@ -28,21 +28,24 @@ PARALLELISM = int(os.getenv("FLINK_JOB_PARALLELISM", "1"))
 
 
 class GraphRagSideEffectMap(MapFunction):
-    def __init__(self):
+    def __init__(self, topic):
+        self.topic = topic
         self.processor = None
 
     def map(self, value):
         if self.processor is None:
             self.processor = HealthcareGraphRagProcessor()
 
-        topic, raw = value
-        if topic in REFERENCE_TOPICS:
-            self.processor.process_reference_event(topic, raw)
-            return f"reference:{topic}"
-        if topic in TOPICS:
-            self.processor.process_event(raw)
-            return f"event:{topic}"
-        return f"skipped:{topic}"
+        # Preserve exact byte values from Kafka by round-tripping through ISO-8859-1.
+        raw = value.encode("ISO-8859-1") if isinstance(value, str) else value
+
+        if self.topic in REFERENCE_TOPICS:
+            self.processor.process_reference_event(self.topic, raw)
+            return f"reference:{self.topic}"
+        if self.topic in TOPICS:
+            self.processor.process_event(raw, self.topic)
+            return f"event:{self.topic}"
+        return f"skipped:{self.topic}"
 
 
 def main():
@@ -51,37 +54,34 @@ def main():
     env.enable_checkpointing(CHECKPOINT_INTERVAL_MS)
 
     streams = []
+    deserializer = SimpleStringSchema("ISO-8859-1")
     for topic in ALL_TOPICS:
         source = KafkaSource.builder() \
             .set_bootstrap_servers(KAFKA_BOOTSTRAP) \
             .set_group_id(f"{GROUP_ID}-{topic.replace('.', '-')}") \
             .set_topics(topic) \
             .set_starting_offsets(KafkaOffsetsInitializer.earliest()) \
-            .set_value_only_deserializer(SimpleStringSchema()) \
+            .set_value_only_deserializer(deserializer) \
             .build()
 
-        tagged = env.from_source(
+        processed = env.from_source(
             source,
             WatermarkStrategy.no_watermarks(),
             f"kafka-source-{topic}",
         ).map(
-            lambda raw, topic_name=topic: (topic_name, raw),
-            output_type=Types.TUPLE([Types.STRING(), Types.STRING()]),
+            GraphRagSideEffectMap(topic),
+            output_type=Types.STRING(),
         )
-        streams.append(tagged)
+        streams.append(processed)
 
     if not streams:
         raise RuntimeError("No topics configured for PyFlink consumer")
 
-    stream = streams[0]
-    for tagged_stream in streams[1:]:
-        stream = stream.union(tagged_stream)
+    merged = streams[0]
+    for output_stream in streams[1:]:
+        merged = merged.union(output_stream)
 
-    processed = stream.map(
-        GraphRagSideEffectMap(), output_type=Types.STRING()
-    )
-
-    processed.print()
+    merged.print()
     env.execute("HealthcareGraphRagPyFlinkJob")
 
 

@@ -15,6 +15,9 @@ import os
 import time
 
 from confluent_kafka import Consumer, KafkaException
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.avro import AvroDeserializer
+from confluent_kafka.serialization import MessageField, SerializationContext
 from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -25,6 +28,7 @@ QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "healthcare_events")
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "healthcare123")
+SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://schema-registry:8081")
 
 TOPICS = [
     "healthcare.ehr.events",
@@ -139,6 +143,11 @@ class HealthcareGraphRagProcessor:
                 vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
             )
         self.neo4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        self.schema_registry = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
+        self.avro_deserializer = AvroDeserializer(
+            schema_registry_client=self.schema_registry,
+            from_dict=lambda obj, ctx: obj,
+        )
         self.reference_store = {
             "patients": {},
             "providers": {},
@@ -150,8 +159,25 @@ class HealthcareGraphRagProcessor:
     def close(self):
         self.neo4j.close()
 
-    def process_reference_event(self, topic: str, raw_value: str):
-        event = json.loads(raw_value)
+    def deserialize_event(self, topic: str, raw_value):
+        if isinstance(raw_value, str):
+            return json.loads(raw_value)
+
+        if isinstance(raw_value, bytearray):
+            raw_value = bytes(raw_value)
+
+        if isinstance(raw_value, bytes):
+            if raw_value.startswith(b"{"):
+                return json.loads(raw_value.decode("utf-8"))
+            return self.avro_deserializer(
+                raw_value,
+                SerializationContext(topic, MessageField.VALUE),
+            )
+
+        raise TypeError(f"Unsupported raw value type: {type(raw_value)}")
+
+    def process_reference_event(self, topic: str, raw_value):
+        event = self.deserialize_event(topic, raw_value)
         payload = json.loads(event.get("payload_json", "{}"))
 
         if topic == "healthcare.master.patients":
@@ -197,8 +223,8 @@ class HealthcareGraphRagProcessor:
         event["reference_hit_count"] = sum(1 for value in reference_data.values() if value is not None)
         return event, payload
 
-    def process_event(self, raw_value: str):
-        event = json.loads(raw_value)
+    def process_event(self, raw_value, topic: str):
+        event = self.deserialize_event(topic, raw_value)
         payload = json.loads(event.get("payload_json", "{}"))
         event, payload = self.enrich_event(event, payload)
         event["payload_json"] = json.dumps(payload)
@@ -518,11 +544,11 @@ def main():
                 raise KafkaException(msg.error())
             try:
                 topic = msg.topic()
-                raw = msg.value().decode("utf-8")
+                raw = msg.value()
                 if topic in REFERENCE_TOPICS:
                     processor.process_reference_event(topic, raw)
                 elif topic in TOPICS:
-                    processor.process_event(raw)
+                    processor.process_event(raw, topic)
                 else:
                     print(f"Skipped message from unknown topic={topic}")
                 c.commit(msg, asynchronous=False)

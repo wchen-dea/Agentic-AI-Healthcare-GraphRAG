@@ -4,27 +4,35 @@
 
 This repository demonstrates a local-first healthcare event intelligence stack that combines streaming ingestion, dual persistence (vector + graph), and grounded LLM answer generation.
 
-The system is intentionally designed for reproducible local experimentation with full observability and clear data lineage.
+It is optimized for reproducible local experimentation with clear lineage and full observability.
+
+## ADR References
+
+Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
+
+- [ADR-0001: Embed FastMCP in rag-api](adrs/0001-embed-fastmcp-in-rag-api.md)
+- [ADR-0002: Use dual persistence (Qdrant + Neo4j)](adrs/0002-dual-persistence-qdrant-neo4j.md)
+- [ADR-0003: Local-first LLM with provider routing](adrs/0003-local-first-llm-provider-routing.md)
 
 ## Why This Architecture Scales Across Healthcare Sections
 
-The architecture separates reusable platform capabilities from domain-specific healthcare logic.
+The design separates stable platform capabilities from domain-specific healthcare logic.
 
-Reusable platform capabilities:
+Platform capabilities:
 
 - streaming ingestion and replay,
 - hybrid vector plus graph persistence,
 - retrieval-grounded generation pipeline,
 - observability and operational controls.
 
-Domain-specific extension points:
+Domain extension points:
 
 - Kafka topic contracts and schema variants,
 - enrichment and normalization rules,
 - graph labels, properties, and relationships,
 - prompt templates and response policies.
 
-This separation makes new healthcare sections additive and modular.
+This keeps new sections additive and modular.
 
 ## Healthcare Extension Matrix
 
@@ -39,7 +47,7 @@ This separation makes new healthcare sections additive and modular.
 
 ## Extension Playbook
 
-For each new section, apply the same implementation sequence:
+For each new section, follow the same sequence:
 
 1. Define or extend topic contracts and payload schema.
 2. Add enrichment rules and map new entities into graph merges.
@@ -61,6 +69,7 @@ Synthetic Producer
      -> vector retrieval from Qdrant
      -> graph retrieval from Neo4j
      -> response generation via Ollama
+      -> embedded MCP endpoint (/mcp)
 
 Operational Plane
   -> Flink UI
@@ -76,9 +85,9 @@ Operational Plane
 ```mermaid
 flowchart LR
   subgraph Ingestion[Streaming Ingestion]
-    P[Producer] --> K[Kafka Topics]
+    P[Producer] --> K[Kafka]
     SR[Schema Registry] --> K
-    K --> F[PyFlink Job]
+    K --> F[PyFlink]
   end
 
   subgraph Persistence[Dual Persistence]
@@ -86,11 +95,20 @@ flowchart LR
     F --> N[Neo4j]
   end
 
+  subgraph APIProc[rag-api Process]
+    RAG[RAG REST API]
+    MCP[FastMCP API]
+    CORE[Shared RAG Core]
+    RAG --> CORE
+    MCP --> CORE
+  end
+
   subgraph AI[AI Application Layer]
-    UI[Provider Web] --> API[FastAPI GraphRAG API]
-    API --> Q
-    API --> N
-    API --> L[LLM Provider]
+    UI[Provider Web] --> RAG
+    MCPClient[MCP Client] --> MCP
+    CORE --> Q
+    CORE --> N
+    CORE --> L[LLM]
   end
 
   subgraph Ops[Operations]
@@ -102,7 +120,7 @@ flowchart LR
 
   K -. inspect .-> CDK
   F -. monitor .-> FL
-  API -. probe .-> PR
+  CORE -. probe .-> PR
   Q -. metrics .-> PR
   N -. probe .-> PR
   PR --> GF
@@ -112,42 +130,49 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-  participant Producer
-  participant Kafka
-  participant PyFlink
+  participant UI as Provider Web
+  participant MCP as MCP Client
+  participant RAG as RAG REST API
+  participant MCPAPI as FastMCP API
+  participant Core as Shared RAG Core
   participant Qdrant
   participant Neo4j
-  participant API as GraphRAG API
   participant LLM
-  participant UI as Provider Web
 
-  Producer->>Kafka: Publish transactional/reference event
-  PyFlink->>Kafka: Consume from topic sources
-  PyFlink->>PyFlink: Enrich with reference store
-  PyFlink->>Qdrant: Upsert vector payload
-  PyFlink->>Neo4j: Merge graph entities and edges
+  UI->>RAG: call query endpoint
+  RAG->>Core: orchestrate retrieval
+  Core->>Qdrant: vector search
+  Core->>Neo4j: graph lookup
+  Core->>LLM: grounded generation
+  LLM-->>Core: answer text
+  Core-->>RAG: evidence and answer
+  RAG-->>UI: JSON response
 
-  UI->>API: POST /query
-  API->>Qdrant: Semantic retrieval
-  API->>Neo4j: Graph context retrieval
-  API->>LLM: Grounded prompt generation call
-  LLM-->>API: Answer text
-  API-->>UI: Answer + evidence context
+  MCP->>MCPAPI: initialize session
+  MCPAPI-->>MCP: handshake and tool list
+  MCP->>MCPAPI: call tool
+  MCPAPI->>Core: invoke tool handler
+  Core-->>MCPAPI: tool result
+  MCPAPI-->>MCP: MCP tool response
 ```
 
 ## Event Flow Diagram
 
 ```mermaid
 flowchart TD
-  A[Generate Synthetic Event] --> B{Reference Event?}
-  B -->|Yes| C[Update In-Memory Reference Store]
+  A[Generate Event] --> B{Reference Event?}
+  B -->|Yes| C[Update Reference Store]
   B -->|No| D[Load Transactional Payload]
   C --> E[Wait for Next Event]
-  D --> F[Apply Reference Enrichment]
+  D --> F[Apply Enrichment]
   F --> G[Render Clinical Text]
-  G --> H[Create Stable Embedding]
+  G --> H[Build Embedding]
   H --> I[Upsert to Qdrant]
   F --> J[Merge to Neo4j]
+  I --> K[Expose Evidence to API Core]
+  J --> K
+  K --> L[RAG REST Surface]
+  K --> M[FastMCP Surface]
   I --> E
   J --> E
 ```
@@ -156,16 +181,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  Q1[Receive Query] --> Q2[Build Query Embedding]
-  Q2 --> Q3[Search Qdrant Top-K]
-  Q3 --> Q4[Derive Patient Scope]
-  Q4 --> Q5[Fetch Neo4j Graph Context]
-  Q5 --> Q6[Compose Grounded Prompt]
-  Q6 --> Q7{LLM Provider}
-  Q7 -->|Local| Q8[Ollama]
-  Q7 -->|Production| Q9[Anthropic or OpenAI]
-  Q8 --> Q10[Return Structured Answer]
-  Q9 --> Q10
+  E1[Receive Request] --> E2{API Surface}
+  E2 -->|RAG REST| E3[RAG Query Endpoint]
+  E2 -->|FastMCP| E4[MCP Session and Tool Endpoint]
+  E3 --> C1[Normalize Scope]
+  E4 --> C1
+  C1 --> C2[Build Embedding]
+  C2 --> C3[Search Qdrant Top-K]
+  C3 --> C4[Derive Patient Scope]
+  C4 --> C5[Fetch Neo4j Context]
+  C5 --> C6[Compose Grounded Prompt]
+  C6 --> C7{LLM Provider}
+  C7 -->|Local| C8[Ollama]
+  C7 -->|Production| C9[Anthropic or OpenAI]
+  C8 --> C10[Build Unified Result]
+  C9 --> C10
+  C10 --> O1[REST JSON]
+  C10 --> O2[MCP Tool Response]
 ```
 
 ## LLM Selection Strategy (Local and Production)
@@ -178,9 +210,15 @@ Current implementation uses Ollama in rag-api/app.py.
 - Local model choice via OLLAMA_MODEL.
 - Automatic fallback to available local model tags when possible.
 
+MCP delivery in the current implementation:
+
+- MCP is embedded in the same rag-api process.
+- MCP protocol endpoint: `POST /mcp` (streamable HTTP).
+- Human diagnostic endpoint: `GET /mcp/health`.
+
 ### Production With Anthropic or OpenAI
 
-For production, keep retrieval orchestration the same and swap only the generation provider behind an adapter interface.
+For production, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
 
 Recommended provider adapter contract:
 
@@ -205,7 +243,7 @@ Recommended production configuration keys:
 - LLM_MAX_TOKENS
 - LLM_TEMPERATURE
 
-Use managed secrets for API keys and avoid writing provider credentials to files or compose manifests.
+Use a secret manager for API keys. Do not store credentials in files or compose manifests.
 
 ## Services And Responsibilities
 
@@ -226,13 +264,13 @@ producer/produce_events.py emits two event families:
   - medications
   - payers
 
-The producer registers a shared Avro envelope in Schema Registry while publishing JSON payloads to Kafka for local transparency.
+The producer registers a shared Avro envelope in Schema Registry and publishes Confluent Avro-serialized values to Kafka.
 
 ### Kafka + Schema Registry
 
-Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in docker-compose.yml, with fixed partitions per domain topic.
+Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in docker-compose.yml with fixed partitions per domain topic.
 
-Schema Registry stores the MedicalEvent envelope under topic-value subjects for both transactional and reference topics.
+Schema Registry stores the MedicalEvent envelope under topic-value subjects for transactional and reference topics, and the schema ID is embedded in Kafka value payloads.
 
 ### Flink Runtime
 
@@ -248,14 +286,14 @@ There is no demo auto-submit service in the current implementation.
 
 ### Native PyFlink Job
 
-flink-app/healthcare_graph_rag_pyflink_job.py implements the active stream job:
+flink-app/healthcare_graph_rag_pyflink_job.py is the active stream job:
 
 - Builds one KafkaSource per topic in ALL_TOPICS.
 - Tags each record with its topic and unions all streams.
 - Applies GraphRagSideEffectMap to route by topic type.
 - Reuses HealthcareGraphRagProcessor from healthcare_graph_rag_job.py for business logic and sink writes.
 
-Execution semantics:
+Execution details:
 
 - Checkpointing enabled via FLINK_CHECKPOINT_INTERVAL_MS.
 - Parallelism controlled by FLINK_JOB_PARALLELISM.
@@ -273,7 +311,7 @@ flink-app/healthcare_graph_rag_job.py provides:
 - Qdrant upserts,
 - Neo4j merges by event type.
 
-This file also retains a direct Kafka consumer main() path for fallback/local troubleshooting, but the active runtime path is the native PyFlink job.
+This file also retains a direct Kafka consumer main() path for fallback troubleshooting, but the active runtime path is the native PyFlink job.
 
 ### Qdrant
 
@@ -297,7 +335,7 @@ Neo4j stores patient-centric graph entities and lineage, including:
 - medication/device/claim entities,
 - reference-context links (Provider, Device, Medication, Payer).
 
-See docs/NEO4J_MODEL.md for the complete model.
+See docs/NEO4J_MODEL.md for the full model.
 
 ### RAG API
 
@@ -312,12 +350,12 @@ Query flow:
 2. Search Qdrant for nearest evidence, optionally filtered by patient_id.
 3. Collect patient IDs from vector hits and optional request scope.
 4. Pull graph summary from Neo4j for those patients.
-5. Build synthesis prompt and call Ollama /api/generate.
+5. Build a synthesis prompt and call Ollama /api/generate.
 6. Return answer plus vector_context and graph_context.
 
 #### Provider-Agnostic LLM Interface Sketch
 
-The API can keep retrieval logic unchanged and swap only generation providers via an adapter interface.
+The API can keep retrieval logic unchanged and swap only generation providers through an adapter.
 
 ```python
 from __future__ import annotations
@@ -379,7 +417,7 @@ def llm_client_from_env() -> LLMClient:
 
 Suggested integration point in [rag-api/app.py](rag-api/app.py):
 
-- Keep query orchestration as-is.
+- Keep query orchestration as is.
 - Replace direct generation call in ask_ollama(...) with ask_llm(...).
 - Build prompt exactly once, then call client.generate(prompt, cfg).
 
@@ -409,7 +447,7 @@ Secrets should be sourced from a secret manager or runtime environment injection
 
 ### Provider Web
 
-webapp provides a browser-based interface to submit questions and visualize API responses without manual curl usage.
+webapp provides a browser interface to submit questions and view API responses without manual curl usage.
 
 ### Observability
 
@@ -450,19 +488,19 @@ Producer master topic write
 
 ## Reliability And Operational Notes
 
-- Flink starts from earliest offsets; local restarts can replay historical topic data.
+- Flink starts from earliest offsets, so local restarts can replay historical topic data.
 - Processor writes are designed around stable identifiers to keep upserts deterministic.
 - Reference store is process memory; recovery of reference context relies on replay.
 - healthcare.dlq.events currently exists for future hardening but is not populated by the active processor.
 
 ## Security And Scope
 
-This stack is for local synthetic-demo use. It is not production hardened. Notable simplifications:
+This stack is for local synthetic-demo use. It is not production-hardened. Notable simplifications:
 
 - open CORS policy in API,
 - demo credentials in compose,
 - no auth between most internal services,
-- JSON-on-wire instead of strict schema-enforced serialization.
+- Confluent Avro-on-wire with schema ID framing and subject-based enforcement.
 
 ## Evolution Paths
 

@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: healthcare-ai
+resources:
+- namespace.yaml
+- rag-api-configmap.yaml
+- rag-api-deployment.yaml
+- rag-api-service.yaml
+- provider-web-deployment.yaml
+- provider-web-service.yaml
+- networkpolicy-default-deny-ingress.yaml
+- networkpolicy-rag-api.yaml
+- networkpolicy-provider-web.yaml
+- hpa-rag-api.yaml
+- hpa-provider-web.yaml
+# Apply your generated secret separately, for example:
+# kubectl apply -f rag-api-secret.yaml

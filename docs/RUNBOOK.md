@@ -4,6 +4,8 @@
 
 This runbook covers day-0 and day-2 operations for the local Docker Compose stack, including startup, verification, recovery, and common failure handling.
 
+For production AI-only deployment boundaries and compose bundles, see [deploy/production/README.md](../deploy/production/README.md).
+
 ## Prerequisites
 
 - Docker Compose
@@ -51,6 +53,8 @@ docker compose ps
 
 Expected core services: kafka, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer.
 
+Note: MCP is embedded in rag-api in the current architecture, so no separate mcp-server container is expected.
+
 ### 2) Flink Job Health
 
 ```bash
@@ -74,7 +78,29 @@ Expected response:
 {"status":"ok"}
 ```
 
-### 4) Qdrant Collection
+### 4) MCP Diagnostic Health
+
+```bash
+curl -s http://localhost:8000/mcp/health | jq .
+```
+
+Expected response includes:
+
+- status: ok
+- mcp.enabled: true
+- mcp.endpoint: /mcp
+
+### 5) MCP Handshake Smoke Test
+
+```bash
+python3 ./scripts/mcp_smoke_test.py
+```
+
+Expected output starts with:
+
+- MCP smoke test passed
+
+### 6) Qdrant Collection
 
 ```bash
 curl -s http://localhost:6333/collections | jq .
@@ -82,7 +108,7 @@ curl -s http://localhost:6333/collections | jq .
 
 Expected collection includes healthcare_events.
 
-### 5) Neo4j Basic Check
+### 7) Neo4j Basic Check
 
 ```bash
 docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
@@ -234,6 +260,29 @@ Fix:
 docker exec -it healthcare-ollama ollama pull llama3.1
 ```
 
+### 6) Conduktor Message Cannot Be Displayed (Bytes Deserializer)
+
+Symptom:
+
+- `Message cannot be displayed`
+- `The data masking rules cannot be applied with bytes deserializer`
+
+Cause:
+
+- Topic value deserializer is set to `Bytes` while payloads are Confluent Avro on wire.
+
+Fix in Conduktor:
+
+1. Set key deserializer to `String`.
+1. Set value deserializer to `Avro (Schema Registry)`.
+1. Ensure Schema Registry endpoint is `http://schema-registry:8081`.
+1. Refresh the topic messages view.
+
+Note:
+
+- `payload_json` is a string field in the current envelope schema.
+- Field masking applies to envelope fields, but not nested JSON keys inside `payload_json`.
+
 ## Data Reset Procedures
 
 ### Soft Restart (keep volumes)
@@ -275,7 +324,7 @@ For persistent stream failures, capture and share:
 - docker compose ps
 - docker logs --tail=400 healthcare-flink-app
 - docker logs --tail=400 healthcare-flink-taskmanager
-  - `curl -s http://localhost:8082/jobs/overview | jq .`
-  - `curl -s http://localhost:8082/jobs/JOB_ID/exceptions | jq .`
+- `curl -s http://localhost:8082/jobs/overview | jq .`
+- `curl -s http://localhost:8082/jobs/JOB_ID/exceptions | jq .`
 
 These artifacts are typically sufficient to identify whether the issue is submission, dependency, connector, or runtime-state related.

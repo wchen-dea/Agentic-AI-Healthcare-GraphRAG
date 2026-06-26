@@ -248,6 +248,7 @@ services:
       NEO4J_PASSWORD: healthcare123
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: llama3.1
+      MCP_SERVER_NAME: HealthcareGraphRAG MCP
 
   provider-web:
     build:

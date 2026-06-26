@@ -1,6 +1,19 @@
 # Agentic AI Healthcare GraphRAG
 
-Local Docker Compose environment for a healthcare-focused hybrid GraphRAG system built on Kafka, PyFlink, Qdrant, Neo4j, FastAPI, and Ollama.
+A healthcare-focused hybrid GraphRAG system built on Kafka, PyFlink, Qdrant, Neo4j, FastAPI, and Ollama.
+
+## Summary
+
+This project provides a healthcare AI platform blueprint across three dimensions:
+
+- Technical leadership: streaming-first ingestion, dual evidence stores (vector plus graph), and agent-ready APIs (REST + MCP) on shared reasoning logic.
+- Industry innovation: one reusable architecture for clinical, operational, and financial healthcare AI workflows.
+- Implementation maturity: complete local development stack plus production-ready deployment variants for AI deliverables.
+
+Production boundary in this repository:
+
+- In scope: rag-api (embedded MCP), provider-web, optional standalone mcp-server, separate monitoring config.
+- Out of scope: source data systems, Confluent Kafka platform, and Apache Flink platform (independently managed).
 
 ## Tech Stack
 
@@ -11,9 +24,9 @@ Local Docker Compose environment for a healthcare-focused hybrid GraphRAG system
 - Observability: Prometheus, Grafana, Blackbox Exporter
 - Operations and Tooling: Docker Compose, Conduktor, NeoDash
 
-## Overview
+## What This Repository Runs
 
-This project simulates an end-to-end healthcare intelligence pipeline that:
+End-to-end healthcare intelligence pipeline:
 
 - generates synthetic transactional and reference healthcare events,
 - streams events through Kafka and Schema Registry,
@@ -23,15 +36,9 @@ This project simulates an end-to-end healthcare intelligence pipeline that:
 - serves GraphRAG responses through a FastAPI API backed by Ollama,
 - exposes provider and observability surfaces for local exploration.
 
-## Industry Extensions
+## Healthcare Domain Readiness
 
-This project is designed as a reusable healthcare intelligence platform, not a single fixed workflow.
-
-Why it extends broadly:
-
-- The platform layer stays stable (streaming, storage, retrieval, API, observability).
-- New healthcare sections are added as domain modules (topic contracts, enrichment rules, graph entities, prompt templates).
-- Expansion is mostly configuration and modeling, rather than full-system rewrites.
+The platform is reusable by design: core platform layers stay stable while domain behavior is added through topic contracts, enrichment rules, graph models, and prompt policy.
 
 | Healthcare Section | Example Data Sources | Typical Outcomes |
 | --- | --- | --- |
@@ -41,6 +48,15 @@ Why it extends broadly:
 | Population Health | Longitudinal encounters, chronic-condition signals | Cohort risk stratification, outreach prioritization |
 | Medication Safety | Orders, allergies, interaction knowledge | Safer prescribing, interaction explainability |
 | Device and Remote Monitoring | Device telemetry, alerts, maintenance events | Faster anomaly response, operational efficiency |
+
+## Innovation Highlights
+
+- Real-time healthcare intelligence stack: Kafka + Flink processing with Avro schema-governed event contracts.
+- Hybrid GraphRAG retrieval: Qdrant vector evidence plus Neo4j relationship context in one grounded answer flow.
+- Streaming enrichment pattern: reference/master data fused into transactional events before vector and graph persistence.
+- Production-ready AI portability: local Ollama by default with clear provider-routing path to Anthropic/OpenAI.
+- Explainability by design: API returns both vector_context and graph_context alongside generated responses.
+- Operations-first engineering: Prometheus, Grafana, Flink UI, and Conduktor integrated for full-stack observability.
 
 ## Runtime Summary
 
@@ -64,39 +80,12 @@ Ops/UI
   -> Neo4j Browser + NeoDash
 ```
 
-## LLM Selection: Local vs Production
+## LLM Strategy
 
-### Local Development (Current Default)
-
-The current implementation uses Ollama through the RAG API environment settings:
-
-- OLLAMA_URL (default: <http://ollama:11434>)
-- OLLAMA_MODEL (default: llama3.1)
-
-This is the recommended mode for local testing because it avoids external API dependencies and keeps data fully local.
-
-### Production Deployment (Anthropic or OpenAI)
-
-For production, use a provider abstraction in the API layer and route generation calls to a managed model provider.
-
-- Anthropic option: use a provider adapter that calls the Anthropic Messages API.
-- OpenAI option: use a provider adapter that calls the OpenAI Responses or Chat Completions API.
-
-Recommended selection policy:
-
-- Primary provider chosen by configuration.
-- Optional fallback provider for resiliency.
-- Per-environment model mapping (for example, fast model for triage, higher-quality model for final response).
-
-Recommended production environment variables:
-
-- LLM_PROVIDER: ollama, anthropic, or openai
-- LLM_MODEL: provider-specific model name
-- LLM_TIMEOUT_SECONDS: request timeout budget
-- LLM_MAX_TOKENS: output guardrail
-- LLM_TEMPERATURE: generation control
-
-Provider-specific secrets should be injected via your secret manager, not stored in source control.
+- Local default: Ollama using OLLAMA_URL and OLLAMA_MODEL.
+- Production path: provider routing for Anthropic or OpenAI via LLM_PROVIDER and LLM_MODEL.
+- Recommended controls: LLM_TIMEOUT_SECONDS, LLM_MAX_TOKENS, LLM_TEMPERATURE.
+- Security: inject API keys from a secret manager, never from source-controlled files.
 
 ## Key Capabilities
 
@@ -105,6 +94,14 @@ Provider-specific secrets should be injected via your secret manager, not stored
 - Native Flink job visibility from the Flink dashboard.
 - Local observability for Kafka, Flink, Neo4j, and Qdrant.
 - Provider-facing UI for query workflows without curl.
+- Embedded MCP tool endpoint in rag-api for agent integration without a separate MCP service.
+
+## MCP Quick Verify
+
+```bash
+curl -s http://localhost:8000/mcp/health | jq .
+python3 ./scripts/mcp_smoke_test.py
+```
 
 ## Quick Start
 
@@ -133,6 +130,7 @@ Optional one-shot validation:
 ./scripts/validate_docs.sh
 ./scripts/validate_stack.sh
 ./scripts/query_examples.sh
+python3 ./scripts/mcp_smoke_test.py
 ```
 
 ## Service Endpoints
@@ -141,6 +139,8 @@ Optional one-shot validation:
 | --- | --- |
 | RAG API docs | <http://localhost:8000/docs> |
 | RAG API health | <http://localhost:8000/health> |
+| MCP server endpoint | <http://localhost:8000/mcp> |
+| MCP diagnostic health | <http://localhost:8000/mcp/health> |
 | Provider web app | <http://localhost:8088> |
 | Flink UI | <http://localhost:8082> |
 | Conduktor Console | <http://localhost:8085> |
@@ -189,6 +189,15 @@ curl -s http://localhost:8082/jobs/overview | jq .
 
 You should see HealthcareGraphRagPyFlinkJob in RUNNING state and no demo job auto-submission service.
 
+## Conduktor Message View Setup
+
+Because Kafka values are published using Confluent Avro wire format, configure Conduktor topic deserializers as:
+
+- key: `String`
+- value: `Avro (Schema Registry)`
+
+If value deserializer is set to `Bytes`, message rendering and masking rules will fail.
+
 ## Query Examples
 
 The script scripts/query_examples.sh runs representative GraphRAG queries:
@@ -212,7 +221,9 @@ curl -s -X POST "http://localhost:8000/query" \
 
 ```text
 docs/           Architecture, Kafka contract, graph model, and runbook
+docs/adrs/      Architecture Decision Records (ADRs)
 flink-app/      PyFlink job, processor logic, and Flink runtime image
+mcp-server/     MCP adapter scaffold (reference implementation)
 monitoring/     Prometheus, Grafana, alerting, and blackbox config
 neo4j/          Constraints and seed graph relationships
 producer/       Synthetic event producer
@@ -220,22 +231,28 @@ rag-api/        FastAPI GraphRAG API
 schemas/        Avro envelope schema
 scripts/        Validation and query helper scripts
 webapp/         Provider-facing static UI
+deploy/         Deployment bundles (production AI runtime and monitoring)
+deploy/production/k8s/ Kubernetes-ready AI component manifests
 ```
 
 ## Implementation Notes
 
 - flink-app submits a native PyFlink DataStream job (healthcare_graph_rag_pyflink_job.py) to Flink JobManager.
 - healthcare_graph_rag_job.py is retained as a fallback processing implementation and provides reusable sink/enrichment logic consumed by the PyFlink job.
-- Schema Registry stores the MedicalEvent Avro schema; producer wire payloads remain JSON for MVP readability.
+- Schema Registry stores MedicalEvent Avro schemas and Kafka payloads are published with Confluent Avro serialization (schema ID on wire).
 - healthcare.dlq.events is created but not actively written by the processor yet.
 - API model resolution falls back to available Ollama tags (for example llama3.1:latest) when needed.
 
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/adrs/README.md](docs/adrs/README.md)
 - [docs/KAFKA_SCHEMA.md](docs/KAFKA_SCHEMA.md)
+- [docs/MCP_LAYER_DESIGN.md](docs/MCP_LAYER_DESIGN.md)
 - [docs/NEO4J_MODEL.md](docs/NEO4J_MODEL.md)
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)
+- [deploy/production/README.md](deploy/production/README.md)
+- [deploy/production/k8s/README.md](deploy/production/k8s/README.md)
 
 ## Safety Disclaimer
 
