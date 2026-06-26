@@ -6,6 +6,48 @@ This repository demonstrates a local-first healthcare event intelligence stack t
 
 The system is intentionally designed for reproducible local experimentation with full observability and clear data lineage.
 
+## Why This Architecture Scales Across Healthcare Sections
+
+The architecture separates reusable platform capabilities from domain-specific healthcare logic.
+
+Reusable platform capabilities:
+
+- streaming ingestion and replay,
+- hybrid vector plus graph persistence,
+- retrieval-grounded generation pipeline,
+- observability and operational controls.
+
+Domain-specific extension points:
+
+- Kafka topic contracts and schema variants,
+- enrichment and normalization rules,
+- graph labels, properties, and relationships,
+- prompt templates and response policies.
+
+This separation makes new healthcare sections additive and modular.
+
+## Healthcare Extension Matrix
+
+| Section | Example Inputs | Graph/Vector Emphasis | Primary Users | Expected Outcome |
+| --- | --- | --- | --- | --- |
+| Acute Clinical Ops | EHR notes, vitals, labs, encounters | Condition progression, symptom-observation linkage | Care teams, command center | Faster deterioration signal detection and context-rich escalation |
+| Medication Management | Orders, dispense records, interaction references | Medication-order linkage, interaction evidence | Pharmacists, inpatient teams | Reduced adverse-drug-risk exposure and clearer intervention rationale |
+| Revenue Cycle Intelligence | Claims events, coding metadata, auth records | Clinical-claim traceability and mismatch signals | RCM analysts, coding teams | Lower denial rates and earlier documentation/coding correction |
+| Payer Utilization Review | Authorization outcomes, utilization events | Coverage patterns and utilization trajectory | UM teams, payer analysts | Better high-cost-case triage and utilization governance |
+| Population Health | Longitudinal events, risk tiers, chronic indicators | Cohort similarity + graph risk factors | Population health teams | Prioritized outreach and proactive risk management |
+| Device and Remote Care | Telemetry, device inventory, alert streams | Device-patient-event lineage | Monitoring teams, biomedical ops | Faster anomaly triage and reduced alert fatigue |
+
+## Extension Playbook
+
+For each new section, apply the same implementation sequence:
+
+1. Define or extend topic contracts and payload schema.
+2. Add enrichment rules and map new entities into graph merges.
+3. Add retrieval filters and prompt templates for that workflow.
+4. Validate with section-specific test queries and outcome metrics.
+
+This keeps platform code stable while allowing domain growth by module.
+
 ## Architecture At A Glance
 
 ```text

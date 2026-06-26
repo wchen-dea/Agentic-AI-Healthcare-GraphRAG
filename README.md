@@ -23,6 +23,25 @@ This project simulates an end-to-end healthcare intelligence pipeline that:
 - serves GraphRAG responses through a FastAPI API backed by Ollama,
 - exposes provider and observability surfaces for local exploration.
 
+## Industry Extensions
+
+This project is designed as a reusable healthcare intelligence platform, not a single fixed workflow.
+
+Why it extends broadly:
+
+- The platform layer stays stable (streaming, storage, retrieval, API, observability).
+- New healthcare sections are added as domain modules (topic contracts, enrichment rules, graph entities, prompt templates).
+- Expansion is mostly configuration and modeling, rather than full-system rewrites.
+
+| Healthcare Section | Example Data Sources | Typical Outcomes |
+| --- | --- | --- |
+| Clinical Operations | EHR notes, labs, telemetry | Earlier risk detection, clinician-ready summaries |
+| Revenue Cycle | Claims, coding events, prior-auth records | Denial reduction, coding consistency insights |
+| Payer and Utilization | Claims timelines, authorization decisions | Utilization trend detection, anomaly triage |
+| Population Health | Longitudinal encounters, chronic-condition signals | Cohort risk stratification, outreach prioritization |
+| Medication Safety | Orders, allergies, interaction knowledge | Safer prescribing, interaction explainability |
+| Device and Remote Monitoring | Device telemetry, alerts, maintenance events | Faster anomaly response, operational efficiency |
+
 ## Runtime Summary
 
 ```text
