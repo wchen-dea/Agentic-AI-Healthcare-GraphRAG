@@ -1,66 +1,114 @@
 # Agentic AI Healthcare GraphRAG
 
-Local Docker Compose environment for a healthcare-focused hybrid GraphRAG system built on Kafka, Qdrant, Neo4j, FastAPI, Ollama, and supporting operational tooling.
+Local Docker Compose environment for a healthcare-focused hybrid GraphRAG system built on Kafka, PyFlink, Qdrant, Neo4j, FastAPI, and Ollama.
+
+## Tech Stack
+
+- Streaming: Apache Kafka, Confluent Schema Registry, Apache Flink (PyFlink)
+- Data Stores: Qdrant (vector), Neo4j (graph)
+- API and AI: FastAPI, Ollama (local), Anthropic/OpenAI ready via provider routing
+- Frontend: Static provider web app (Nginx-served)
+- Observability: Prometheus, Grafana, Blackbox Exporter
+- Operations and Tooling: Docker Compose, Conduktor, NeoDash
 
 ## Overview
 
-This project simulates a healthcare event platform that:
+This project simulates an end-to-end healthcare intelligence pipeline that:
 
-- generates synthetic clinical, lab, telemetry, pharmacy, claims, and master-data events,
-- streams those events through Kafka and Schema Registry,
-- enriches transactional events with reference data in the streaming layer,
-- writes dual representations to Qdrant and Neo4j,
+- generates synthetic transactional and reference healthcare events,
+- streams events through Kafka and Schema Registry,
+- processes streams in a native PyFlink DataStream job,
+- enriches transactional events with master data,
+- writes dual sinks to Qdrant and Neo4j,
 - serves GraphRAG responses through a FastAPI API backed by Ollama,
-- exposes provider, monitoring, and admin interfaces for local exploration.
+- exposes provider and observability surfaces for local exploration.
 
-## What Is Running
+## Runtime Summary
 
 ```text
-Synthetic Producers
-  -> Kafka + Schema Registry
-  -> Python streaming processor in Flink container
-  -> Qdrant vector index
-  -> Neo4j property graph
+Producer
+  -> Kafka topics
+  -> Native PyFlink DataStream job (HealthcareGraphRagPyFlinkJob)
+     -> reference-store enrichment
+     -> Qdrant vector upserts
+     -> Neo4j graph merges
   -> FastAPI GraphRAG API
-  -> Ollama local LLM
+     -> Qdrant semantic context
+     -> Neo4j relationship context
+     -> Ollama answer generation
 
-Supporting tools
+Ops/UI
   -> Provider web app
-  -> NeoDash + Neo4j Browser
+  -> Flink dashboard
   -> Conduktor Console
   -> Prometheus + Grafana + Blackbox Exporter
+  -> Neo4j Browser + NeoDash
 ```
+
+## LLM Selection: Local vs Production
+
+### Local Development (Current Default)
+
+The current implementation uses Ollama through the RAG API environment settings:
+
+- OLLAMA_URL (default: <http://ollama:11434>)
+- OLLAMA_MODEL (default: llama3.1)
+
+This is the recommended mode for local testing because it avoids external API dependencies and keeps data fully local.
+
+### Production Deployment (Anthropic or OpenAI)
+
+For production, use a provider abstraction in the API layer and route generation calls to a managed model provider.
+
+- Anthropic option: use a provider adapter that calls the Anthropic Messages API.
+- OpenAI option: use a provider adapter that calls the OpenAI Responses or Chat Completions API.
+
+Recommended selection policy:
+
+- Primary provider chosen by configuration.
+- Optional fallback provider for resiliency.
+- Per-environment model mapping (for example, fast model for triage, higher-quality model for final response).
+
+Recommended production environment variables:
+
+- LLM_PROVIDER: ollama, anthropic, or openai
+- LLM_MODEL: provider-specific model name
+- LLM_TIMEOUT_SECONDS: request timeout budget
+- LLM_MAX_TOKENS: output guardrail
+- LLM_TEMPERATURE: generation control
+
+Provider-specific secrets should be injected via your secret manager, not stored in source control.
 
 ## Key Capabilities
 
-- Hybrid retrieval that combines vector similarity from Qdrant with patient-centric graph context from Neo4j.
+- Hybrid retrieval that combines semantic nearest-neighbor evidence from Qdrant with patient-centric relationship context from Neo4j.
 - Reference-data enrichment for patients, providers, devices, medications, and payers before sink writes.
+- Native Flink job visibility from the Flink dashboard.
 - Local observability for Kafka, Flink, Neo4j, and Qdrant.
-- Provider-facing UI for issuing RAG queries without using curl.
-- Neo4j GUI support through both Neo4j Browser and NeoDash.
+- Provider-facing UI for query workflows without curl.
 
 ## Quick Start
 
 Prerequisites:
 
 - Docker Desktop or Docker Engine with Compose support
-- Enough disk for Ollama model download, roughly 5 GB+
+- jq (recommended for shell validations)
+- Enough disk for Ollama model download (roughly 5 GB+)
 
-Start the stack:
+Start the full stack:
 
 ```bash
-cd {project_root}/Agentic-AI-Healthcare-GraphRAG
-cp .env.example .env
-docker compose up --build
+cd /path/to/Agentic-AI-Healthcare-GraphRAG
+docker compose up -d --build
 ```
 
-Pull the local Ollama model used by the API:
+Pull the LLM model used by the API:
 
 ```bash
 docker exec -it healthcare-ollama ollama pull llama3.1
 ```
 
-Validate the platform:
+Optional one-shot validation:
 
 ```bash
 ./scripts/validate_docs.sh
@@ -68,11 +116,7 @@ Validate the platform:
 ./scripts/query_examples.sh
 ```
 
-Notes:
-
-- The first LLM-backed query can take noticeably longer than subsequent calls.
-
-## Endpoints
+## Service Endpoints
 
 | Service | URL |
 | --- | --- |
@@ -88,7 +132,7 @@ Notes:
 | Prometheus | <http://localhost:9090> |
 | Grafana | <http://localhost:3000> |
 
-## Credentials And Connection Settings
+## Default Credentials
 
 Neo4j:
 
@@ -97,16 +141,6 @@ username: neo4j
 password: healthcare123
 bolt url: neo4j://localhost:7687
 ```
-
-NeoDash:
-
-```text
-url: neo4j://localhost:7687
-username: neo4j
-password: healthcare123
-```
-
-NeoDash is preconfigured in `docker-compose.yml` and should connect to the local Neo4j instance directly.
 
 Conduktor:
 
@@ -122,95 +156,67 @@ username: admin
 password: admin123
 ```
 
-## Example Queries
+## Verifying Flink Job Submission
 
-The included [scripts/query_examples.sh](scripts/query_examples.sh) script runs five representative GraphRAG queries:
+The stack should submit exactly one application job by default:
+
+- HealthcareGraphRagPyFlinkJob
+
+Check with:
 
 ```bash
-# 1) Hyperkalemia risk evidence
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Why might this patient have hyperkalemia risk and what evidence exists?","patient_id":"patient-0001"}'
-
-# 2) Vitals instability and respiratory concern
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Summarize recent device telemetry anomalies for this patient and whether they suggest respiratory deterioration.","patient_id":"patient-0012"}'
-
-# 3) Medication interaction and safety
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Check current medication orders for possible interaction risks and provide supporting graph and event evidence.","patient_id":"patient-0025"}'
-
-# 4) Clinical vs claims consistency
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Compare clinical events with claim status for this patient and identify any potential documentation or coverage mismatch.","patient_id":"patient-0007"}'
-
-# 5) Cross-patient cohort risk overview
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Across recent events, which patterns indicate rising cardiometabolic risk and what evidence is most frequent?"}'
+curl -s http://localhost:8082/jobs/overview | jq .
 ```
 
-## Provider Web App
+You should see HealthcareGraphRagPyFlinkJob in RUNNING state and no demo job auto-submission service.
 
-The provider UI is a lightweight static web application that calls the FastAPI backend from the browser.
+## Query Examples
 
-Features:
-
-- configurable API base URL,
-- optional patient ID filter,
-- free-text clinical question input,
-- structured display for answer, vector context, and graph context,
-- browser-local persistence of the selected API base URL.
-
-## Monitoring And Operations
-
-Observability components:
-
-- Prometheus scrapes Qdrant directly and probes Neo4j, Kafka, and Flink through Blackbox Exporter.
-- Grafana auto-loads two dashboards:
-  - `monitoring/grafana/dashboards/healthcare-monitoring-overview.json`
-  - `monitoring/grafana/dashboards/kafka-flink-service-health.json`
-- Prometheus alert rules are defined in `monitoring/prometheus-alerts.yml`.
-- Conduktor provides Kafka topic, broker, and schema visibility.
-
-Operational validation commands:
+The script scripts/query_examples.sh runs representative GraphRAG queries:
 
 ```bash
-./scripts/validate_docs.sh
-docker compose ps
-./scripts/validate_stack.sh
 ./scripts/query_examples.sh
+```
+
+Direct API call example:
+
+```bash
+curl -s -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Why might this patient have hyperkalemia risk and what evidence exists?",
+    "patient_id": "patient-0001"
+  }' | jq .
 ```
 
 ## Project Layout
 
 ```text
-docs/           Architecture, Kafka contract, and graph model docs
-flink-app/      Streaming processor container and processing logic
-monitoring/     Prometheus, Grafana, alerting, and probe config
+docs/           Architecture, Kafka contract, graph model, and runbook
+flink-app/      PyFlink job, processor logic, and Flink runtime image
+monitoring/     Prometheus, Grafana, alerting, and blackbox config
 neo4j/          Constraints and seed graph relationships
 producer/       Synthetic event producer
 rag-api/        FastAPI GraphRAG API
 schemas/        Avro envelope schema
-scripts/        Validation and example query scripts
+scripts/        Validation and query helper scripts
 webapp/         Provider-facing static UI
 ```
 
 ## Implementation Notes
 
-- The `flink-app` service is not a native PyFlink DataStream job. It is a Python Kafka consumer running inside a Flink-oriented container and following Flink-style streaming principles.
-- Schema Registry is used to register a shared Avro envelope, but the producer currently publishes JSON messages for local transparency and simpler Python handling.
-- A DLQ topic is created in Kafka for future hardening, but this MVP does not yet implement a dedicated dead-letter writer.
-- The RAG API automatically falls back to an available Ollama model variant when possible, for example `llama3.1` vs `llama3.1:latest`.
+- flink-app submits a native PyFlink DataStream job (healthcare_graph_rag_pyflink_job.py) to Flink JobManager.
+- healthcare_graph_rag_job.py is retained as a fallback processing implementation and provides reusable sink/enrichment logic consumed by the PyFlink job.
+- Schema Registry stores the MedicalEvent Avro schema; producer wire payloads remain JSON for MVP readability.
+- healthcare.dlq.events is created but not actively written by the processor yet.
+- API model resolution falls back to available Ollama tags (for example llama3.1:latest) when needed.
 
-## Additional Documentation
+## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/KAFKA_SCHEMA.md](docs/KAFKA_SCHEMA.md)
 - [docs/NEO4J_MODEL.md](docs/NEO4J_MODEL.md)
+- [docs/RUNBOOK.md](docs/RUNBOOK.md)
 
 ## Safety Disclaimer
 

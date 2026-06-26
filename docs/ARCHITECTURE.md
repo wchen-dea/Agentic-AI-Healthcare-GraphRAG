@@ -2,184 +2,432 @@
 
 ## Purpose
 
-This project demonstrates a local healthcare event platform that combines streaming ingestion, vector retrieval, graph reasoning, and local LLM generation in one reproducible Docker Compose environment.
+This repository demonstrates a local-first healthcare event intelligence stack that combines streaming ingestion, dual persistence (vector + graph), and grounded LLM answer generation.
 
-The architecture is designed to show how transactional clinical events and slower-changing master data can be combined into a GraphRAG workflow.
+The system is intentionally designed for reproducible local experimentation with full observability and clear data lineage.
 
-## Runtime Topology
+## Architecture At A Glance
 
 ```text
-Synthetic producers
-  -> Kafka domain topics
-  -> Schema Registry
-  -> Streaming processor in flink-app container
-     -> in-memory reference store for master data
-     -> Qdrant vector sink
-     -> Neo4j graph sink
-  -> FastAPI RAG API
-     -> Qdrant semantic retrieval
-     -> Neo4j patient relationship retrieval
-     -> Ollama answer generation
+Synthetic Producer
+  -> Kafka topics + Schema Registry
+  -> Native PyFlink DataStream job
+     -> reference-state enrichment
+     -> Qdrant upsert (semantic evidence)
+     -> Neo4j merge (relationship evidence)
+  -> FastAPI GraphRAG API
+     -> vector retrieval from Qdrant
+     -> graph retrieval from Neo4j
+     -> response generation via Ollama
 
-Operations plane
-  -> Conduktor for Kafka administration
-  -> Prometheus + Blackbox Exporter for metrics and probes
-  -> Grafana dashboards and alerts
-  -> Neo4j Browser + NeoDash for graph inspection
-  -> Provider web app for human query workflow
+Operational Plane
+  -> Flink UI
+  -> Conduktor
+  -> Prometheus + Blackbox Exporter
+  -> Grafana dashboards + alerts
+  -> Neo4j Browser + NeoDash
+  -> Provider Web UI
 ```
 
-## Main Components
+## Overall Architecture Diagram
+
+```mermaid
+flowchart LR
+  subgraph Ingestion[Streaming Ingestion]
+    P[Producer] --> K[Kafka Topics]
+    SR[Schema Registry] --> K
+    K --> F[PyFlink Job]
+  end
+
+  subgraph Persistence[Dual Persistence]
+    F --> Q[Qdrant]
+    F --> N[Neo4j]
+  end
+
+  subgraph AI[AI Application Layer]
+    UI[Provider Web] --> API[FastAPI GraphRAG API]
+    API --> Q
+    API --> N
+    API --> L[LLM Provider]
+  end
+
+  subgraph Ops[Operations]
+    FL[Flink UI]
+    CDK[Conduktor]
+    PR[Prometheus]
+    GF[Grafana]
+  end
+
+  K -. inspect .-> CDK
+  F -. monitor .-> FL
+  API -. probe .-> PR
+  Q -. metrics .-> PR
+  N -. probe .-> PR
+  PR --> GF
+```
+
+## Component Interaction Diagram
+
+```mermaid
+sequenceDiagram
+  participant Producer
+  participant Kafka
+  participant PyFlink
+  participant Qdrant
+  participant Neo4j
+  participant API as GraphRAG API
+  participant LLM
+  participant UI as Provider Web
+
+  Producer->>Kafka: Publish transactional/reference event
+  PyFlink->>Kafka: Consume from topic sources
+  PyFlink->>PyFlink: Enrich with reference store
+  PyFlink->>Qdrant: Upsert vector payload
+  PyFlink->>Neo4j: Merge graph entities and edges
+
+  UI->>API: POST /query
+  API->>Qdrant: Semantic retrieval
+  API->>Neo4j: Graph context retrieval
+  API->>LLM: Grounded prompt generation call
+  LLM-->>API: Answer text
+  API-->>UI: Answer + evidence context
+```
+
+## Event Flow Diagram
+
+```mermaid
+flowchart TD
+  A[Generate Synthetic Event] --> B{Reference Event?}
+  B -->|Yes| C[Update In-Memory Reference Store]
+  B -->|No| D[Load Transactional Payload]
+  C --> E[Wait for Next Event]
+  D --> F[Apply Reference Enrichment]
+  F --> G[Render Clinical Text]
+  G --> H[Create Stable Embedding]
+  H --> I[Upsert to Qdrant]
+  F --> J[Merge to Neo4j]
+  I --> E
+  J --> E
+```
+
+## AI App Process Flow Diagram
+
+```mermaid
+flowchart TD
+  Q1[Receive Query] --> Q2[Build Query Embedding]
+  Q2 --> Q3[Search Qdrant Top-K]
+  Q3 --> Q4[Derive Patient Scope]
+  Q4 --> Q5[Fetch Neo4j Graph Context]
+  Q5 --> Q6[Compose Grounded Prompt]
+  Q6 --> Q7{LLM Provider}
+  Q7 -->|Local| Q8[Ollama]
+  Q7 -->|Production| Q9[Anthropic or OpenAI]
+  Q8 --> Q10[Return Structured Answer]
+  Q9 --> Q10
+```
+
+## LLM Selection Strategy (Local and Production)
+
+### Local Development
+
+Current implementation uses Ollama in rag-api/app.py.
+
+- Local endpoint via OLLAMA_URL.
+- Local model choice via OLLAMA_MODEL.
+- Automatic fallback to available local model tags when possible.
+
+### Production With Anthropic or OpenAI
+
+For production, keep retrieval orchestration the same and swap only the generation provider behind an adapter interface.
+
+Recommended provider adapter contract:
+
+- generate(prompt, model, timeout, temperature, max_tokens) -> answer
+
+Provider options:
+
+- Anthropic: Messages API with model families such as Claude.
+- OpenAI: Responses or Chat Completions API with GPT model families.
+
+Recommended routing policy:
+
+- Primary provider from environment configuration.
+- Optional failover provider on timeout or 5xx failures.
+- Per-use-case model profiles (latency-optimized vs quality-optimized).
+
+Recommended production configuration keys:
+
+- LLM_PROVIDER
+- LLM_MODEL
+- LLM_TIMEOUT_SECONDS
+- LLM_MAX_TOKENS
+- LLM_TEMPERATURE
+
+Use managed secrets for API keys and avoid writing provider credentials to files or compose manifests.
+
+## Services And Responsibilities
 
 ### Producer
 
-The producer emits two categories of events:
+producer/produce_events.py emits two event families:
 
-- transactional healthcare events such as clinical notes, lab results, telemetry, medication orders, and claims,
-- master-data reference events for patients, providers, devices, medications, and payers.
+- Transactional events:
+  - clinical notes
+  - lab results
+  - device telemetry
+  - medication orders
+  - claims events
+- Reference events:
+  - patients
+  - providers
+  - devices
+  - medications
+  - payers
 
-The producer registers the Avro envelope schema in Schema Registry, but publishes JSON payloads for simplicity.
+The producer registers a shared Avro envelope in Schema Registry while publishing JSON payloads to Kafka for local transparency.
 
-### Kafka And Schema Registry
+### Kafka + Schema Registry
 
-Kafka is the event backbone. Topics are created explicitly on startup by the `kafka-init` service. Schema Registry stores the shared `MedicalEvent` envelope contract for all topics.
+Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in docker-compose.yml, with fixed partitions per domain topic.
 
-### Streaming Processor
+Schema Registry stores the MedicalEvent envelope under topic-value subjects for both transactional and reference topics.
 
-The core stream logic lives in `flink-app/healthcare_graph_rag_job.py`.
+### Flink Runtime
 
-Important implementation detail:
+docker-compose.yml starts:
 
-- this is not a native PyFlink DataStream job,
-- it is a Python process running inside a Flink-oriented container,
-- it consumes Kafka topics directly via `confluent_kafka.Consumer`.
+- flink-jobmanager
+- flink-taskmanager
+- flink-app
 
-The processor:
+flink-app submits healthcare_graph_rag_pyflink_job.py using flink run -py with explicit Python executable settings.
 
-1. subscribes to both transactional and reference topics,
-2. updates an in-memory reference store from master-data events,
-3. enriches transactional events with matching reference context,
-4. generates deterministic embeddings from rendered clinical text,
-5. writes vector records to Qdrant,
-6. writes structured graph state to Neo4j.
+There is no demo auto-submit service in the current implementation.
+
+### Native PyFlink Job
+
+flink-app/healthcare_graph_rag_pyflink_job.py implements the active stream job:
+
+- Builds one KafkaSource per topic in ALL_TOPICS.
+- Tags each record with its topic and unions all streams.
+- Applies GraphRagSideEffectMap to route by topic type.
+- Reuses HealthcareGraphRagProcessor from healthcare_graph_rag_job.py for business logic and sink writes.
+
+Execution semantics:
+
+- Checkpointing enabled via FLINK_CHECKPOINT_INTERVAL_MS.
+- Parallelism controlled by FLINK_JOB_PARALLELISM.
+- Starts from earliest offsets using KafkaOffsetsInitializer.earliest().
+- Uses per-topic group IDs built from FLINK_KAFKA_GROUP_ID.
+
+### Processor Logic Reuse
+
+flink-app/healthcare_graph_rag_job.py provides:
+
+- stable_embedding for deterministic embeddings,
+- clinical_text rendering with optional reference-data expansion,
+- in-memory reference store updates,
+- event enrichment,
+- Qdrant upserts,
+- Neo4j merges by event type.
+
+This file also retains a direct Kafka consumer main() path for fallback/local troubleshooting, but the active runtime path is the native PyFlink job.
 
 ### Qdrant
 
-Qdrant stores the semantic representation of processed events in the `healthcare_events` collection. Stored payload includes:
+Qdrant stores semantic vectors in healthcare_events with payload fields such as:
 
-- event identifiers,
-- patient and source metadata,
-- enrichment flags,
-- rendered clinical text,
-- original event payload.
+- event_id
+- event_ts
+- event_type
+- patient_id
+- source metadata
+- enriched/reference_hit_count
+- rendered text
+- normalized payload
 
 ### Neo4j
 
-Neo4j stores the patient-centric relationship graph. It contains both event-derived clinical entities and reference-derived entities such as provider, device, medication metadata, and payer coverage.
+Neo4j stores patient-centric graph entities and lineage, including:
+
+- base event lineage (ClinicalEvent, SourceSystem, Encounter),
+- clinical entities (Condition, Symptom, Observation),
+- medication/device/claim entities,
+- reference-context links (Provider, Device, Medication, Payer).
+
+See docs/NEO4J_MODEL.md for the complete model.
 
 ### RAG API
 
-The FastAPI service in `rag-api/app.py` provides the `/query` endpoint.
+rag-api/app.py exposes:
 
-Request flow:
+- GET /health
+- POST /query
 
-1. embed the incoming question using the same deterministic embedding approach used for event text,
-2. search Qdrant for nearest event evidence,
-3. derive patient IDs from vector results and optional request filter,
-4. query Neo4j for graph context around those patients,
-5. construct a combined prompt,
-6. call Ollama for a final synthesized answer.
+Query flow:
 
-### Ollama
+1. Embed user question with stable_embedding.
+2. Search Qdrant for nearest evidence, optionally filtered by patient_id.
+3. Collect patient IDs from vector hits and optional request scope.
+4. Pull graph summary from Neo4j for those patients.
+5. Build synthesis prompt and call Ollama /api/generate.
+6. Return answer plus vector_context and graph_context.
 
-Ollama provides local generation. The API defaults to `llama3.1` and can resolve an available local variant such as `llama3.1:latest` when needed.
+#### Provider-Agnostic LLM Interface Sketch
 
-### Provider Web App
+The API can keep retrieval logic unchanged and swap only generation providers via an adapter interface.
 
-The provider web app is a static browser client that calls the RAG API directly and renders answer, vector context, and graph context for interactive local testing.
+```python
+from __future__ import annotations
 
-### Operational Tooling
+import os
+from dataclasses import dataclass
+from typing import Protocol
 
-- Conduktor for Kafka browsing and cluster visibility
-- Prometheus for scraping and rule evaluation
-- Blackbox Exporter for Neo4j, Kafka, and Flink probes
-- Grafana for dashboards
-- Neo4j Browser and NeoDash for graph exploration
 
-## Event Flow
+@dataclass
+class LLMConfig:
+  provider: str = os.getenv("LLM_PROVIDER", "ollama")
+  model: str = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "llama3.1"))
+  timeout_seconds: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "120"))
+  max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1200"))
+  temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.2"))
 
-### Transactional Flow
 
-```text
-Producer
-  -> healthcare.* transactional topic
-  -> streaming processor
-  -> enriched clinical text
-  -> Qdrant upsert
-  -> Neo4j merge operations
-  -> queryable by API
+class LLMClient(Protocol):
+  def generate(self, prompt: str, cfg: LLMConfig) -> str:
+    ...
+
+
+class OllamaClient:
+  def __init__(self, base_url: str):
+    self.base_url = base_url
+
+  def generate(self, prompt: str, cfg: LLMConfig) -> str:
+    # POST {base_url}/api/generate
+    ...
+
+
+class AnthropicClient:
+  def __init__(self, api_key: str):
+    self.api_key = api_key
+
+  def generate(self, prompt: str, cfg: LLMConfig) -> str:
+    # Call Anthropic Messages API
+    ...
+
+
+class OpenAIClient:
+  def __init__(self, api_key: str):
+    self.api_key = api_key
+
+  def generate(self, prompt: str, cfg: LLMConfig) -> str:
+    # Call OpenAI Responses or Chat Completions API
+    ...
+
+
+def llm_client_from_env() -> LLMClient:
+  provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+  if provider == "anthropic":
+    return AnthropicClient(api_key=os.environ["ANTHROPIC_API_KEY"])
+  if provider == "openai":
+    return OpenAIClient(api_key=os.environ["OPENAI_API_KEY"])
+  return OllamaClient(base_url=os.getenv("OLLAMA_URL", "http://ollama:11434"))
 ```
 
-### Reference-Data Flow
+Suggested integration point in [rag-api/app.py](rag-api/app.py):
 
-```text
-Producer
-  -> healthcare.master.* topic
-  -> streaming processor
-  -> in-memory reference store update
-  -> later transactional event enrichment
+- Keep query orchestration as-is.
+- Replace direct generation call in ask_ollama(...) with ask_llm(...).
+- Build prompt exactly once, then call client.generate(prompt, cfg).
+
+Minimal wiring sketch:
+
+```python
+LLM_CFG = LLMConfig()
+LLM_CLIENT = llm_client_from_env()
+
+
+def ask_llm(prompt: str) -> str:
+  return LLM_CLIENT.generate(prompt, LLM_CFG)
 ```
 
-Reference data is not queried directly through the API. Instead, it improves the quality of:
+Environment-driven routing variables:
 
-- vector text rendering,
-- graph node properties and relationships,
-- downstream prompt context.
+- LLM_PROVIDER: ollama, anthropic, or openai
+- LLM_MODEL: provider-specific model name
+- LLM_TIMEOUT_SECONDS: request timeout
+- LLM_MAX_TOKENS: response token budget
+- LLM_TEMPERATURE: sampling temperature
+- OLLAMA_URL: required for local ollama mode
+- ANTHROPIC_API_KEY: required for anthropic mode
+- OPENAI_API_KEY: required for openai mode
 
-## Topic Categories
+Secrets should be sourced from a secret manager or runtime environment injection, never committed to repository files.
 
-| Category | Topics | Purpose |
-| --- | --- | --- |
-| Transactional | `healthcare.ehr.events`, `healthcare.lab.results`, `healthcare.device.telemetry`, `healthcare.pharmacy.orders`, `healthcare.claims.events` | Primary event ingestion |
-| Reference | `healthcare.master.patients`, `healthcare.master.providers`, `healthcare.master.devices`, `healthcare.master.medications`, `healthcare.master.payers` | Enrichment data |
-| Reserved | `healthcare.dlq.events` | Future dead-letter handling |
+### Provider Web
 
-## Storage Responsibilities
+webapp provides a browser-based interface to submit questions and visualize API responses without manual curl usage.
 
-| Layer | Stores | Retrieval Role |
-| --- | --- | --- |
-| Kafka | raw event stream | transport, replay, decoupling |
-| Qdrant | semantic event vectors + payloads | nearest-neighbor evidence recall |
-| Neo4j | explicit patient/event/reference relationships | relationship-aware context and reasoning |
+### Observability
 
-## Observability Design
+monitoring config provides:
 
-Prometheus configuration covers:
+- Prometheus scrape and alerting,
+- Blackbox probes for Kafka/Flink/Neo4j availability,
+- Grafana provisioning for dashboards,
+- Flink dashboard for job-level visibility,
+- Conduktor for Kafka topic/cluster/schema browsing.
 
-- direct scrape of Qdrant metrics,
-- blackbox HTTP probe for Neo4j,
-- blackbox TCP probe for Kafka,
-- blackbox HTTP probe for Flink JobManager.
+## Data Flow Details
 
-Alert rules currently cover:
+### Transactional Event Path
 
-- Neo4j availability and latency,
-- Qdrant availability,
-- Kafka availability,
-- Flink JobManager availability.
+```text
+Producer transactional topic write
+  -> Kafka topic
+  -> PyFlink KafkaSource
+  -> GraphRagSideEffectMap
+  -> HealthcareGraphRagProcessor.process_event
+  -> enrichment with in-memory reference cache
+  -> Qdrant upsert + Neo4j merge
+  -> RAG API retrieval surface
+```
 
-## Known MVP Boundaries
+### Reference Event Path
 
-- The producer registers Avro schemas but publishes JSON rather than Avro-encoded payloads.
-- The stream processor uses an in-memory reference store, so reference state is not externally checkpointed.
-- The embedding strategy is deterministic and lightweight rather than model-based.
-- The DLQ topic exists but is not yet used by the processor.
-- Native Flink APIs are not yet used for the processing loop.
+```text
+Producer master topic write
+  -> Kafka topic
+  -> PyFlink KafkaSource
+  -> GraphRagSideEffectMap
+  -> HealthcareGraphRagProcessor.process_reference_event
+  -> in-memory reference cache mutation
+  -> affects subsequent transactional enrichment
+```
 
-## Recommended Next Hardening Steps
+## Reliability And Operational Notes
 
-- move to native Flink Kafka source and managed state,
-- serialize events with Avro or Protobuf on the wire,
-- implement DLQ publishing and replay workflows,
-- add authentication and tighter CORS policy to the API and provider UI,
-- externalize credentials and operational defaults for production deployment.
+- Flink starts from earliest offsets; local restarts can replay historical topic data.
+- Processor writes are designed around stable identifiers to keep upserts deterministic.
+- Reference store is process memory; recovery of reference context relies on replay.
+- healthcare.dlq.events currently exists for future hardening but is not populated by the active processor.
+
+## Security And Scope
+
+This stack is for local synthetic-demo use. It is not production hardened. Notable simplifications:
+
+- open CORS policy in API,
+- demo credentials in compose,
+- no auth between most internal services,
+- JSON-on-wire instead of strict schema-enforced serialization.
+
+## Evolution Paths
+
+Recommended next improvements:
+
+- Move reference data to managed Flink keyed state.
+- Add explicit dead-letter publish and replay tooling.
+- Migrate wire format to Avro or Protobuf with compatibility enforcement.
+- Add API auth, role-based access control, and tighter CORS.
+- Add end-to-end test suites for stream processing and retrieval quality.

@@ -1,82 +1,98 @@
 # Kafka Schema And Topic Design
 
-## Overview
+## Purpose
 
-The streaming layer uses a single logical envelope schema for all events and differentiates event semantics through topic choice, `event_type`, and the JSON content stored in `payload_json`.
+This document defines the event contract, topic topology, and runtime usage patterns for the healthcare streaming layer.
 
-This keeps the MVP simple while still documenting a clear event contract for future hardening.
+The stack uses one shared envelope schema and topic-based routing semantics.
 
 ## Envelope Schema
 
-The Avro envelope is defined in `schemas/medical_event.avsc`.
+Source file: schemas/medical_event.avsc
 
-| Field | Type | Meaning |
+| Field | Type | Description |
 | --- | --- | --- |
-| `event_id` | `string` | Globally unique event identifier |
-| `event_ts` | `string` | Event timestamp in ISO-8601 form |
-| `source_system` | `string` | Producing system name |
-| `source_type` | `string` | Broad source family such as `EHR`, `LAB`, `DEVICE`, `PHARMACY`, `CLAIMS`, or `REFERENCE` |
-| `event_type` | `string` | Domain event classification |
-| `patient_id` | `null or string` | Patient identifier when applicable |
-| `encounter_id` | `null or string` | Encounter identifier when applicable |
-| `provider_id` | `null or string` | Provider identifier when applicable |
-| `payload_json` | `string` | Event-specific JSON payload |
-| `schema_version` | `string` | Schema version marker, currently `1.0.0` |
+| event_id | string | Unique event identifier |
+| event_ts | string | ISO-8601 timestamp |
+| source_system | string | Originating system name |
+| source_type | string | Source class: EHR, LAB, DEVICE, PHARMACY, CLAIMS, REFERENCE |
+| event_type | string | Domain-level event classification |
+| patient_id | null or string | Patient identifier if applicable |
+| encounter_id | null or string | Encounter identifier if applicable |
+| provider_id | null or string | Provider identifier if applicable |
+| payload_json | string | Event-specific JSON payload |
+| schema_version | string | Envelope schema version, default 1.0.0 |
 
-## Wire Format Behavior
+## Schema Registry Behavior
 
-Current MVP behavior:
+Producer behavior in producer/produce_events.py:
 
-- the producer registers the Avro envelope in Schema Registry,
-- messages are still published to Kafka as JSON strings,
-- consumers decode JSON directly rather than using an Avro deserializer.
+- Registers the same Avro envelope under topic-value subjects for all transactional and reference topics.
+- Uses POST /subjects/{subject}/versions.
+- Continues processing even if one registration attempt fails.
 
-This is an intentional local-development tradeoff. It improves readability and reduces ceremony in the Python processor while preserving a documented contract.
+Operational implication:
+
+- Contract is documented and versionable through Schema Registry.
+- Wire payload currently remains JSON, not Avro binary.
+
+## Wire Format (Current MVP)
+
+Current producer wire encoding:
+
+- key: UTF-8 bytes from patient_id when present, otherwise event_id
+- value: UTF-8 JSON string containing the full envelope
+
+Current consumers decode JSON directly.
+
+This keeps local debugging simple while preserving a schema contract for future hardening.
 
 ## Topic Topology
 
 ### Transactional Topics
 
-| Topic | Partitions | Event Type | Typical Producer |
+| Topic | Partitions | Typical Event Type | Producer Function |
 | --- | --- | --- | --- |
-| `healthcare.ehr.events` | 3 | `CLINICAL_NOTE` | Epic or Cerner simulation |
-| `healthcare.lab.results` | 3 | `LAB_RESULT` | LIS simulation |
-| `healthcare.device.telemetry` | 3 | `VITAL_SIGN` | device telemetry simulation |
-| `healthcare.pharmacy.orders` | 3 | `MEDICATION_ORDER` | pharmacy simulation |
-| `healthcare.claims.events` | 3 | `CLAIM_STATUS` | claims simulation |
+| healthcare.ehr.events | 3 | CLINICAL_NOTE | ehr_event |
+| healthcare.lab.results | 3 | LAB_RESULT | lab_event |
+| healthcare.device.telemetry | 3 | VITAL_SIGN | device_event |
+| healthcare.pharmacy.orders | 3 | MEDICATION_ORDER | pharmacy_event |
+| healthcare.claims.events | 3 | CLAIM_STATUS | claims_event |
 
 ### Reference Topics
 
-| Topic | Partitions | Event Type | Purpose |
+| Topic | Partitions | Typical Event Type | Producer Function |
 | --- | --- | --- | --- |
-| `healthcare.master.patients` | 1 | `PATIENT_MASTER_UPSERT` | patient demographics and risk tier |
-| `healthcare.master.providers` | 1 | `PROVIDER_MASTER_UPSERT` | provider specialty and organization |
-| `healthcare.master.devices` | 1 | `DEVICE_MASTER_UPSERT` | device model and vendor metadata |
-| `healthcare.master.medications` | 1 | `MEDICATION_MASTER_UPSERT` | drug class and safety tier |
-| `healthcare.master.payers` | 1 | `PAYER_MASTER_UPSERT` | plan type and region |
+| healthcare.master.patients | 1 | PATIENT_MASTER_UPSERT | patient_reference_event |
+| healthcare.master.providers | 1 | PROVIDER_MASTER_UPSERT | provider_reference_event |
+| healthcare.master.devices | 1 | DEVICE_MASTER_UPSERT | device_reference_event |
+| healthcare.master.medications | 1 | MEDICATION_MASTER_UPSERT | medication_reference_event |
+| healthcare.master.payers | 1 | PAYER_MASTER_UPSERT | payer_reference_event |
 
 ### Reserved Topic
 
-| Topic | Partitions | Status |
+| Topic | Partitions | Current Status |
 | --- | --- | --- |
-| `healthcare.dlq.events` | 1 | created for future dead-letter handling |
+| healthcare.dlq.events | 1 | Created by kafka-init; not currently written by processor |
 
-## Producer Keying Strategy
+## Topic Creation And Lifecycle
 
-Messages are produced with key:
+Topics are explicitly created by kafka-init in docker-compose.yml with auto-create disabled on the broker.
 
-- `patient_id` when present,
-- otherwise `event_id`.
+This ensures deterministic local topology and avoids accidental topic drift.
 
-Consequences:
+## Event Generation Mix
 
-- patient-scoped transactional events tend to preserve partition affinity,
-- reference events without patient identifiers fall back to event-level uniqueness,
-- ordering is only guaranteed per partition and key, not globally.
+The producer loop emits:
 
-## Event Payload Shapes
+- 80 percent transactional events
+- 20 percent reference events
 
-### Clinical Note Payload
+This ratio is controlled by random selection in producer/produce_events.py.
+
+## Payload Shape Examples
+
+### Clinical Note
 
 ```json
 {
@@ -87,7 +103,7 @@ Consequences:
 }
 ```
 
-### Lab Result Payload
+### Lab Result
 
 ```json
 {
@@ -98,19 +114,19 @@ Consequences:
 }
 ```
 
-### Device Telemetry Payload
+### Device Telemetry
 
 ```json
 {
-  "device_id": "device-1",
-  "heart_rate": 124,
+  "device_id": "device-7",
+  "heart_rate": 121,
   "spo2": 91,
-  "systolic_bp": 148,
-  "diastolic_bp": 92
+  "systolic_bp": 150,
+  "diastolic_bp": 95
 }
 ```
 
-### Medication Order Payload
+### Medication Order
 
 ```json
 {
@@ -121,7 +137,7 @@ Consequences:
 }
 ```
 
-### Claim Status Payload
+### Claim Event
 
 ```json
 {
@@ -132,7 +148,7 @@ Consequences:
 }
 ```
 
-### Patient Reference Payload
+### Reference (Patient)
 
 ```json
 {
@@ -144,85 +160,47 @@ Consequences:
 }
 ```
 
-### Provider Reference Payload
-
-```json
-{
-  "provider_id": "provider-001",
-  "name": "Dr. Alex Smith",
-  "specialty": "Cardiology",
-  "organization": "City Hospital"
-}
-```
-
-### Device Reference Payload
-
-```json
-{
-  "device_id": "device-7",
-  "model": "CardioMon-100",
-  "vendor": "MedTech",
-  "device_type": "monitor"
-}
-```
-
-### Medication Reference Payload
-
-```json
-{
-  "medication": "Metformin",
-  "drug_class": "Antidiabetic",
-  "safety_tier": "monitor"
-}
-```
-
-### Payer Reference Payload
-
-```json
-{
-  "payer": "BCBS",
-  "plan_type": "PPO",
-  "region": "Northeast"
-}
-```
-
 ## Enrichment Contract
 
-Reference events are not materialized as a separate downstream output stream. Instead, the processor keeps them in memory and merges the matching records into transactional payloads as:
+The processor keeps reference records in memory and injects matched data into transactional payloads under payload.reference_data:
 
 ```json
-"reference_data": {
-  "patient": {...},
-  "provider": {...},
-  "device": {...},
-  "medication": {...},
-  "payer": {...}
+{
+  "reference_data": {
+    "patient": {},
+    "provider": {},
+    "device": {},
+    "medication": {},
+    "payer": {}
+  }
 }
 ```
 
-This enrichment affects both:
+Impacts:
 
-- the clinical text rendered for vector indexing,
-- the properties and relationships written into Neo4j.
+- Enriched context contributes to rendered text persisted in Qdrant.
+- Enriched fields contribute to node and relationship updates in Neo4j.
+- reference_hit_count tracks number of matched reference entities.
 
-## Schema Registry Behavior
+## Consumer Groups And Offsets
 
-The producer attempts to register the same Avro envelope under all topic-value subjects:
+Active PyFlink job behavior:
 
-- transactional topic subjects,
-- reference topic subjects.
+- One KafkaSource is created per topic.
+- Group ID is generated as FLINK_KAFKA_GROUP_ID-topic-name.
+- Source starts from earliest offsets.
 
-In a stricter production implementation, consider:
+Consequences:
 
-- using dedicated schemas per event family,
-- evolving payload structure through strongly typed nested Avro records,
-- enforcing compatibility mode,
-- validating producer and consumer compatibility in CI.
+- First run and replay-friendly restarts process full topic history.
+- Per-topic group IDs isolate offsets by topic and avoid accidental cross-topic coupling.
 
-## Production Hardening Recommendations
+## Data Quality And Hardening Recommendations
 
-- switch to Confluent Avro or Protobuf serialization on the wire,
-- separate transactional and master-data schema families,
-- add DLQ publishing for malformed payloads and enrichment failures,
-- include explicit trace, tenant, and lineage metadata,
-- implement idempotent producer settings and stronger replay controls.
+Recommended next steps:
+
+- Move wire format to Avro or Protobuf serialization with strict compatibility mode.
+- Add producer-side payload validation and schema evolution tests in CI.
+- Implement DLQ writes for parse, enrich, or sink failures.
+- Add explicit event lineage metadata (trace_id, tenant_id, producer_version).
+- Add replay governance for large topic retention scenarios.

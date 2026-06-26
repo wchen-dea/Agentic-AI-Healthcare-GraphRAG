@@ -1,151 +1,167 @@
 # Neo4j Healthcare Graph Model
 
-## Overview
+## Purpose
 
-Neo4j stores the explicit healthcare relationship layer used by the GraphRAG API. The model is intentionally patient-centric: most traversals begin with one or more patients recovered from vector search and then expand to observations, conditions, symptoms, medication orders, device readings, claims, and reference entities.
+Neo4j stores explicit relationship context used by the GraphRAG API to augment vector retrieval with patient-centric graph evidence.
+
+The model prioritizes traceability, simple traversal patterns, and deterministic merges for local replay.
+
+## Graph Principles
+
+- Patient-centric traversal: most queries begin at Patient.
+- Event lineage retained through ClinicalEvent and SourceSystem.
+- Domain entities merged idempotently from streaming input.
+- Reference-data enrichment updates properties and links over time.
 
 ## Core Labels
 
-| Label | Purpose |
+| Label | Meaning |
 | --- | --- |
-| `Patient` | canonical patient node |
-| `Encounter` | encounter linkage when present |
-| `ClinicalEvent` | raw event-level lineage node |
-| `SourceSystem` | producing system such as Epic, LIS, or ClaimsSystem |
-| `Condition` | diagnoses or inferred conditions |
-| `Symptom` | symptoms extracted from notes |
-| `Observation` | lab result observations |
-| `Medication` | medication master and event-linked node |
-| `MedicationOrder` | medication order event node |
-| `Device` | device master node |
-| `DeviceReading` | telemetry event node |
-| `Claim` | claim event node |
-| `Provider` | provider reference node |
-| `Payer` | payer reference node |
+| Patient | Canonical patient node |
+| Encounter | Encounter scope for events when present |
+| ClinicalEvent | Event lineage record |
+| SourceSystem | Source system identity and type |
+| Condition | Clinical diagnosis/condition |
+| Symptom | Symptom extracted from notes |
+| Observation | Lab observation entity |
+| Medication | Medication catalog node |
+| MedicationOrder | Medication order event node |
+| Device | Device catalog node |
+| DeviceReading | Telemetry event node |
+| Claim | Claims event node |
+| Provider | Provider reference node |
+| Payer | Payer reference node |
 
 ## Constraints And Seed Data
 
-The initialization script creates uniqueness constraints for:
+Initialization in neo4j/init.cypher creates uniqueness constraints for:
 
-- `Patient.id`
-- `Encounter.id`
-- `ClinicalEvent.id`
-- `Observation.id`
-- `MedicationOrder.id`
-- `DeviceReading.id`
-- `Claim.id`
-- `Medication.name`
-- `Condition.name`
-- `Symptom.name`
-- `SourceSystem.name`
+- Patient.id
+- Encounter.id
+- ClinicalEvent.id
+- Observation.id
+- MedicationOrder.id
+- DeviceReading.id
+- Claim.id
+- Medication.name
+- Condition.name
+- Symptom.name
+- SourceSystem.name
 
-Seed graph content also includes:
+Seeded relationships include:
 
-- `Warfarin` interacting with `Azithromycin` using `INTERACTS_WITH`
-- a seeded `Hyperkalemia` condition node
+- (Warfarin)-[:INTERACTS_WITH {risk: bleeding_risk, severity: high}]->(Azithromycin)
+- Condition node Hyperkalemia
 
-## Base Relationship Model
+## Base Lineage Pattern
 
-| Pattern | Meaning |
-| --- | --- |
-| `(ClinicalEvent)-[:ABOUT_PATIENT]->(Patient)` | lineage from event to patient |
-| `(ClinicalEvent)-[:FROM_SOURCE]->(SourceSystem)` | producing system lineage |
-| `(ClinicalEvent)-[:DURING_ENCOUNTER]->(Encounter)` | encounter attachment when available |
-| `(ClinicalEvent)-[:DOCUMENTS]->(domain entity)` | event documents a condition, symptom, observation, medication order, device reading, or claim |
+Every transactional event writes the base lineage:
 
-## Patient-Centric Clinical Relationships
+- (ClinicalEvent)-[:ABOUT_PATIENT]->(Patient)
+- (ClinicalEvent)-[:FROM_SOURCE]->(SourceSystem)
+- Optional (ClinicalEvent)-[:DURING_ENCOUNTER]->(Encounter)
 
-| Pattern | Created From |
-| --- | --- |
-| `(Patient)-[:HAS_CONDITION]->(Condition)` | clinical note diagnosis |
-| `(Patient)-[:HAS_SYMPTOM]->(Symptom)` | clinical note symptom |
-| `(Patient)-[:HAS_OBSERVATION]->(Observation)` | lab result |
-| `(Patient)-[:HAS_MEDICATION_ORDER]->(MedicationOrder)` | medication order |
-| `(MedicationOrder)-[:ORDERS_MEDICATION]->(Medication)` | medication order |
-| `(Patient)-[:HAS_DEVICE_READING]->(DeviceReading)` | telemetry |
-| `(DeviceReading)-[:MEASURED_BY]->(Device)` | telemetry |
-| `(Patient)-[:HAS_CLAIM]->(Claim)` | claim event |
+This supports traceability from any downstream clinical assertion back to source event metadata.
 
-## Reference-Enrichment Relationships
+## Event-Type Specific Patterns
 
-These are added when matching reference data exists in the processor's in-memory store.
+### CLINICAL_NOTE
 
-| Pattern | Enrichment Source |
-| --- | --- |
-| `(Patient)-[:MANAGED_BY]->(Provider)` | provider master data |
-| `(Patient)-[:REGISTERED_DEVICE]->(Device)` | device master data |
-| `(Patient)-[:KNOWN_MEDICATION]->(Medication)` | medication master data |
-| `(Patient)-[:COVERED_BY]->(Payer)` | payer master data |
+Creates/merges:
 
-Reference enrichment also populates node properties such as:
+- Condition by diagnosis
+- Symptom by symptom text
 
-- patient `name`, `sex`, `age`, `risk_tier`
-- provider `name`, `specialty`, `organization`
-- device `model`, `vendor`, `device_type`
-- medication `drug_class`, `safety_tier`
-- payer `plan_type`, `region`
+Relationships:
 
-## Derived Clinical Semantics
+- (Patient)-[:HAS_CONDITION]->(Condition)
+- (Patient)-[:HAS_SYMPTOM]->(Symptom)
+- (ClinicalEvent)-[:DOCUMENTS]->(Condition)
+- (ClinicalEvent)-[:DOCUMENTS]->(Symptom)
 
-The graph currently includes a rule-based inference for potassium results:
+### LAB_RESULT
 
-| Rule | Graph Effect |
-| --- | --- |
-| lab name is `Potassium` and value >= 5.5 | `(Observation)-[:MAY_INDICATE {reason: "elevated_potassium"}]->(Condition {name: "Hyperkalemia"})` |
+Creates/merges:
 
-This makes the graph useful for relationship-based reasoning even though the ingestion pipeline remains lightweight.
+- Observation by event_id
 
-## Write Patterns By Event Type
+Relationships:
 
-### Clinical Note
+- (Patient)-[:HAS_OBSERVATION]->(Observation)
+- (ClinicalEvent)-[:DOCUMENTS]->(Observation)
 
-Creates or links:
+Derived rule:
 
-- `Patient`
-- `ClinicalEvent`
-- `Condition`
-- `Symptom`
+- If lab_name is Potassium and value >= 5.5:
+  - (Observation)-[:MAY_INDICATE {reason: elevated_potassium}]->(Condition {name: Hyperkalemia})
 
-### Lab Result
+### VITAL_SIGN
 
-Creates or links:
+Creates/merges:
 
-- `Observation`
-- optional `MAY_INDICATE` inference to `Hyperkalemia`
+- DeviceReading by event_id
+- Device by device_id
 
-### Device Telemetry
+Relationships:
 
-Creates or links:
+- (Patient)-[:HAS_DEVICE_READING]->(DeviceReading)
+- (DeviceReading)-[:MEASURED_BY]->(Device)
+- (ClinicalEvent)-[:DOCUMENTS]->(DeviceReading)
 
-- `DeviceReading`
-- `Device`
+### MEDICATION_ORDER
 
-### Medication Order
+Creates/merges:
 
-Creates or links:
+- MedicationOrder by event_id
+- Medication by medication name
 
-- `MedicationOrder`
-- `Medication`
+Relationships:
 
-### Claim Status
+- (MedicationOrder)-[:ORDERS_MEDICATION]->(Medication)
+- (Patient)-[:HAS_MEDICATION_ORDER]->(MedicationOrder)
+- (ClinicalEvent)-[:DOCUMENTS]->(MedicationOrder)
 
-Creates or links:
+### CLAIM_STATUS
 
-- `Claim`
+Creates/merges:
 
-## How The API Uses The Graph
+- Claim by claim_id
 
-The GraphRAG API does not execute arbitrary graph reasoning. It retrieves a focused patient summary containing:
+Relationships:
 
-- conditions,
-- symptoms,
-- observations,
-- medications,
-- medication interactions,
-- recent vitals,
-- claims.
+- (Patient)-[:HAS_CLAIM]->(Claim)
+- (ClinicalEvent)-[:DOCUMENTS]->(Claim)
 
-This patient summary is then inserted into the LLM prompt alongside vector evidence from Qdrant.
+## Reference Enrichment Relationships
+
+When reference data is available in the processor store, additional links are merged:
+
+- (Patient)-[:MANAGED_BY]->(Provider)
+- (Patient)-[:REGISTERED_DEVICE]->(Device)
+- (Patient)-[:KNOWN_MEDICATION]->(Medication)
+- (Patient)-[:COVERED_BY]->(Payer)
+
+Property enrichment examples:
+
+- Patient: name, sex, age, risk_tier
+- Provider: name, specialty, organization
+- Device: model, vendor, device_type
+- Medication: drug_class, safety_tier
+- Payer: plan_type, region
+
+## How Graph Context Is Queried
+
+rag-api/app.py graph_context() retrieves for selected patient IDs:
+
+- conditions
+- symptoms
+- observations
+- medications
+- medication interactions
+- vitals
+- claims
+
+Returned graph context is sent to the LLM prompt alongside vector evidence.
 
 ## Validation Queries
 
@@ -157,7 +173,7 @@ RETURN p, r, n
 LIMIT 100;
 ```
 
-### Abnormal Potassium
+### Hyperkalemia Signal
 
 ```cypher
 MATCH (p:Patient)-[:HAS_OBSERVATION]->(o:Observation)
@@ -166,7 +182,7 @@ RETURN p.id, o.name, o.value, o.unit, o.abnormal
 ORDER BY o.value DESC;
 ```
 
-### Drug Interaction Risk
+### Medication Interaction Exposure
 
 ```cypher
 MATCH (p:Patient)-[:HAS_MEDICATION_ORDER]->(:MedicationOrder)-[:ORDERS_MEDICATION]->(m1:Medication)
@@ -174,7 +190,7 @@ MATCH (m1)-[i:INTERACTS_WITH]->(m2:Medication)
 RETURN p.id, m1.name, m2.name, i.risk, i.severity;
 ```
 
-### Provider Coverage View
+### Coverage And Provider Context
 
 ```cypher
 MATCH (p:Patient)-[:MANAGED_BY]->(pr:Provider)
@@ -193,9 +209,9 @@ ORDER BY ce.event_ts DESC
 LIMIT 25;
 ```
 
-## Modeling Notes
+## Operational Notes
 
-- `ClinicalEvent` preserves lineage and source traceability.
-- Event-derived nodes such as `Observation` and `DeviceReading` use event IDs as stable unique identifiers.
-- Reference-data nodes are gradually enriched over time rather than re-created per event.
-- The model favors readability and local demos over exhaustive normalization.
+- Merge patterns are idempotent by constrained identifiers.
+- Reference enrichment is eventual with respect to transactional ordering.
+- Replays can improve property completeness as more reference records arrive.
+- This model is optimized for local explainability over full clinical normalization.
