@@ -1,6 +1,6 @@
 # ADR-0003: Local-first LLM with provider routing
 
-- Status: accepted
+- Status: accepted (partially implemented)
 - Date: 2026-06-26
 
 ## Context
@@ -14,6 +14,11 @@ Adopt local-first generation with provider abstraction:
 - Default local provider: Ollama.
 - Production-ready routing path: Anthropic or OpenAI adapters.
 - Keep retrieval orchestration stable and swap provider client behind adapter.
+
+Implementation status in this repository today:
+
+- Implemented: local Ollama-first runtime in `rag-api/app.py`.
+- Planned extension: provider adapter and environment-based routing for Anthropic/OpenAI.
 
 ## Consequences
 

@@ -210,6 +210,8 @@ Current implementation uses Ollama in rag-api/app.py.
 - Local model choice via OLLAMA_MODEL.
 - Automatic fallback to available local model tags when possible.
 - No per-token API fee for local Ollama inference; cost is primarily local infrastructure (hardware and power).
+- Runtime controls currently wired from env: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
+- Generation temperature is currently fixed in code (`0.2`).
 
 MCP delivery in the current implementation:
 
@@ -217,9 +219,11 @@ MCP delivery in the current implementation:
 - MCP protocol endpoint: `POST /mcp` (streamable HTTP).
 - Human diagnostic endpoint: `GET /mcp/health`.
 
-### Production With Anthropic or OpenAI
+### Future Extension: Anthropic/OpenAI Routing
 
-For production, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
+The current repository runtime does not yet include a provider adapter in `rag-api/app.py`.
+
+For a future production extension, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
 
 Recommended provider adapter contract:
 
@@ -236,13 +240,12 @@ Recommended routing policy:
 - Optional failover provider on timeout or 5xx failures.
 - Per-use-case model profiles (latency-optimized vs quality-optimized).
 
-Recommended production configuration keys:
+Current configuration keys used by implementation:
 
-- LLM_PROVIDER
-- LLM_MODEL
+- OLLAMA_URL
+- OLLAMA_MODEL
 - LLM_TIMEOUT_SECONDS
 - LLM_MAX_TOKENS
-- LLM_TEMPERATURE
 
 Current rag-api observability metrics for query latency and throughput:
 
@@ -349,7 +352,18 @@ See docs/NEO4J_MODEL.md for the full model.
 rag-api/app.py exposes:
 
 - GET /health
+- GET /metrics
+- GET /mcp/health
 - POST /query
+- POST /mcp (MCP streamable HTTP protocol endpoint)
+
+Embedded MCP tools exposed from rag-api/app.py:
+
+- patient_context_get
+- vector_evidence_search
+- graphrag_answer_generate
+- risk_summary_generate
+- evidence_bundle_export
 
 Query flow:
 
@@ -360,9 +374,10 @@ Query flow:
 5. Build a synthesis prompt and call Ollama /api/generate.
 6. Return answer plus vector_context and graph_context.
 
-#### Provider-Agnostic LLM Interface Sketch
+#### Provider-Agnostic LLM Interface Sketch (Future)
 
 The API can keep retrieval logic unchanged and swap only generation providers through an adapter.
+This sketch is design guidance and is not the current implementation.
 
 ```python
 from __future__ import annotations
@@ -439,7 +454,7 @@ def ask_llm(prompt: str) -> str:
   return LLM_CLIENT.generate(prompt, LLM_CFG)
 ```
 
-Environment-driven routing variables:
+Environment-driven routing variables for future adapter mode:
 
 - LLM_PROVIDER: ollama, anthropic, or openai
 - LLM_MODEL: provider-specific model name

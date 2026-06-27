@@ -24,7 +24,7 @@ Production boundary in this repository:
 
 - Streaming: Apache Kafka, Confluent Schema Registry, Apache Flink (PyFlink)
 - Data Stores: Qdrant (vector), Neo4j (graph)
-- API and AI: FastAPI, Ollama (local), Anthropic/OpenAI ready via provider routing
+- API and AI: FastAPI + embedded FastMCP, Ollama (local-first)
 - Frontend: Static provider web app (Nginx-served)
 - Observability: Prometheus, Grafana, Blackbox Exporter
 - Operations and Tooling: Docker Compose, Conduktor, NeoDash
@@ -59,7 +59,7 @@ The platform is reusable by design: core platform layers stay stable while domai
 - Real-time healthcare intelligence stack: Kafka + Flink processing with Avro schema-governed event contracts.
 - Hybrid GraphRAG retrieval: Qdrant vector evidence plus Neo4j relationship context in one grounded answer flow.
 - Streaming enrichment pattern: reference/master data fused into transactional events before vector and graph persistence.
-- Production-ready AI portability: local Ollama by default with clear provider-routing path to Anthropic/OpenAI.
+- Local-first AI runtime with bounded generation controls and model fallback for resilient development workflows.
 - Explainability by design: API returns both vector_context and graph_context alongside generated responses.
 - Operations-first engineering: Prometheus, Grafana, Flink UI, and Conduktor integrated for full-stack observability.
 
@@ -88,9 +88,10 @@ Ops/UI
 ## LLM Strategy
 
 - Local default: Ollama using OLLAMA_URL and OLLAMA_MODEL.
-- Production path: provider routing for Anthropic or OpenAI via LLM_PROVIDER and LLM_MODEL.
-- Recommended controls: LLM_TIMEOUT_SECONDS, LLM_MAX_TOKENS, LLM_TEMPERATURE.
-- Security: inject API keys from a secret manager, never from source-controlled files.
+- Current implementation in `rag-api/app.py` uses Ollama `/api/generate` directly.
+- Active latency and output controls: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
+- Temperature is currently fixed in code (`0.2`) and is not yet env-configurable.
+- Anthropic/OpenAI provider routing remains a documented extension path, not the active local runtime.
 
 ### Ollama Cost Model (Local)
 

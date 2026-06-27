@@ -310,6 +310,10 @@ Exit criteria:
 - All tool schemas validated.
 - Basic happy-path tests pass locally.
 
+Current status:
+
+- Completed in current implementation (embedded MCP in rag-api with the 5-tool surface).
+
 ### Phase 1: Local Demo Integration
 
 1. Validate initialize handshake against `http://localhost:8000/mcp`.
@@ -320,6 +324,10 @@ Exit criteria:
 
 - End-to-end calls from MCP client succeed.
 - Trace IDs link MCP calls to API logs.
+
+Current status:
+
+- Completed for local stack (`/mcp` and `/mcp/health` active, smoke test script present).
 
 ### Phase 2: Staging Hardening
 
@@ -346,6 +354,6 @@ Exit criteria:
 - Audit completeness verified.
 - Operational runbook published.
 
-## Suggested Next Implementation Step
+## Current Implementation Note
 
-Start with `graphrag_answer_generate` as a thin MCP wrapper around `POST /query`, then add `patient_context_get` and `vector_evidence_search`.
+The embedded MCP layer in `rag-api/app.py` already ships all five tools and shares the same retrieval + guardrail core used by `POST /query`.

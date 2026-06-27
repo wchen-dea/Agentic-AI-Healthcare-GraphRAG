@@ -117,7 +117,7 @@ kubectl apply -f k8s/optional-mcp/mcp-secret.yaml
 - Set `RAG_API_ALLOW_ORIGINS` to explicit trusted origins; never leave wildcard browser origins in production.
 - Set `RAG_API_TOOL_POLICY_PATH` and caller-role policy values explicitly per environment.
 - Bound LLM latency and output with `LLM_TIMEOUT_SECONDS`, `LLM_MAX_TOKENS`, and related provider limits.
-- Configure provider routing so production uses managed model credentials and endpoints rather than local Ollama defaults unless that is an intentional deployment choice.
+- Current `rag-api` implementation is local-Ollama-first; if you require managed providers, implement and validate the provider adapter path before relying on `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` at runtime.
 
 ### 6. Scaling And Availability
 

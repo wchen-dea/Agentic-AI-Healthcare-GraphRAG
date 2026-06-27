@@ -36,6 +36,13 @@ Apply compose changes and remove deleted services:
 docker compose up -d --remove-orphans
 ```
 
+If you change `rag-api` source code, rebuild the image before recreating the service:
+
+```bash
+docker compose build rag-api
+docker compose up -d --force-recreate rag-api
+```
+
 Stop all services:
 
 ```bash
