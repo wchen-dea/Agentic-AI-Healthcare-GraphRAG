@@ -209,6 +209,7 @@ Current implementation uses Ollama in rag-api/app.py.
 - Local endpoint via OLLAMA_URL.
 - Local model choice via OLLAMA_MODEL.
 - Automatic fallback to available local model tags when possible.
+- No per-token API fee for local Ollama inference; cost is primarily local infrastructure (hardware and power).
 
 MCP delivery in the current implementation:
 
@@ -242,6 +243,12 @@ Recommended production configuration keys:
 - LLM_TIMEOUT_SECONDS
 - LLM_MAX_TOKENS
 - LLM_TEMPERATURE
+
+Current rag-api observability metrics for query latency and throughput:
+
+- rag_api_http_request_duration_seconds
+- rag_api_tool_execution_duration_seconds
+- rag_api_tool_execution_total
 
 Use a secret manager for API keys. Do not store credentials in files or compose manifests.
 

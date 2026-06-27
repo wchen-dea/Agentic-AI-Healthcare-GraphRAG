@@ -257,8 +257,8 @@ Minimal model that runs locally and scales to production.
 
 Local demo (embedded mode):
 
-- Run without token enforcement by default for local simplicity.
-- Add token checks in rag-api MCP wrappers when required by environment.
+- Run without bearer-token enforcement by default for local simplicity.
+- Enforce role-based authorization through a tool policy in embedded rag-api for both `/query` and MCP tool entrypoints.
 
 Optional standalone mode:
 
@@ -270,7 +270,7 @@ Production:
 - Service-to-service auth with OAuth2 client credentials or workload identity.
 - Tool-level authorization policy:
   - `read_only`: patient_context_get, vector_evidence_search
-  - `generation`: graphrag_answer_generate, risk_summary_generate
+  - `generation`: query, graphrag_answer_generate, risk_summary_generate
   - `export`: evidence_bundle_export
 - Environment-scoped policies (`dev`, `stage`, `prod`).
 
@@ -293,6 +293,7 @@ Do not log raw PHI payloads. Prefer hashes, IDs, and minimal metadata.
 ### Data Protection Controls
 
 - Redact or tokenize sensitive fields before returning tool output when policy requires.
+- Return guardrails metadata that records evidence-access mode and response truncation state.
 - Enforce max response sizes and timeouts per tool.
 - Add per-tool rate and burst limits.
 
@@ -301,8 +302,8 @@ Do not log raw PHI payloads. Prefer hashes, IDs, and minimal metadata.
 ### Phase 0: Local Design and Contract Freeze
 
 1. Finalize 5-tool contract and JSON schemas in this document.
-1. Implement MCP tool surface in rag-api over existing query orchestration.
-1. Add contract tests with static fixtures.
+1. MCP tool surface is implemented in rag-api over the shared query orchestration.
+1. Contract tests with static fixtures and CI validation are in place.
 
 Exit criteria:
 

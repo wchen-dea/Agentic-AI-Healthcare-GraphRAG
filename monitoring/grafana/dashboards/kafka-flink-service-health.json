@@ -89,8 +89,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "probe_success{job=\"kafka_probe\",instance=\"kafka:29092\"}",
-          "legendFormat": "kafka",
+          "expr": "min(probe_success{job=\"kafka_probe\"})",
+          "legendFormat": "kafka-cluster",
           "range": true,
           "refId": "A"
         }

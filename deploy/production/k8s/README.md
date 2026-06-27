@@ -30,6 +30,17 @@ Minimal platform controls included:
 
 Note: HPAs require metrics-server (or compatible metrics pipeline) in the cluster.
 
+## Kubernetes Configuration Guidelines
+
+- Use dedicated namespaces per environment and keep RBAC scoped to the minimum required subjects.
+- Replace example secret manifests with values sourced from your cluster secret workflow before apply.
+- Pin image tags or digests in the deployment manifests and promote the same tested image between environments.
+- Set ingress hosts, TLS certificates, and DNS records explicitly for each environment.
+- Review NetworkPolicy rules together with ingress controller behavior so only intended traffic reaches `rag-api`, `provider-web`, and optional `mcp-server`.
+- Confirm that HPA settings match real workload behavior and that cluster autoscaling can support the requested replica ranges.
+- Add pod disruption budgets, resource requests and limits, and rollout strategy settings if your production platform standards require them.
+- Forward logs, metrics, and audit events to centralized observability systems rather than relying only on in-cluster inspection.
+
 ## Deploy Base (rag-api + provider-web)
 
 1. Create secret manifests from examples:

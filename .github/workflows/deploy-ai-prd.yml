@@ -1,0 +1,72 @@
+name: deploy-ai-prd
+
+on:
+  push:
+    branches:
+      - prd
+    paths:
+      - .github/workflows/deploy-ai-prd.yml
+      - deploy/production/k8s/**
+      - rag-api/**
+      - webapp/**
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-ai-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars['AWS_ROLE_TO_ASSUME'] }}
+          aws-region: ${{ vars['AWS_REGION'] }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Configure kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --name "$EKS_CLUSTER_NAME" \
+            --region "$AWS_REGION"
+        env:
+          AWS_REGION: ${{ vars['AWS_REGION'] }}
+          EKS_CLUSTER_NAME: ${{ vars['EKS_CLUSTER_NAME'] }}
+
+      - name: Ensure namespace exists
+        run: kubectl apply -f deploy/production/k8s/base/namespace.yaml
+
+      - name: Apply rag-api secrets
+        run: |
+          kubectl create secret generic rag-api-secrets \
+            --namespace healthcare-ai \
+            --from-literal=NEO4J_PASSWORD="$NEO4J_PASSWORD" \
+            --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+            --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+        env:
+          NEO4J_PASSWORD: ${{ secrets['NEO4J_PASSWORD'] }}
+          OPENAI_API_KEY: ${{ secrets['OPENAI_API_KEY'] }}
+          ANTHROPIC_API_KEY: ${{ secrets['ANTHROPIC_API_KEY'] }}
+
+      - name: Deploy AI app base
+        run: kubectl apply -k deploy/production/k8s/base
+
+      - name: Wait for rollouts
+        run: |
+          kubectl rollout status deployment/rag-api -n healthcare-ai --timeout=300s
+          kubectl rollout status deployment/provider-web -n healthcare-ai --timeout=300s
+
+      - name: Show deployment status
+        run: |
+          kubectl get pods -n healthcare-ai
+          kubectl get svc -n healthcare-ai

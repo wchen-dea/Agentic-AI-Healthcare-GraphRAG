@@ -1,0 +1,16 @@
+{
+  "roles": {
+    "read_only": [
+      "patient_context_get",
+      "vector_evidence_search"
+    ],
+    "generation": [
+      "query",
+      "graphrag_answer_generate",
+      "risk_summary_generate"
+    ],
+    "export": [
+      "evidence_bundle_export"
+    ]
+  }
+}

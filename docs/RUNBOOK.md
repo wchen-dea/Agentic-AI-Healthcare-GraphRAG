@@ -2,9 +2,14 @@
 
 ## Purpose
 
-This runbook covers day-0 and day-2 operations for the local Docker Compose stack, including startup, verification, recovery, and common failure handling.
+This runbook covers day-0 and day-2 operations for the local Docker Compose development stack, including startup, verification, recovery, and common failure handling.
 
 For production AI-only deployment boundaries and compose bundles, see [deploy/production/README.md](../deploy/production/README.md).
+
+Scope note:
+
+- The commands and defaults in this runbook are for local development and synthetic-demo operation.
+- Production-ready deployment configuration lives under `deploy/production/` and should be operated with environment-specific security, secrets, networking, and platform controls.
 
 ## Prerequisites
 
@@ -51,9 +56,11 @@ docker compose down -v
 docker compose ps
 ```
 
-Expected core services: kafka, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer.
+Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer, localstack.
 
 Note: MCP is embedded in rag-api in the current architecture, so no separate mcp-server container is expected.
+
+Producer startup is intentionally blocked until `schema-registry` is healthy and `kafka-init` completes successfully.
 
 ### 2) Flink Job Health
 
@@ -108,7 +115,15 @@ curl -s http://localhost:6333/collections | jq .
 
 Expected collection includes healthcare_events.
 
-### 7) Neo4j Basic Check
+### 7) LocalStack Health
+
+```bash
+curl -s http://localhost:4566/_localstack/health | jq .
+```
+
+Expected response includes a LocalStack version plus a services object with available local AWS-compatible services.
+
+### 8) Neo4j Basic Check
 
 ```bash
 docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
@@ -116,6 +131,29 @@ docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
 ```
 
 Expected patients count increases over time as producer and stream processing continue.
+
+### 9) RAG API Metrics Endpoint
+
+```bash
+curl -s http://localhost:8000/metrics | grep -E 'rag_api_(http_request_duration_seconds|tool_execution_duration_seconds|tool_execution_total)'
+```
+
+Expected result includes metric families:
+
+- rag_api_http_request_duration_seconds
+- rag_api_tool_execution_duration_seconds
+- rag_api_tool_execution_total
+
+### 10) Grafana Query Latency Panel
+
+In Grafana, open the Healthcare GraphRAG Monitoring Overview dashboard and verify the panel:
+
+- RAG Query Latency (p50/p95)
+
+The panel uses the query tool histogram and should display two series:
+
+- query p50
+- query p95
 
 ## Smoke Query
 

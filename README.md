@@ -8,7 +8,12 @@ This project provides a healthcare AI platform blueprint across three dimensions
 
 - Technical leadership: streaming-first ingestion, dual evidence stores (vector plus graph), and agent-ready APIs (REST + MCP) on shared reasoning logic.
 - Industry innovation: one reusable architecture for clinical, operational, and financial healthcare AI workflows.
-- Implementation maturity: complete local development stack plus production-ready deployment variants for AI deliverables.
+- Implementation maturity: complete local development stack plus production-ready deployment configuration variants for AI deliverables.
+
+Repository intent:
+
+- Root-level Docker Compose, default credentials, and local env examples are for development and synthetic-demo use only.
+- Production readiness in this repository refers to the deployment configuration assets under `deploy/production/`, not to the root local stack defaults.
 
 Production boundary in this repository:
 
@@ -87,6 +92,13 @@ Ops/UI
 - Recommended controls: LLM_TIMEOUT_SECONDS, LLM_MAX_TOKENS, LLM_TEMPERATURE.
 - Security: inject API keys from a secret manager, never from source-controlled files.
 
+### Ollama Cost Model (Local)
+
+- Local Ollama inference has no per-token or per-request API fee.
+- Local operating costs still exist (hardware, power, and maintenance time).
+- If you move Ollama to cloud VMs, cloud compute/storage/network costs apply.
+- If you switch to managed providers (Anthropic/OpenAI), provider token pricing applies.
+
 ## Key Capabilities
 
 - Hybrid retrieval that combines semantic nearest-neighbor evidence from Qdrant with patient-centric relationship context from Neo4j.
@@ -95,6 +107,8 @@ Ops/UI
 - Local observability for Kafka, Flink, Neo4j, and Qdrant.
 - Provider-facing UI for query workflows without curl.
 - Embedded MCP tool endpoint in rag-api for agent integration without a separate MCP service.
+- Role-based API and MCP guardrails with caller-policy authorization, evidence redaction rules, and response budget metadata.
+- CI-backed rag-api contract checks plus container build validation for the hardened API surface.
 
 ## MCP Quick Verify
 
@@ -104,6 +118,8 @@ python3 ./scripts/mcp_smoke_test.py
 ```
 
 ## Quick Start
+
+This quick start is for local development only. It is not a production deployment path.
 
 Prerequisites:
 
@@ -115,6 +131,55 @@ Start the full stack:
 
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
+cp .env.example .env
+docker compose up -d --build
+```
+
+The local stack follows the same externalized configuration pattern as the production bundle: copy `.env.example` to `.env` and keep local credentials and secret-like values in `.env`, not hardcoded in source-controlled Compose overrides.
+
+Startup ordering in the local stack is intentionally gated:
+
+- Schema Registry must report healthy before topic initialization runs.
+- Topic initialization must complete before the producer starts.
+- The producer also waits and retries until Schema Registry is reachable before schema registration.
+
+### Local Secret Configuration
+
+For local development, configure secret-like values in `.env` only.
+
+1. Create a local env file:
+
+```bash
+cp .env.example .env
+```
+
+1. Edit `.env` and set the local values you want to use, especially:
+
+- `NEO4J_PASSWORD`
+- `CONDUKTOR_POSTGRES_PASSWORD`
+- `CONDUKTOR_ADMIN_PASSWORD`
+- `GRAFANA_ADMIN_PASSWORD`
+
+1. Keep `.env` local only. It is ignored by git and should not be committed.
+
+1. Recreate or restart affected services after changing secret-bearing values:
+
+```bash
+docker compose up -d --build
+```
+
+The values in `.env.example` are development placeholders. Replace them in `.env` if you want non-default local credentials.
+
+Local Kafka topology after startup:
+
+- broker 1: `localhost:9092`
+- broker 2: `localhost:9093`
+- broker 3: `localhost:9094`
+
+If your local stack was created before the move to three brokers, existing Kafka topics may still have replication factor `1` because topic creation is idempotent. To fully reprovision the local Kafka cluster with replication factor `3`, recreate the local Kafka state when it is safe to do so:
+
+```bash
+docker compose down -v
 docker compose up -d --build
 ```
 
@@ -133,12 +198,29 @@ Optional one-shot validation:
 python3 ./scripts/mcp_smoke_test.py
 ```
 
+## LocalStack
+
+The local stack also includes `localstack` for development scenarios that need an AWS-compatible local endpoint surface.
+
+LocalStack endpoint:
+
+- Edge endpoint: `http://localhost:4566`
+
+Basic health check:
+
+```bash
+curl -s http://localhost:4566/_localstack/health | jq .
+```
+
+Use this service for local-only integration and smoke testing. It is separate from the production deployment bundle and should not be interpreted as a production AWS configuration pattern.
+
 ## Service Endpoints
 
 | Service | URL |
 | --- | --- |
 | RAG API docs | <http://localhost:8000/docs> |
 | RAG API health | <http://localhost:8000/health> |
+| RAG API metrics | <http://localhost:8000/metrics> |
 | MCP server endpoint | <http://localhost:8000/mcp> |
 | MCP diagnostic health | <http://localhost:8000/mcp/health> |
 | Provider web app | <http://localhost:8088> |
@@ -148,10 +230,13 @@ python3 ./scripts/mcp_smoke_test.py
 | Neo4j Browser | <http://localhost:7474> |
 | NeoDash | <http://localhost:5005> |
 | Qdrant dashboard | <http://localhost:6333/dashboard> |
+| LocalStack edge endpoint | <http://localhost:4566> |
 | Prometheus | <http://localhost:9090> |
 | Grafana | <http://localhost:3000> |
 
 ## Default Credentials
+
+These credentials are development-only defaults for the local stack. They must not be used as-is in any production or shared environment.
 
 Neo4j:
 

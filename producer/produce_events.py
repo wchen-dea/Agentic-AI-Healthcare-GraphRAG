@@ -14,9 +14,15 @@ from faker import Faker
 
 fake = Faker()
 
-BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092,localhost:9093,localhost:9094")
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 INTERVAL = float(os.getenv("EVENT_INTERVAL_SECONDS", "1"))
+SCHEMA_REGISTRY_STARTUP_TIMEOUT_SECONDS = int(
+    os.getenv("SCHEMA_REGISTRY_STARTUP_TIMEOUT_SECONDS", "120")
+)
+SCHEMA_REGISTRY_RETRY_INTERVAL_SECONDS = float(
+    os.getenv("SCHEMA_REGISTRY_RETRY_INTERVAL_SECONDS", "3")
+)
 
 producer = Producer({"bootstrap.servers": BOOTSTRAP})
 
@@ -44,6 +50,30 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def wait_for_schema_registry():
+    deadline = time.time() + SCHEMA_REGISTRY_STARTUP_TIMEOUT_SECONDS
+    health_url = f"{SCHEMA_REGISTRY_URL}/subjects"
+
+    while time.time() < deadline:
+        try:
+            response = requests.get(health_url, timeout=5)
+            if response.status_code == 200:
+                print("Schema Registry is ready.")
+                return
+            print(
+                "Schema Registry not ready yet "
+                f"status={response.status_code} body={response.text[:200]}"
+            )
+        except Exception as ex:
+            print(f"Waiting for Schema Registry at {SCHEMA_REGISTRY_URL}: {ex}")
+        time.sleep(SCHEMA_REGISTRY_RETRY_INTERVAL_SECONDS)
+
+    raise RuntimeError(
+        "Schema Registry did not become ready within "
+        f"{SCHEMA_REGISTRY_STARTUP_TIMEOUT_SECONDS} seconds"
+    )
+
+
 def register_schema():
     with open("schemas/medical_event.avsc", "r", encoding="utf-8") as f:
         schema = f.read()
@@ -51,11 +81,29 @@ def register_schema():
         subject = f"{topic}-value"
         url = f"{SCHEMA_REGISTRY_URL}/subjects/{subject}/versions"
         payload = {"schemaType": "AVRO", "schema": schema}
-        try:
-            r = requests.post(url, json=payload, timeout=10)
-            print(f"Schema registration subject={subject} status={r.status_code} response={r.text[:200]}")
-        except Exception as ex:
-            print(f"Schema registration failed subject={subject}: {ex}")
+        deadline = time.time() + SCHEMA_REGISTRY_STARTUP_TIMEOUT_SECONDS
+        last_error = None
+        while time.time() < deadline:
+            try:
+                response = requests.post(url, json=payload, timeout=10)
+                print(
+                    "Schema registration "
+                    f"subject={subject} status={response.status_code} "
+                    f"response={response.text[:200]}"
+                )
+                if response.status_code in {200, 201, 409}:
+                    break
+                last_error = RuntimeError(
+                    f"Unexpected schema registry status {response.status_code}: {response.text[:200]}"
+                )
+            except Exception as ex:
+                last_error = ex
+                print(f"Schema registration retry subject={subject}: {ex}")
+            time.sleep(SCHEMA_REGISTRY_RETRY_INTERVAL_SECONDS)
+        else:
+            raise RuntimeError(
+                f"Schema registration failed for subject={subject}: {last_error}"
+            )
 
 
 def build_avro_serializer():
@@ -230,7 +278,7 @@ REFERENCE_GENERATORS = [
     medication_reference_event,
     payer_reference_event,
 ]
-
+wait_for_schema_registry()
 register_schema()
 avro_serializer = build_avro_serializer()
 

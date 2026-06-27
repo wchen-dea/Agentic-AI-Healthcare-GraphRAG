@@ -29,14 +29,14 @@ groups:
       summary: "Neo4j probe latency is high"
       description: "Neo4j probe duration has been above 1s for 5 minutes."
   - alert: KafkaProbeDown
-    expr: probe_success{job="kafka_probe", instance="kafka:29092"} == 0
+    expr: probe_success{job="kafka_probe"} == 0
     for: 2m
     labels:
       severity: critical
       service: kafka
     annotations:
       summary: "Kafka broker probe is down"
-      description: "TCP probe to Kafka broker (kafka:29092) has been failing for 2 minutes."
+      description: "TCP probe to Kafka broker {{ $labels.instance }} has been failing for 2 minutes."
   - alert: FlinkJobManagerProbeDown
     expr: probe_success{job="flink_probe", instance="http://flink-jobmanager:8081"} == 0
     for: 2m

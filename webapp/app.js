@@ -212,7 +212,8 @@ async function runRagQuery(apiBase, payload) {
   const response = await fetch(`${apiBase}/query`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "X-Caller-Role": "generation"
     },
     body: JSON.stringify(payload)
   });
