@@ -56,6 +56,32 @@ For each new section, follow the same sequence:
 
 This keeps platform code stable while allowing domain growth by module.
 
+## Design Patterns Used
+
+This architecture intentionally combines several patterns so streaming ingestion, retrieval quality, and API surfaces can evolve independently.
+
+| Pattern | Where Used | Why It Is Used Here | Current Status |
+| --- | --- | --- | --- |
+| Event-Driven Pipeline | producer -> Kafka -> PyFlink -> Qdrant/Neo4j | Decouples producers from downstream processing and supports replay/backfill | Implemented |
+| Dual Materialized Views | Qdrant (semantic view) + Neo4j (relationship view) | Keeps retrieval optimized for both similarity search and graph reasoning | Implemented |
+| Shared-Core, Multi-Interface (Hexagonal-style boundary) | One query core reused by REST and embedded MCP tools | Avoids duplicated business logic across API surfaces | Implemented |
+| Policy Enforcement Point | Role/tool authorization and response guardrails in rag-api | Centralizes access control and output safety rules | Implemented |
+| Contract-First Tooling | MCP tool request/response schemas and contract tests | Keeps tool semantics stable while internals change | Implemented |
+| Bounded Context Window | Max question/context/evidence/answer and response-byte budgets | Prevents unbounded prompt/output growth and latency spikes | Implemented |
+| Observability by Design | Prometheus metrics + Grafana latency dashboards + health probes | Makes latency and failure modes visible during iteration | Implemented |
+| Adapter Pattern for LLM Providers | Provider-agnostic client sketch in architecture doc | Enables future Anthropic/OpenAI routing without rewriting retrieval | Planned extension |
+
+### Pattern Mapping to Repository Components
+
+- Event-Driven Pipeline: [producer/produce_events.py](../producer/produce_events.py), [flink-app/healthcare_graph_rag_pyflink_job.py](../flink-app/healthcare_graph_rag_pyflink_job.py), [docker-compose.yml](../docker-compose.yml)
+- Dual Materialized Views: [flink-app/healthcare_graph_rag_job.py](../flink-app/healthcare_graph_rag_job.py), [docs/NEO4J_MODEL.md](NEO4J_MODEL.md)
+- Shared-Core, Multi-Interface: [rag-api/app.py](../rag-api/app.py) (`run_query`, REST `/query`, MCP tools)
+- Policy Enforcement Point: [rag-api/app.py](../rag-api/app.py) (`_authorize`, `_execute_with_audit`, guardrail shaping)
+- Contract-First Tooling: [rag-api/tests/test_contracts.py](../rag-api/tests/test_contracts.py), [docs/MCP_LAYER_DESIGN.md](MCP_LAYER_DESIGN.md)
+- Bounded Context Window: [rag-api/app.py](../rag-api/app.py) (`max_*` settings and truncation/budget helpers)
+- Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/RUNBOOK.md](RUNBOOK.md)
+- Adapter Pattern (planned): [docs/adrs/0003-local-first-llm-provider-routing.md](adrs/0003-local-first-llm-provider-routing.md)
+
 ## Architecture At A Glance
 
 ```text
