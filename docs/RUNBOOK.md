@@ -139,6 +139,56 @@ docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
 
 Expected patients count increases over time as producer and stream processing continue.
 
+### 8a) Drug Safety Seeding Verification
+
+Verify `init.cypher` seeded the FAERS-aligned pharmacovigilance vocabulary:
+
+```bash
+docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
+  'MATCH (ao:AdverseOutcome) RETURN ao.code, ao.description ORDER BY ao.code;'
+```
+
+Expected: 6 rows — CA, DE, DS, HO, LT, OT.
+
+```bash
+docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
+  'MATCH (:Medication)-[r:HAS_KNOWN_REACTION]->(:Symptom) RETURN count(r) AS edges;'
+```
+
+Expected: 20 or more edges.
+
+```bash
+docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
+  'MATCH (m:Medication)-[r:CONTRAINDICATED_FOR]->(c:Condition) RETURN m.name, c.name, r.severity ORDER BY r.severity DESC LIMIT 8;'
+```
+
+Expected rows include: Metformin → Chronic Kidney Disease, Lisinopril → Hyperkalemia, Vancomycin → Chronic Kidney Disease.
+
+```bash
+docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
+  'MATCH (m:Medication)-[r:INTERACTS_WITH]->(m2:Medication) WHERE r.mechanism IS NOT NULL RETURN m.name, m2.name, r.mechanism LIMIT 5;'
+```
+
+Expected rows include Warfarin interactions with mechanism annotations.
+
+### 8b) Live Adverse Event and Lab Signal Check
+
+After the stack has been running for a few minutes:
+
+```bash
+docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
+  'MATCH (ae:AdverseEvent)-[:ASSOCIATED_WITH_MEDICATION]->(m:Medication) RETURN m.name, ae.symptom_name, ae.severity LIMIT 10;'
+```
+
+Expected: rows appear as clinical notes with matching symptoms are processed.
+
+```bash
+docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
+  'MATCH (o:Observation)-[mi:MAY_INDICATE]->(c:Condition) RETURN o.name, o.value, c.name, mi.reason LIMIT 10;'
+```
+
+Expected: rows appear as lab results cross clinical thresholds.
+
 ### 9) RAG API Metrics Endpoint
 
 ```bash
@@ -173,12 +223,28 @@ curl -s -X POST "http://localhost:8000/query" \
   }' | jq .
 ```
 
-Expected response includes:
+Expected top-level response fields:
 
-- answer
-- vector_context
-- graph_context
-- patients
+- `answer` — LLM-generated text grounded in both retrieval paths
+- `vector_context` — list of Qdrant ANN hits, each with `event_type`, `score`, `text_redacted`
+- `patients` — patient IDs resolved from vector hits plus the supplied `patient_id`
+- `trace_id`, `retrieved_at`, `guardrails`
+
+Each entry in `graph_context` contains:
+
+| Field | Content |
+| --- | --- |
+| `conditions` | Diagnosed conditions with onset timestamps |
+| `symptoms` | Symptoms extracted from clinical notes |
+| `observations` | Lab results with `lab_panel` and `specimen_type` |
+| `medications` | Orders with `drug_class`, `route`, `order_type` |
+| `interactions` | Drug-drug pairs with `risk`, `severity`, `mechanism` |
+| `vitals` | Device readings with `temp_c`, `rr`, `alert` |
+| `claims` | Claims with `Procedure` description and `Payer` name |
+| `lab_signals` | `MAY_INDICATE` edges: observation → indicated condition |
+| `icd10_codes` | `CODED_AS` edges: condition → ICD-10 code |
+| `adverse_events` | `REPORTED_ADVERSE_REACTION` with medication, MedDRA term, severity |
+| `contraindications` | `CONTRAINDICATED_FOR` edges active for current medication orders |
 
 ## Flink Operations
 

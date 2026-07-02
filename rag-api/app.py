@@ -328,14 +328,14 @@ def graph_context(patient_ids: list[str]) -> list[dict[str, Any]]:
                         CALL (p) {
                             OPTIONAL MATCH (p)-[:HAS_OBSERVATION]->(o:Observation)
                             RETURN collect(
-                                DISTINCT {name: o.name, value: o.value, unit: o.unit, abnormal: o.abnormal}
+                                DISTINCT {name: o.name, value: o.value, unit: o.unit, abnormal: o.abnormal, panel: o.lab_panel, specimen: o.specimen_type}
                             )[..20] AS observations
                         }
 
                         CALL (p) {
                             OPTIONAL MATCH (p)-[:HAS_MEDICATION_ORDER]->(mo:MedicationOrder)-[:ORDERS_MEDICATION]->(m:Medication)
                             RETURN collect(
-                                DISTINCT {medication: m.name, dose: mo.dose, frequency: mo.frequency}
+                                DISTINCT {medication: m.name, drug_class: m.drug_class, dose: mo.dose, route: mo.route, frequency: mo.frequency, order_type: mo.order_type}
                             )[..20] AS medications
                         }
 
@@ -353,16 +353,48 @@ def graph_context(patient_ids: list[str]) -> list[dict[str, Any]]:
                                 DISTINCT {
                                     heart_rate: dr.heart_rate,
                                     spo2: dr.spo2,
-                                    bp: toString(dr.systolic_bp) + '/' + toString(dr.diastolic_bp)
+                                    bp: toString(dr.systolic_bp) + '/' + toString(dr.diastolic_bp),
+                                    temp_c: dr.temperature_c,
+                                    rr: dr.respiratory_rate,
+                                    alert: dr.alert
                                 }
                             )[..20] AS vitals
                         }
 
                         CALL (p) {
                             OPTIONAL MATCH (p)-[:HAS_CLAIM]->(cl:Claim)
+                            OPTIONAL MATCH (cl)-[:SUBMITTED_TO]->(pay:Payer)
+                            OPTIONAL MATCH (cl)-[:FOR_PROCEDURE]->(proc:Procedure)
                             RETURN collect(
-                                DISTINCT {payer: cl.payer, code: cl.procedure_code, status: cl.status}
+                                DISTINCT {payer: coalesce(pay.name, cl.payer), code: proc.code, description: proc.description, status: cl.status, claim_type: cl.claim_type, billed: cl.billed_amount}
                             )[..20] AS claims
+                        }
+
+                        CALL (p) {
+                            OPTIONAL MATCH (p)-[:HAS_OBSERVATION]->(o:Observation)-[mi:MAY_INDICATE]->(c:Condition)
+                            RETURN collect(
+                                DISTINCT {observation: o.name, value: o.value, unit: o.unit, indicated_condition: c.name, reason: mi.reason}
+                            )[..20] AS lab_signals
+                        }
+
+                        CALL (p) {
+                            OPTIONAL MATCH (p)-[:HAS_CONDITION]->(c:Condition)-[:CODED_AS]->(icd:ICD10Code)
+                            RETURN collect(DISTINCT {condition: c.name, icd10: icd.code})[..20] AS icd10_codes
+                        }
+
+                        CALL (p) {
+                            OPTIONAL MATCH (p)-[:REPORTED_ADVERSE_REACTION]->(ae:AdverseEvent)-[:ASSOCIATED_WITH_MEDICATION]->(m:Medication)
+                            RETURN collect(
+                                DISTINCT {symptom: ae.symptom_name, medication: m.name, severity: ae.severity, meddra_term: ae.meddra_term}
+                            )[..20] AS adverse_events
+                        }
+
+                        CALL (p) {
+                            OPTIONAL MATCH (p)-[:HAS_CONDITION]->(c:Condition)<-[ci:CONTRAINDICATED_FOR]-(m:Medication)
+                            WHERE EXISTS { MATCH (p)-[:HAS_MEDICATION_ORDER]->(:MedicationOrder)-[:ORDERS_MEDICATION]->(m) }
+                            RETURN collect(
+                                DISTINCT {medication: m.name, condition: c.name, reason: ci.reason, severity: ci.severity}
+                            )[..10] AS contraindications
                         }
 
             RETURN p.id AS patient_id,
@@ -372,7 +404,11 @@ def graph_context(patient_ids: list[str]) -> list[dict[str, Any]]:
                                      medications,
                                      interactions,
                                      vitals,
-                                     claims
+                                     claims,
+                                     lab_signals,
+                                     icd10_codes,
+                                     adverse_events,
+                                     contraindications
             """,
             {"patient_ids": patient_ids},
         )
@@ -447,8 +483,36 @@ def _compact_graph_context(graph_ctx: list[dict[str, Any]]) -> str:
         ) or "none"
 
         medications = patient.get("medications", [])[:3]
-        medication_summary = ", ".join(
-            med.get("medication", "unknown") for med in medications
+        medication_summary = "; ".join(
+            f"{med.get('medication', 'unknown')} {med.get('dose', '')} {med.get('route', '')}".strip()
+            for med in medications
+        ) or "none"
+
+        interactions = [i for i in patient.get("interactions", [])[:3] if i.get("to")]
+        interaction_summary = "; ".join(
+            f"{i.get('from', '?')}+{i.get('to', '?')} ({i.get('risk', '?')}/{i.get('severity', '?')})"
+            for i in interactions
+        ) or "none"
+
+        lab_signals = patient.get("lab_signals", [])[:5]
+        lab_signal_summary = "; ".join(
+            f"{s.get('observation', '?')}={s.get('value', '?')} \u2192 {s.get('indicated_condition', '?')}"
+            for s in lab_signals
+        ) or "none"
+
+        vitals_alerts = [v.get("alert") for v in patient.get("vitals", [])[:5] if v.get("alert")]
+        alert_summary = "; ".join(vitals_alerts) or "none"
+
+        adverse_events = patient.get("adverse_events", [])[:3]
+        adverse_summary = "; ".join(
+            f"{ae.get('symptom', '?')} \u2190 {ae.get('medication', '?')} [{ae.get('severity', '?')}]"
+            for ae in adverse_events
+        ) or "none"
+
+        contraindications = patient.get("contraindications", [])[:3]
+        contra_summary = "; ".join(
+            f"{c.get('medication', '?')} \u26a0 {c.get('condition', '?')} ({c.get('reason', '?')})"
+            for c in contraindications
         ) or "none"
 
         chunks.append(
@@ -456,7 +520,12 @@ def _compact_graph_context(graph_ctx: list[dict[str, Any]]) -> str:
             f"  conditions={conditions}\n"
             f"  symptoms={symptoms}\n"
             f"  observations={observation_summary}\n"
-            f"  medications={medication_summary}"
+            f"  lab_signals={lab_signal_summary}\n"
+            f"  medications={medication_summary}\n"
+            f"  drug_interactions={interaction_summary}\n"
+            f"  adverse_events={adverse_summary}\n"
+            f"  contraindications={contra_summary}\n"
+            f"  device_alerts={alert_summary}"
         )
 
     return "\n".join(chunks)

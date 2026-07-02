@@ -10,9 +10,10 @@ It is optimized for reproducible local experimentation with clear lineage and fu
 
 Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
 
-- [ADR-0001: Embed FastMCP in rag-api](adrs/0001-embed-fastmcp-in-rag-api.md)
-- [ADR-0002: Use dual persistence (Qdrant + Neo4j)](adrs/0002-dual-persistence-qdrant-neo4j.md)
+- [ADR-0001: Use dual persistence (Qdrant + Neo4j)](adrs/0001-dual-persistence-qdrant-neo4j.md)
+- [ADR-0002: Qdrant as the streaming vector store for real-time RAG](adrs/0002-qdrant-streaming-vector-store.md)
 - [ADR-0003: Local-first LLM with provider routing](adrs/0003-local-first-llm-provider-routing.md)
+- [ADR-0004: Embed FastMCP in rag-api](adrs/0004-embed-fastmcp-in-rag-api.md)
 
 ## Why This Architecture Scales Across Healthcare Sections
 
@@ -39,7 +40,7 @@ This keeps new sections additive and modular.
 | Section | Example Inputs | Graph/Vector Emphasis | Primary Users | Expected Outcome |
 | --- | --- | --- | --- | --- |
 | Acute Clinical Ops | EHR notes, vitals, labs, encounters | Condition progression, symptom-observation linkage | Care teams, command center | Faster deterioration signal detection and context-rich escalation |
-| Medication Management | Orders, dispense records, interaction references | Medication-order linkage, interaction evidence | Pharmacists, inpatient teams | Reduced adverse-drug-risk exposure and clearer intervention rationale |
+| Medication Management | Orders, interaction knowledge base, FAERS adverse event data | Medication-order linkage, HAS_KNOWN_REACTION adverse event detection, CONTRAINDICATED_FOR validation, INTERACTS_WITH mechanism annotation | Pharmacists, inpatient teams | Reduced adverse-drug-risk exposure, real-time pharmacovigilance signals, and clearer intervention rationale |
 | Revenue Cycle Intelligence | Claims events, coding metadata, auth records | Clinical-claim traceability and mismatch signals | RCM analysts, coding teams | Lower denial rates and earlier documentation/coding correction |
 | Payer Utilization Review | Authorization outcomes, utilization events | Coverage patterns and utilization trajectory | UM teams, payer analysts | Better high-cost-case triage and utilization governance |
 | Population Health | Longitudinal events, risk tiers, chronic indicators | Cohort similarity + graph risk factors | Population health teams | Prioritized outreach and proactive risk management |
@@ -194,10 +195,23 @@ flowchart TD
   F --> G[Render Clinical Text]
   G --> H[Build Embedding]
   H --> I[Upsert to Qdrant]
-  F --> J[Merge to Neo4j]
-  I --> K[Expose Evidence to API Core]
-  J --> K
-  K --> L[RAG REST Surface]
+  F --> J[Merge Base Event to Neo4j]
+  J --> K{Event Type?}
+  K -->|CLINICAL_NOTE| L[Merge Condition + Symptom + ICD10Code]
+  K -->|LAB_RESULT| M[Merge Observation + run 14 lab signal rules]
+  K -->|VITAL_SIGN| N[Merge DeviceReading with temp/RR/alert]
+  K -->|MEDICATION_ORDER| O[Merge MedicationOrder + drug_class]
+  K -->|CLAIM_STATUS| P[Merge Claim + Procedure + Payer + AdverseOutcome]
+  L --> Q[merge_adverse_event_signal]
+  Q --> R[AdverseEvent if HAS_KNOWN_REACTION match]
+  M --> S[MAY_INDICATE edges to Condition]
+  I --> T[Expose Evidence to API Core]
+  R --> T
+  S --> T
+  N --> T
+  O --> T
+  P --> T
+  T --> U[RAG REST Surface]
   K --> M[FastMCP Surface]
   I --> E
   J --> E

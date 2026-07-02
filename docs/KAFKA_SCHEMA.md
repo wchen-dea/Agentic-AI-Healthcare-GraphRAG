@@ -127,54 +127,105 @@ This ratio is controlled by random selection in producer/produce_events.py.
   "diagnosis": "Pneumonia",
   "symptom": "cough",
   "note": "Patient presents with cough. Assessment suggests Pneumonia.",
-  "system": "Epic"
+  "system": "Epic",
+  "icd10_code": "J18.9"
 }
 ```
 
 ### Lab Result
+
+The producer selects from 18 lab tests. Each test carries a per-test abnormality threshold evaluated by the Flink processor to write `MAY_INDICATE` edges.
 
 ```json
 {
   "lab_name": "Potassium",
   "value": 6.2,
   "unit": "mmol/L",
-  "abnormal": true
+  "abnormal": true,
+  "lab_panel": "BMP",
+  "specimen_type": "serum"
 }
 ```
 
+Additional lab examples (same schema):
+
+| lab_name | unit | Abnormal condition triggered |
+| --- | --- | --- |
+| Glucose | mg/dL | ≥ 180 → Hyperglycemia |
+| HbA1c | % | ≥ 6.5 → Diabetes Mellitus |
+| Creatinine | mg/dL | > 1.2 → Chronic Kidney Disease |
+| eGFR | mL/min | < 60 → Chronic Kidney Disease |
+| Troponin I | ng/mL | > 0.04 → Acute Myocardial Infarction |
+| WBC | 10³/µL | > 11.0 → Infection |
+| INR | ratio | > 3.0 → Anticoagulation Concern |
+| LDL | mg/dL | > 130 → Hyperlipidemia |
+| TSH | mIU/L | > 4.5 → Hypothyroidism / < 0.5 → Hyperthyroidism |
+| Hemoglobin | g/dL | < 12.0 → Anemia |
+| Sodium | mmol/L | < 135 → Hyponatremia / > 145 → Hypernatremia |
+
 ### Device Telemetry
+
+Device events now include temperature, respiratory rate, optional glucose, device type, and an alert field for threshold-breach conditions.
 
 ```json
 {
   "device_id": "device-7",
+  "device_type": "bedside",
   "heart_rate": 121,
   "spo2": 91,
   "systolic_bp": 150,
-  "diastolic_bp": 95
+  "diastolic_bp": 95,
+  "temperature_c": 38.6,
+  "respiratory_rate": 22,
+  "glucose_mg_dl": null,
+  "alert": "tachycardia"
 }
 ```
 
+Possible `alert` values: `tachycardia`, `hypoxia`, `hypertension`, `bradycardia`, or `null` (no alert).
+Possible `device_type` values: `monitor`, `wearable`, `bedside`, `implant`, `patch`.
+
 ### Medication Order
+
+The producer selects from 24 medications. Each order carries `drug_class` (derived from the medication catalog), `order_type`, and `days_supply`.
 
 ```json
 {
   "medication": "Warfarin",
+  "drug_class": "Anticoagulant",
   "dose": "5mg",
   "route": "oral",
-  "frequency": "daily"
+  "frequency": "daily",
+  "order_type": "new",
+  "days_supply": 30
 }
 ```
+
+Possible `order_type` values: `new`, `renewal`, `discontinue`, `dose_change`.
+Possible `route` values: `oral`, `IV`, `subcutaneous`, `inhaled`, `topical`, `sublingual`.
 
 ### Claim Event
 
+Claims now carry a full financial record including procedure description (from 19 CPT codes), ICD-10 diagnosis code, financial amounts, claim type, and service date.
+
 ```json
 {
-  "claim_id": "claim-uuid",
+  "claim_id": "claim-<uuid>",
   "payer": "Aetna",
   "procedure_code": "99213",
+  "procedure_description": "Office visit, established patient, moderate",
+  "diagnosis_code": "I10",
+  "billed_amount": 285.00,
+  "allowed_amount": 142.50,
+  "claim_type": "professional",
+  "service_date": "2026-06-15",
   "status": "approved"
 }
 ```
+
+Possible `status` values: `submitted`, `approved`, `denied`, `pending`, `appealed`, `partially_approved`.
+Possible `claim_type` values: `professional`, `institutional`, `dental`, `pharmacy`.
+Hospital-related CPT codes (99232, 99285, 99291, 99223) trigger a `(Claim)-[:RESULTED_IN]->(AdverseOutcome {code: "HO"})` edge in Neo4j.
 
 ### Reference (Patient)
 
@@ -185,6 +236,54 @@ This ratio is controlled by random selection in producer/produce_events.py.
   "sex": "F",
   "age": 67,
   "risk_tier": "high"
+}
+```
+
+### Reference (Provider)
+
+```json
+{
+  "provider_id": "provider-001",
+  "name": "Dr. Alice Chen",
+  "specialty": "Cardiology",
+  "organization": "City Hospital",
+  "npi": "1234567890"
+}
+```
+
+### Reference (Device)
+
+```json
+{
+  "device_id": "device-5",
+  "model": "CardioMon-100",
+  "vendor": "MedTech",
+  "device_type": "monitor",
+  "firmware_version": "2.1.04",
+  "connectivity": "WiFi"
+}
+```
+
+### Reference (Medication)
+
+```json
+{
+  "medication": "Warfarin",
+  "drug_class": "Anticoagulant",
+  "safety_tier": "high-alert",
+  "requires_monitoring": true,
+  "controlled_substance": false
+}
+```
+
+### Reference (Payer)
+
+```json
+{
+  "payer": "Aetna",
+  "plan_type": "PPO",
+  "region": "Northeast",
+  "network_tier": "in-network"
 }
 ```
 

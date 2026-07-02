@@ -98,36 +98,44 @@ def clinical_text(event: dict) -> str:
     if event_type == "CLINICAL_NOTE":
         return " ".join([item for item in [
             f"Patient {event['patient_id']} clinical note from {event['source_system']}. "
-            f"Diagnosis {payload.get('diagnosis')}. Symptom {payload.get('symptom')}. "
-            f"Note: {payload.get('note')}",
+            f"Diagnosis {payload.get('diagnosis')} ICD10 {payload.get('icd10_code')}. "
+            f"Symptom {payload.get('symptom')}. Note: {payload.get('note')}",
             ref_summary,
         ] if item])
     if event_type == "LAB_RESULT":
         return " ".join([item for item in [
             f"Patient {event['patient_id']} lab result. "
             f"{payload.get('lab_name')} equals {payload.get('value')} {payload.get('unit')}. "
+            f"Panel {payload.get('lab_panel')}. Specimen {payload.get('specimen_type')}. "
             f"Abnormal: {payload.get('abnormal')}",
             ref_summary,
         ] if item])
     if event_type == "VITAL_SIGN":
-        return " ".join([item for item in [
-            f"Patient {event['patient_id']} device telemetry. "
+        parts = [
+            f"Patient {event['patient_id']} device telemetry from {event['source_system']}. "
             f"Heart rate {payload.get('heart_rate')}, SpO2 {payload.get('spo2')}, "
-            f"blood pressure {payload.get('systolic_bp')}/{payload.get('diastolic_bp')}.",
-            ref_summary,
-        ] if item])
+            f"BP {payload.get('systolic_bp')}/{payload.get('diastolic_bp')}, "
+            f"temp {payload.get('temperature_c')} C, RR {payload.get('respiratory_rate')}.",
+        ]
+        if payload.get("alert"):
+            parts.append(f"Alert: {payload.get('alert')}.")
+        if ref_summary:
+            parts.append(ref_summary)
+        return " ".join(parts)
     if event_type == "MEDICATION_ORDER":
         return " ".join([item for item in [
             f"Patient {event['patient_id']} medication order. "
-            f"Medication {payload.get('medication')} dose {payload.get('dose')} "
-            f"route {payload.get('route')} frequency {payload.get('frequency')}.",
+            f"Medication {payload.get('medication')} drug class {payload.get('drug_class')} "
+            f"dose {payload.get('dose')} route {payload.get('route')} "
+            f"frequency {payload.get('frequency')} order type {payload.get('order_type')}.",
             ref_summary,
         ] if item])
     if event_type == "CLAIM_STATUS":
         return " ".join([item for item in [
             f"Patient {event['patient_id']} claim event. "
             f"Payer {payload.get('payer')} procedure {payload.get('procedure_code')} "
-            f"status {payload.get('status')}.",
+            f"{payload.get('procedure_description')} diagnosis {payload.get('diagnosis_code')} "
+            f"billed {payload.get('billed_amount')} status {payload.get('status')}.",
             ref_summary,
         ] if item])
     return json.dumps(event)
@@ -266,8 +274,15 @@ class HealthcareGraphRagProcessor:
             event_type = event["event_type"]
             if event_type == "CLINICAL_NOTE":
                 session.execute_write(self.merge_clinical_note, event, payload)
+                session.execute_write(self.merge_adverse_event_signal, event, payload)
             elif event_type == "LAB_RESULT":
                 session.execute_write(self.merge_lab_result, event, payload)
+                session.execute_write(
+                    self.merge_lab_signals,
+                    event["event_id"],
+                    payload.get("lab_name"),
+                    payload.get("value"),
+                )
             elif event_type == "VITAL_SIGN":
                 session.execute_write(self.merge_device_reading, event, payload)
             elif event_type == "MEDICATION_ORDER":
@@ -297,6 +312,15 @@ class HealthcareGraphRagProcessor:
               MERGE (ce)-[:DURING_ENCOUNTER]->(e)
               RETURN count(*) AS _
             }
+            WITH ce
+            CALL {
+              WITH ce
+              WITH ce WHERE $encounter_id IS NOT NULL AND $provider_id IS NOT NULL
+              MATCH (e:Encounter {id: $encounter_id})
+              MERGE (pr:Provider {id: $provider_id})
+              MERGE (e)-[:SEEN_BY]->(pr)
+              RETURN count(*) AS _
+            }
             RETURN ce
             """,
             {
@@ -309,6 +333,7 @@ class HealthcareGraphRagProcessor:
                 "text": text,
                 "schema_version": event.get("schema_version"),
                 "encounter_id": event.get("encounter_id"),
+                "provider_id": event.get("provider_id"),
             },
         )
 
@@ -335,7 +360,8 @@ class HealthcareGraphRagProcessor:
               MERGE (pr:Provider {id: $provider_id})
               SET pr.name = coalesce($provider_ref.name, pr.name),
                   pr.specialty = coalesce($provider_ref.specialty, pr.specialty),
-                  pr.organization = coalesce($provider_ref.organization, pr.organization)
+                  pr.organization = coalesce($provider_ref.organization, pr.organization),
+                  pr.npi = coalesce($provider_ref.npi, pr.npi)
               MERGE (p)-[:MANAGED_BY]->(pr)
               RETURN count(*) AS _
             }
@@ -366,7 +392,8 @@ class HealthcareGraphRagProcessor:
               WITH p WHERE $payer IS NOT NULL AND $payer_ref IS NOT NULL
               MERGE (pay:Payer {name: $payer})
               SET pay.plan_type = coalesce($payer_ref.plan_type, pay.plan_type),
-                  pay.region = coalesce($payer_ref.region, pay.region)
+                  pay.region = coalesce($payer_ref.region, pay.region),
+                  pay.network_tier = coalesce($payer_ref.network_tier, pay.network_tier)
               MERGE (p)-[:COVERED_BY]->(pay)
               RETURN count(*) AS _
             }
@@ -393,17 +420,31 @@ class HealthcareGraphRagProcessor:
             MATCH (p:Patient {id: $patient_id})
             MATCH (ce:ClinicalEvent {id: $event_id})
             MERGE (c:Condition {name: $diagnosis})
+              ON CREATE SET c.first_seen_ts = datetime($event_ts)
+              ON MATCH SET c.last_seen_ts = datetime($event_ts)
             MERGE (s:Symptom {name: $symptom})
-            MERGE (p)-[:HAS_CONDITION]->(c)
+            MERGE (p)-[hc:HAS_CONDITION]->(c)
+              ON CREATE SET hc.onset_ts = datetime($event_ts)
             MERGE (p)-[:HAS_SYMPTOM]->(s)
             MERGE (ce)-[:DOCUMENTS]->(c)
             MERGE (ce)-[:DOCUMENTS]->(s)
+            WITH c
+            CALL {
+              WITH c
+              WITH c WHERE $icd10_code IS NOT NULL
+              MERGE (icd:ICD10Code {code: $icd10_code})
+              MERGE (c)-[:CODED_AS]->(icd)
+              RETURN count(*) AS _
+            }
+            RETURN c
             """,
             {
                 "patient_id": event["patient_id"],
                 "event_id": event["event_id"],
                 "diagnosis": payload.get("diagnosis"),
                 "symptom": payload.get("symptom"),
+                "icd10_code": payload.get("icd10_code"),
+                "event_ts": event["event_ts"],
             },
         )
 
@@ -418,18 +459,11 @@ class HealthcareGraphRagProcessor:
                   o.value = $value,
                   o.unit = $unit,
                   o.abnormal = $abnormal,
+                  o.lab_panel = $lab_panel,
+                  o.specimen_type = $specimen_type,
                   o.event_ts = datetime($event_ts)
             MERGE (p)-[:HAS_OBSERVATION]->(o)
             MERGE (ce)-[:DOCUMENTS]->(o)
-            WITH o
-            CALL {
-              WITH o
-              WITH o WHERE $lab_name = "Potassium" AND $value >= 5.5
-              MERGE (c:Condition {name: "Hyperkalemia"})
-              MERGE (o)-[:MAY_INDICATE {reason: "elevated_potassium"}]->(c)
-              RETURN count(*) AS _
-            }
-            RETURN o
             """,
             {
                 "patient_id": event["patient_id"],
@@ -439,8 +473,50 @@ class HealthcareGraphRagProcessor:
                 "value": payload.get("value"),
                 "unit": payload.get("unit"),
                 "abnormal": bool(payload.get("abnormal", False)),
+                "lab_panel": payload.get("lab_panel"),
+                "specimen_type": payload.get("specimen_type"),
                 "event_ts": event["event_ts"],
             },
+        )
+
+    # Clinical decision rules: (lab_name, threshold_fn, condition_name, reason)
+    _LAB_SIGNAL_RULES = [
+        ("Potassium",  lambda v: v >= 5.5,  "Hyperkalemia",               "elevated_potassium"),
+        ("Glucose",    lambda v: v >= 180,  "Hyperglycemia",              "elevated_glucose"),
+        ("HbA1c",      lambda v: v >= 6.5,  "Diabetes Mellitus",          "elevated_hba1c"),
+        ("Creatinine", lambda v: v > 1.2,   "Chronic Kidney Disease",     "elevated_creatinine"),
+        ("eGFR",       lambda v: v < 60,    "Chronic Kidney Disease",     "low_egfr"),
+        ("Troponin I", lambda v: v > 0.04,  "Acute Myocardial Infarction","elevated_troponin"),
+        ("WBC",        lambda v: v > 11.0,  "Infection",                  "elevated_wbc"),
+        ("INR",        lambda v: v > 3.0,   "Anticoagulation Concern",    "supratherapeutic_inr"),
+        ("LDL",        lambda v: v > 130,   "Hyperlipidemia",             "elevated_ldl"),
+        ("TSH",        lambda v: v > 4.5,   "Hypothyroidism",             "elevated_tsh"),
+        ("TSH",        lambda v: v < 0.5,   "Hyperthyroidism",            "low_tsh"),
+        ("Hemoglobin", lambda v: v < 12.0,  "Anemia",                     "low_hemoglobin"),
+        ("Sodium",     lambda v: v < 135,   "Hyponatremia",               "low_sodium"),
+        ("Sodium",     lambda v: v > 145,   "Hypernatremia",              "high_sodium"),
+    ]
+
+    @classmethod
+    def merge_lab_signals(cls, tx, obs_id: str, lab_name, value):
+        """Write MAY_INDICATE edges for any lab result that crosses a clinical threshold."""
+        if lab_name is None or value is None:
+            return
+        signals = [
+            {"condition": cond, "reason": reason}
+            for lab, check, cond, reason in cls._LAB_SIGNAL_RULES
+            if lab == lab_name and check(value)
+        ]
+        if not signals:
+            return
+        tx.run(
+            """
+            MATCH (o:Observation {id: $obs_id})
+            UNWIND $signals AS sig
+            MERGE (c:Condition {name: sig.condition})
+            MERGE (o)-[:MAY_INDICATE {reason: sig.reason}]->(c)
+            """,
+            {"obs_id": obs_id, "signals": signals},
         )
 
     @staticmethod
@@ -450,11 +526,16 @@ class HealthcareGraphRagProcessor:
             MATCH (p:Patient {id: $patient_id})
             MATCH (ce:ClinicalEvent {id: $event_id})
             MERGE (d:Device {id: $device_id})
+              SET d.device_type = coalesce($device_type, d.device_type)
             MERGE (r:DeviceReading {id: $event_id})
               SET r.heart_rate = $heart_rate,
                   r.spo2 = $spo2,
                   r.systolic_bp = $systolic_bp,
                   r.diastolic_bp = $diastolic_bp,
+                  r.temperature_c = $temperature_c,
+                  r.respiratory_rate = $respiratory_rate,
+                  r.glucose_mg_dl = $glucose_mg_dl,
+                  r.alert = $alert,
                   r.event_ts = datetime($event_ts)
             MERGE (p)-[:HAS_DEVICE_READING]->(r)
             MERGE (r)-[:MEASURED_BY]->(d)
@@ -464,10 +545,15 @@ class HealthcareGraphRagProcessor:
                 "patient_id": event["patient_id"],
                 "event_id": event["event_id"],
                 "device_id": payload.get("device_id"),
+                "device_type": payload.get("device_type"),
                 "heart_rate": payload.get("heart_rate"),
                 "spo2": payload.get("spo2"),
                 "systolic_bp": payload.get("systolic_bp"),
                 "diastolic_bp": payload.get("diastolic_bp"),
+                "temperature_c": payload.get("temperature_c"),
+                "respiratory_rate": payload.get("respiratory_rate"),
+                "glucose_mg_dl": payload.get("glucose_mg_dl"),
+                "alert": payload.get("alert"),
                 "event_ts": event["event_ts"],
             },
         )
@@ -479,10 +565,13 @@ class HealthcareGraphRagProcessor:
             MATCH (p:Patient {id: $patient_id})
             MATCH (ce:ClinicalEvent {id: $event_id})
             MERGE (m:Medication {name: $medication})
+              SET m.drug_class = coalesce($drug_class, m.drug_class)
             MERGE (mo:MedicationOrder {id: $event_id})
               SET mo.dose = $dose,
                   mo.route = $route,
                   mo.frequency = $frequency,
+                  mo.order_type = $order_type,
+                  mo.days_supply = $days_supply,
                   mo.event_ts = datetime($event_ts)
             MERGE (mo)-[:ORDERS_MEDICATION]->(m)
             MERGE (p)-[:HAS_MEDICATION_ORDER]->(mo)
@@ -492,9 +581,12 @@ class HealthcareGraphRagProcessor:
                 "patient_id": event["patient_id"],
                 "event_id": event["event_id"],
                 "medication": payload.get("medication"),
+                "drug_class": payload.get("drug_class"),
                 "dose": payload.get("dose"),
                 "route": payload.get("route"),
                 "frequency": payload.get("frequency"),
+                "order_type": payload.get("order_type"),
+                "days_supply": payload.get("days_supply"),
                 "event_ts": event["event_ts"],
             },
         )
@@ -506,12 +598,41 @@ class HealthcareGraphRagProcessor:
             MATCH (p:Patient {id: $patient_id})
             MATCH (ce:ClinicalEvent {id: $event_id})
             MERGE (c:Claim {id: $claim_id})
-              SET c.payer = $payer,
-                  c.procedure_code = $procedure_code,
-                  c.status = $status,
+              SET c.status = $status,
+                  c.claim_type = $claim_type,
+                  c.diagnosis_code = $diagnosis_code,
+                  c.billed_amount = $billed_amount,
+                  c.allowed_amount = $allowed_amount,
+                  c.service_date = $service_date,
                   c.event_ts = datetime($event_ts)
             MERGE (p)-[:HAS_CLAIM]->(c)
             MERGE (ce)-[:DOCUMENTS]->(c)
+            WITH c
+            CALL {
+              WITH c
+              WITH c WHERE $procedure_code IS NOT NULL
+              MERGE (proc:Procedure {code: $procedure_code})
+                ON CREATE SET proc.description = $procedure_description
+              MERGE (c)-[:FOR_PROCEDURE]->(proc)
+              RETURN count(*) AS _
+            }
+            WITH c
+            CALL {
+              WITH c
+              WITH c WHERE $payer IS NOT NULL
+              MERGE (pay:Payer {name: $payer})
+              MERGE (c)-[:SUBMITTED_TO]->(pay)
+              RETURN count(*) AS _
+            }
+            WITH c
+            CALL {
+              WITH c
+              WITH c WHERE $procedure_code IN ['99232', '99285', '99291', '99223'] OR $claim_type = 'institutional'
+              MERGE (ao:AdverseOutcome {code: "HO"})
+              MERGE (c)-[:RESULTED_IN]->(ao)
+              RETURN count(*) AS _
+            }
+            RETURN c
             """,
             {
                 "patient_id": event["patient_id"],
@@ -519,8 +640,48 @@ class HealthcareGraphRagProcessor:
                 "claim_id": payload.get("claim_id"),
                 "payer": payload.get("payer"),
                 "procedure_code": payload.get("procedure_code"),
+                "procedure_description": payload.get("procedure_description"),
+                "diagnosis_code": payload.get("diagnosis_code"),
                 "status": payload.get("status"),
+                "claim_type": payload.get("claim_type"),
+                "billed_amount": payload.get("billed_amount"),
+                "allowed_amount": payload.get("allowed_amount"),
+                "service_date": payload.get("service_date"),
                 "event_ts": event["event_ts"],
+            },
+        )
+
+    @staticmethod
+    def merge_adverse_event_signal(tx, event, payload):
+        """
+        FAERS-inspired pharmacovigilance signal detection.
+        If the symptom documented in a clinical note is a known adverse reaction
+        for any medication currently ordered for the patient, create an AdverseEvent
+        node linking patient, medication, symptom, and source event.
+        No-ops silently when no matching drug-symptom pair exists.
+        """
+        tx.run(
+            """
+            MATCH (p:Patient {id: $patient_id})
+            MATCH (p)-[:HAS_MEDICATION_ORDER]->(mo:MedicationOrder)-[:ORDERS_MEDICATION]->(m:Medication)
+            MATCH (m)-[kr:HAS_KNOWN_REACTION]->(s:Symptom {name: $symptom})
+            MATCH (ce:ClinicalEvent {id: $source_event_id})
+            MERGE (ae:AdverseEvent {id: $adverse_event_id})
+              ON CREATE SET ae.symptom_name = $symptom,
+                            ae.detected_ts = datetime($event_ts),
+                            ae.source_event_id = $source_event_id,
+                            ae.severity = kr.severity,
+                            ae.meddra_term = kr.meddra_term
+            MERGE (p)-[:REPORTED_ADVERSE_REACTION]->(ae)
+            MERGE (ae)-[:ASSOCIATED_WITH_MEDICATION]->(m)
+            MERGE (ae)-[:TRIGGERED_BY_EVENT]->(ce)
+            """,
+            {
+                "patient_id": event["patient_id"],
+                "symptom": payload.get("symptom"),
+                "adverse_event_id": f"ae-{event['event_id']}",
+                "event_ts": event["event_ts"],
+                "source_event_id": event["event_id"],
             },
         )
 

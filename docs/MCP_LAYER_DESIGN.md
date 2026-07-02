@@ -12,7 +12,7 @@ Goals:
 
 ## ADR References
 
-- [ADR-0001: Embed FastMCP in rag-api](adrs/0001-embed-fastmcp-in-rag-api.md)
+- [ADR-0004: Embed FastMCP in rag-api](adrs/0004-embed-fastmcp-in-rag-api.md)
 - [ADR-0003: Local-first LLM with provider routing](adrs/0003-local-first-llm-provider-routing.md)
 
 ## Architecture Placement

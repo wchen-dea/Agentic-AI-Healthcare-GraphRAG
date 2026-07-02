@@ -51,7 +51,7 @@ The platform is reusable by design: core platform layers stay stable while domai
 | Revenue Cycle | Claims, coding events, prior-auth records | Denial reduction, coding consistency insights |
 | Payer and Utilization | Claims timelines, authorization decisions | Utilization trend detection, anomaly triage |
 | Population Health | Longitudinal encounters, chronic-condition signals | Cohort risk stratification, outreach prioritization |
-| Medication Safety | Orders, allergies, interaction knowledge | Safer prescribing, interaction explainability |
+| Medication Safety | Orders, interaction knowledge base, FAERS adverse event reporting | Real-time adverse event detection, contraindication alerts, drug-drug interaction mechanism tracing, pharmacovigilance signal ranking |
 | Device and Remote Monitoring | Device telemetry, alerts, maintenance events | Faster anomaly response, operational efficiency |
 
 ## Innovation Highlights
@@ -104,6 +104,12 @@ Ops/UI
 
 - Hybrid retrieval that combines semantic nearest-neighbor evidence from Qdrant with patient-centric relationship context from Neo4j.
 - Reference-data enrichment for patients, providers, devices, medications, and payers before sink writes.
+- 14-rule lab signal engine: each lab result is evaluated against clinical thresholds at ingest time and `MAY_INDICATE` edges are written atomically to Neo4j (Hyperkalemia, AMI, CKD, Anemia, Hyperlipidemia, Hypothyroidism, and more).
+- FAERS-aligned pharmacovigilance: adverse event detection fires after every `CLINICAL_NOTE` event by matching the documented symptom against `HAS_KNOWN_REACTION` graph edges for the patient's currently ordered medications.
+- Drug safety knowledge graph: `INTERACTS_WITH` edges carry mechanism annotations; `HAS_KNOWN_REACTION` edges carry MedDRA terms and severity; `CONTRAINDICATED_FOR` edges encode clinical contraindication reasoning — all seeded at stack startup from `neo4j/init.cypher`.
+- ICD-10 coding: clinical note events carry an `icd10_code` field written as `(Condition)-[:CODED_AS]->(ICD10Code)` edges, enabling coding-gap queries across the graph.
+- Expanded synthetic event scope: 24-medication catalog with active ingredients, 18-lab-test panels with per-test abnormality thresholds, device alerts (tachycardia, hypoxia, hypertension), CPT procedure descriptions, and claims financial fields (billed/allowed amounts, service dates).
+- graph_context response includes `lab_signals`, `adverse_events`, `contraindications`, `icd10_codes`, and enriched `medications` / `vitals` / `claims` payloads visible in every API and MCP tool response.
 - Native Flink job visibility from the Flink dashboard.
 - Local observability for Kafka, Flink, Neo4j, and Qdrant.
 - Provider-facing UI for query workflows without curl.
