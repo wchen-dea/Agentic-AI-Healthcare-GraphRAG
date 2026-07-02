@@ -160,16 +160,16 @@ For local development, configure secret-like values in `.env` only.
 cp .env.example .env
 ```
 
-1. Edit `.env` and set the local values you want to use, especially:
+2. Edit `.env` and set the local values you want to use, especially:
 
 - `NEO4J_PASSWORD`
 - `CONDUKTOR_POSTGRES_PASSWORD`
 - `CONDUKTOR_ADMIN_PASSWORD`
 - `GRAFANA_ADMIN_PASSWORD`
 
-1. Keep `.env` local only. It is ignored by git and should not be committed.
+3. Keep `.env` local only. It is ignored by git and should not be committed.
 
-1. Recreate or restart affected services after changing secret-bearing values:
+4. Recreate or restart affected services after changing secret-bearing values:
 
 ```bash
 docker compose up -d --build
@@ -337,14 +337,19 @@ deploy/production/k8s/ Kubernetes-ready AI component manifests
 
 ## Documentation
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [docs/adrs/README.md](docs/adrs/README.md)
-- [docs/KAFKA_SCHEMA.md](docs/KAFKA_SCHEMA.md)
-- [docs/MCP_LAYER_DESIGN.md](docs/MCP_LAYER_DESIGN.md)
-- [docs/NEO4J_MODEL.md](docs/NEO4J_MODEL.md)
-- [docs/RUNBOOK.md](docs/RUNBOOK.md)
-- [deploy/production/README.md](deploy/production/README.md)
-- [deploy/production/k8s/README.md](deploy/production/k8s/README.md)
+| Document | Purpose |
+|----------|---------|
+| [docs/architecture.md](docs/architecture.md) | System architecture, design patterns, component diagrams |
+| [docs/adrs/README.md](docs/adrs/README.md) | Architecture Decision Records index |
+| [docs/technical_specs.md](docs/technical_specs.md) | Container inventory, library versions, API specification |
+| [docs/business_specs.md](docs/business_specs.md) | Use cases, business rules, stakeholders, AI governance |
+| [docs/kafka_schema.md](docs/kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
+| [docs/neo4j_model.md](docs/neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
+| [docs/mcp_layer_design.md](docs/mcp_layer_design.md) | MCP tool contracts, schemas, rollout phases |
+| [docs/runbook.md](docs/runbook.md) | Operations runbook, health checks, failure modes |
+| [docs/ai_qa.md](docs/ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
+| [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |
+| [deploy/production/k8s/README.md](deploy/production/k8s/README.md) | Kubernetes manifests |
 
 ## Safety Disclaimer
 

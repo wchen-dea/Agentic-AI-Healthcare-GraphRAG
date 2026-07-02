@@ -34,5 +34,5 @@ Trade-offs:
 
 ## Related
 
-- [Architecture](../ARCHITECTURE.md)
-- [MCP Layer Design](../MCP_LAYER_DESIGN.md)
+- [Architecture](../architecture.md)
+- [MCP Layer Design](../mcp_layer_design.md)

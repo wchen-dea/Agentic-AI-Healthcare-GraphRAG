@@ -66,8 +66,8 @@ Root cause:
 Fix:
 
 1. Switch topic value deserializer to `Avro (Schema Registry)`.
-1. Refresh topic view.
-1. Reopen messages.
+2. Refresh topic view.
+3. Reopen messages.
 
 Important limitation in current schema design:
 

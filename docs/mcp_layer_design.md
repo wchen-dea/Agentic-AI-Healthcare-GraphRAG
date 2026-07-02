@@ -230,20 +230,26 @@ Response schema:
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["question", "bundle", "retrieved_at"],
+  "required": ["question", "vector_context", "graph_context", "answer", "retrieved_at"],
   "properties": {
     "question": { "type": "string" },
-    "bundle": {
-      "type": "object",
-      "required": ["vector_evidence", "graph_evidence"],
-      "properties": {
-        "vector_evidence": { "type": "array", "items": { "type": "object" } },
-        "graph_evidence": { "type": "array", "items": { "type": "object" } }
-      },
-      "additionalProperties": true
-    },
+    "patients": { "type": "array", "items": { "type": "string" } },
+    "vector_context": { "type": "array", "items": { "type": "object" } },
+    "graph_context": { "type": "array", "items": { "type": "object" } },
+    "answer": { "type": "string" },
     "retrieved_at": { "type": "string", "format": "date-time" },
-    "trace_id": { "type": "string" }
+    "trace_id": { "type": "string" },
+    "guardrails": {
+      "type": "object",
+      "properties": {
+        "evidence_text_redacted": { "type": "boolean" },
+        "evidence_access_level": { "type": "string", "enum": ["none", "bounded"] },
+        "graph_access_level": { "type": "string", "enum": ["standard", "broader"] },
+        "raw_payload_requested": { "type": "boolean" },
+        "raw_payload_returned": { "type": "boolean" },
+        "response_truncated": { "type": "boolean" }
+      }
+    }
   },
   "additionalProperties": false
 }
@@ -302,8 +308,8 @@ Do not log raw PHI payloads. Prefer hashes, IDs, and minimal metadata.
 ### Phase 0: Local Design and Contract Freeze
 
 1. Finalize 5-tool contract and JSON schemas in this document.
-1. MCP tool surface is implemented in rag-api over the shared query orchestration.
-1. Contract tests with static fixtures and CI validation are in place.
+2. MCP tool surface is implemented in rag-api over the shared query orchestration.
+3. Contract tests with static fixtures and CI validation are in place.
 
 Exit criteria:
 
@@ -317,8 +323,8 @@ Current status:
 ### Phase 1: Local Demo Integration
 
 1. Validate initialize handshake against `http://localhost:8000/mcp`.
-1. Keep non-protocol diagnostics available at `/mcp/health`.
-1. Validate from at least one MCP client.
+2. Keep non-protocol diagnostics available at `/mcp/health`.
+3. Validate from at least one MCP client.
 
 Exit criteria:
 
@@ -332,9 +338,9 @@ Current status:
 ### Phase 2: Staging Hardening
 
 1. Add centralized auth (service identity).
-1. Add policy gates per tool and environment.
-1. Add SLO dashboards (latency, error rate, tool call volume).
-1. Add resilience controls (timeouts, retries, circuit breaker).
+2. Add policy gates per tool and environment.
+3. Add SLO dashboards (latency, error rate, tool call volume).
+4. Add resilience controls (timeouts, retries, circuit breaker).
 
 Exit criteria:
 
@@ -344,9 +350,9 @@ Exit criteria:
 ### Phase 3: Production Launch
 
 1. Enable production identity and secret management.
-1. Enable audited tool access with retention policy.
-1. Roll out in canary mode to selected clients.
-1. Expand tool set only after stability is proven.
+2. Enable audited tool access with retention policy.
+3. Roll out in canary mode to selected clients.
+4. Expand tool set only after stability is proven.
 
 Exit criteria:
 

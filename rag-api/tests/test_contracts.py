@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import prometheus_client
 from fastapi.testclient import TestClient
 
 
@@ -57,6 +58,19 @@ class RagApiContractTests(unittest.TestCase):
         module = sys.modules.pop("app", None)
         if module is not None and hasattr(module, "neo4j"):
             module.neo4j.close()
+        # Prometheus REGISTRY is a process-wide singleton that outlives the
+        # module reload.  Unregister rag_api_* collectors so the next
+        # load_module() import can re-register them without collision.
+        rag_collectors = set(
+            c
+            for name, c in list(prometheus_client.REGISTRY._names_to_collectors.items())
+            if name.startswith("rag_api_")
+        )
+        for collector in rag_collectors:
+            try:
+                prometheus_client.REGISTRY.unregister(collector)
+            except Exception:
+                pass
 
     def load_module(self, **env_overrides):
         for key in self.managed_env_keys:

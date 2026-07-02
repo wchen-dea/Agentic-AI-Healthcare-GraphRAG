@@ -304,13 +304,13 @@ Fix:
 curl -s -X PATCH http://localhost:8082/jobs/<demo_job_id>
 ```
 
-1. Ensure no legacy submitter container exists:
+2. Ensure no legacy submitter container exists:
 
 ```bash
 docker compose ps
 ```
 
-1. Re-run with orphan cleanup:
+3. Re-run with orphan cleanup:
 
 ```bash
 docker compose up -d --remove-orphans

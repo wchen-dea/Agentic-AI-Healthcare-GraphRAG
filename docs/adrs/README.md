@@ -17,3 +17,16 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 - Numbering is sequential and immutable.
 - Status values: proposed, accepted, superseded, deprecated.
 - Update impacted docs when an ADR is accepted or superseded.
+
+## Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| [architecture.md](../architecture.md) | System architecture, design patterns, component diagrams |
+| [technical_specs.md](../technical_specs.md) | Container inventory, library versions, API specification |
+| [business_specs.md](../business_specs.md) | Use cases, business rules, stakeholders |
+| [neo4j_model.md](../neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
+| [kafka_schema.md](../kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
+| [mcp_layer_design.md](../mcp_layer_design.md) | MCP tool contracts and rollout phases |
+| [runbook.md](../runbook.md) | Operations runbook, health checks, failure modes |
+| [ai_qa.md](../ai_qa.md) | QA strategy, contract tests, accuracy validation |

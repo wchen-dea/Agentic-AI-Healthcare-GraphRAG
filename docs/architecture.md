@@ -75,12 +75,12 @@ This architecture intentionally combines several patterns so streaming ingestion
 ### Pattern Mapping to Repository Components
 
 - Event-Driven Pipeline: [producer/produce_events.py](../producer/produce_events.py), [flink-app/healthcare_graph_rag_pyflink_job.py](../flink-app/healthcare_graph_rag_pyflink_job.py), [docker-compose.yml](../docker-compose.yml)
-- Dual Materialized Views: [flink-app/healthcare_graph_rag_job.py](../flink-app/healthcare_graph_rag_job.py), [docs/NEO4J_MODEL.md](NEO4J_MODEL.md)
+- Dual Materialized Views: [flink-app/healthcare_graph_rag_job.py](../flink-app/healthcare_graph_rag_job.py), [docs/neo4j_model.md](neo4j_model.md)
 - Shared-Core, Multi-Interface: [rag-api/app.py](../rag-api/app.py) (`run_query`, REST `/query`, MCP tools)
 - Policy Enforcement Point: [rag-api/app.py](../rag-api/app.py) (`_authorize`, `_execute_with_audit`, guardrail shaping)
-- Contract-First Tooling: [rag-api/tests/test_contracts.py](../rag-api/tests/test_contracts.py), [docs/MCP_LAYER_DESIGN.md](MCP_LAYER_DESIGN.md)
+- Contract-First Tooling: [rag-api/tests/test_contracts.py](../rag-api/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
 - Bounded Context Window: [rag-api/app.py](../rag-api/app.py) (`max_*` settings and truncation/budget helpers)
-- Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/RUNBOOK.md](RUNBOOK.md)
+- Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
 - Adapter Pattern (planned): [docs/adrs/0003-local-first-llm-provider-routing.md](adrs/0003-local-first-llm-provider-routing.md)
 
 ## Architecture At A Glance
@@ -385,7 +385,7 @@ Neo4j stores patient-centric graph entities and lineage, including:
 - medication/device/claim entities,
 - reference-context links (Provider, Device, Medication, Payer).
 
-See docs/NEO4J_MODEL.md for the full model.
+See [neo4j_model.md](neo4j_model.md) for the full model.
 
 ### RAG API
 
