@@ -1,4 +1,4 @@
-# ADR-0001: Embed FastMCP in rag-api
+# ADR-0004: Embed FastMCP in rag-api
 
 - Status: accepted
 - Date: 2026-06-26

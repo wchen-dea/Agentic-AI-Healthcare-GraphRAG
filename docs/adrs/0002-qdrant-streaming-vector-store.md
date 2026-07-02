@@ -1,7 +1,7 @@
-# ADR-0004: Qdrant as the Streaming Vector Store for Real-Time RAG
+# ADR-0002: Qdrant as the Streaming Vector Store for Real-Time RAG
 
 - Status: accepted
-- Date: 2026-07-02
+- Date: 2026-06-26
 - Deciders: platform team
 - Supersedes: none
 - Superseded by: none
@@ -106,7 +106,7 @@ Trade-offs:
 
 ## Related
 
-- [ADR-0002: Dual Persistence (Qdrant + Neo4j)](./0002-dual-persistence-qdrant-neo4j.md)
+- [ADR-0001: Dual Persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
 - [Architecture](../ARCHITECTURE.md)
 - [Kafka Schema](../KAFKA_SCHEMA.md)
 - [Conduktor — Vector Embeddings in Streaming](https://www.conduktor.io/glossary/vector-embeddings-in-streaming)
