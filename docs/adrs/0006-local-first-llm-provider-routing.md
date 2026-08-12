@@ -1,4 +1,4 @@
-# ADR-0003: Local-first LLM with provider routing
+# ADR-0006: Local-first LLM with provider routing
 
 - Status: accepted (partially implemented)
 - Date: 2026-06-26
@@ -18,7 +18,7 @@ Adopt local-first generation with provider abstraction:
 Implementation status in this repository today:
 
 - Implemented: local Ollama-first runtime in `rag-api/app.py`.
-- Planned extension: provider adapter and environment-based routing for Anthropic/OpenAI.
+- Roadmap extension: provider adapter and environment-based routing for Anthropic/OpenAI.
 
 ## Consequences
 
@@ -36,3 +36,4 @@ Trade-offs:
 
 - [Architecture](../architecture.md)
 - [MCP Layer Design](../mcp_layer_design.md)
+- [Skills Layer](../skills_layer.md)

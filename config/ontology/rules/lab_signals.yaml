@@ -1,0 +1,189 @@
+version: 0.1.0
+status: draft
+owner: clinical-rules
+source_of_truth:
+- flink-app/healthcare_graph_rag_job.py
+purpose: Declarative lab threshold rules corresponding to MAY_INDICATE graph edges.
+rules:
+- id: potassium_hyperkalemia
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: Potassium
+  condition:
+    operator: gte
+    value: 5.5
+    unit: mmol/L
+  output_edge:
+    type: MAY_INDICATE
+    condition: Hyperkalemia
+    reason: elevated_potassium
+  severity: high
+- id: glucose_hyperglycemia
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: Glucose
+  condition:
+    operator: gte
+    value: 180
+    unit: mg/dL
+  output_edge:
+    type: MAY_INDICATE
+    condition: Hyperglycemia
+    reason: elevated_glucose
+  severity: moderate
+- id: hba1c_diabetes
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: HbA1c
+  condition:
+    operator: gte
+    value: 6.5
+    unit: percent
+  output_edge:
+    type: MAY_INDICATE
+    condition: Diabetes Mellitus
+    reason: elevated_hba1c
+  severity: moderate
+- id: creatinine_ckd
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: Creatinine
+  condition:
+    operator: gt
+    value: 1.2
+    unit: mg/dL
+  output_edge:
+    type: MAY_INDICATE
+    condition: Chronic Kidney Disease
+    reason: elevated_creatinine
+  severity: high
+- id: egfr_ckd
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: eGFR
+  condition:
+    operator: lt
+    value: 60
+    unit: mL/min
+  output_edge:
+    type: MAY_INDICATE
+    condition: Chronic Kidney Disease
+    reason: low_egfr
+  severity: high
+- id: troponin_ami
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: Troponin I
+  condition:
+    operator: gt
+    value: 0.04
+    unit: ng/mL
+  output_edge:
+    type: MAY_INDICATE
+    condition: Acute Myocardial Infarction
+    reason: elevated_troponin
+  severity: critical
+- id: wbc_infection
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: WBC
+  condition:
+    operator: gt
+    value: 11.0
+    unit: 10^3/uL
+  output_edge:
+    type: MAY_INDICATE
+    condition: Infection
+    reason: elevated_wbc
+  severity: moderate
+- id: inr_anticoagulation_concern
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: INR
+  condition:
+    operator: gt
+    value: 3.0
+    unit: ratio
+  output_edge:
+    type: MAY_INDICATE
+    condition: Anticoagulation Concern
+    reason: supratherapeutic_inr
+  severity: high
+- id: ldl_hyperlipidemia
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: LDL
+  condition:
+    operator: gt
+    value: 130
+    unit: mg/dL
+  output_edge:
+    type: MAY_INDICATE
+    condition: Hyperlipidemia
+    reason: elevated_ldl
+  severity: moderate
+- id: tsh_hypothyroidism
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: TSH
+  condition:
+    operator: gt
+    value: 4.5
+    unit: mIU/L
+  output_edge:
+    type: MAY_INDICATE
+    condition: Hypothyroidism
+    reason: elevated_tsh
+  severity: moderate
+- id: tsh_hyperthyroidism
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: TSH
+  condition:
+    operator: lt
+    value: 0.5
+    unit: mIU/L
+  output_edge:
+    type: MAY_INDICATE
+    condition: Hyperthyroidism
+    reason: low_tsh
+  severity: moderate
+- id: hemoglobin_anemia
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: Hemoglobin
+  condition:
+    operator: lt
+    value: 12.0
+    unit: g/dL
+  output_edge:
+    type: MAY_INDICATE
+    condition: Anemia
+    reason: low_hemoglobin
+  severity: moderate
+- id: sodium_hyponatremia
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: Sodium
+  condition:
+    operator: lt
+    value: 135
+    unit: mmol/L
+  output_edge:
+    type: MAY_INDICATE
+    condition: Hyponatremia
+    reason: low_sodium
+  severity: high
+- id: sodium_hypernatremia
+  trigger:
+    event_type: LAB_RESULT
+    observation_name: Sodium
+  condition:
+    operator: gt
+    value: 145
+    unit: mmol/L
+  output_edge:
+    type: MAY_INDICATE
+    condition: Hypernatremia
+    reason: high_sodium
+  severity: high

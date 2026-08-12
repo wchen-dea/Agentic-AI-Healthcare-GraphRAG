@@ -12,8 +12,10 @@ Goals:
 
 ## ADR References
 
-- [ADR-0004: Embed FastMCP in rag-api](adrs/0004-embed-fastmcp-in-rag-api.md)
-- [ADR-0003: Local-first LLM with provider routing](adrs/0003-local-first-llm-provider-routing.md)
+- [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
+- [ADR-0006: Local-first LLM with provider routing](adrs/0006-local-first-llm-provider-routing.md)
+
+Skill composition roadmap strategy is described in [target_architecture.md](target_architecture.md), with actionable backlog sequencing in [future_improvements.md](future_improvements.md).
 
 ## Architecture Placement
 
@@ -27,24 +29,30 @@ AI Client (Copilot, Claude Desktop, custom agent)
 ```
 
 Default runtime mode is embedded MCP inside rag-api.
-The `mcp-server/` folder remains a standalone reference scaffold for future split-service deployments.
+The `mcp-server/` folder remains a standalone reference scaffold for optional split-service deployments.
 
 ## 1) Minimal Tool List
 
-Use 5 tools to keep scope small while covering high-value workflows.
+Use a minimal toolset while covering high-value workflows.
 
 | Tool Name | Purpose | Backing Service |
 | --- | --- | --- |
+| `skills_plan_get` | Resolve Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools plan | rag-api skills layer |
 | `patient_context_get` | Retrieve patient-centric graph context summary | Neo4j via rag-api or direct adapter |
 | `vector_evidence_search` | Retrieve top-k vector evidence for question/patient | Qdrant via rag-api or direct adapter |
 | `graphrag_answer_generate` | Generate grounded answer from vector + graph evidence | rag-api |
 | `risk_summary_generate` | Generate concise risk summary for one patient | rag-api + prompt policy |
+| `timeline_explain` | Explain patient progression over a bounded time window | rag-api |
+| `medication_risk_assess` | Assess contraindications, interactions, and adverse reaction risks | rag-api + Neo4j context |
+| `coding_gap_detect` | Surface coding and claims consistency gaps | rag-api + Neo4j/Qdrant evidence |
+| `cohort_risk_summary` | Summarize cross-patient risk signals for cohort triage | rag-api + Qdrant/Neo4j |
 | `evidence_bundle_export` | Return traceable evidence bundle for audit/review | rag-api aggregation |
 
 Notes:
 
 - Keep tool names stable; evolve behavior via versioned schemas.
-- Add async tools later only if needed (`ai_task_submit`, `ai_task_status_get`).
+- Add async tools optionally when needed (`ai_task_submit`, `ai_task_status_get`).
+- Skill-composed tool expansion roadmap is documented in [skills_layer.md](skills_layer.md), [target_architecture.md](target_architecture.md), and [future_improvements.md](future_improvements.md).
 
 ## 2) Request/Response Schemas
 
@@ -224,6 +232,57 @@ Request schema:
 }
 ```
 
+### `skills_plan_get`
+
+Request schema:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["business_goal"],
+  "properties": {
+    "business_goal": { "type": "string", "minLength": 3 },
+    "agent": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}
+```
+
+Response schema:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "flow",
+    "business_goal",
+    "agent",
+    "skills",
+    "context_requirements",
+    "ontology_dependencies",
+    "mcp_tools",
+    "runtime_tools",
+    "retrieved_at"
+  ],
+  "properties": {
+    "flow": { "type": "array", "items": { "type": "string" } },
+    "business_goal": { "type": "string" },
+    "goal_description": { "type": "string" },
+    "agent": { "type": "string" },
+    "skills": { "type": "array", "items": { "type": "object" } },
+    "context_requirements": { "type": "array", "items": { "type": "string" } },
+    "ontology_dependencies": { "type": "array", "items": { "type": "string" } },
+    "mcp_tools": { "type": "array", "items": { "type": "string" } },
+    "runtime_tools": { "type": "array", "items": { "type": "string" } },
+    "retrieved_at": { "type": "string", "format": "date-time" },
+    "trace_id": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+```
+
 Response schema:
 
 ```json
@@ -303,9 +362,9 @@ Do not log raw PHI payloads. Prefer hashes, IDs, and minimal metadata.
 - Enforce max response sizes and timeouts per tool.
 - Add per-tool rate and burst limits.
 
-## 4) Rollout Phases: Local Demo to Production
+## 4) Rollout Stages: Local Demo to Production
 
-### Phase 0: Local Design and Contract Freeze
+### Stage 0: Local Design and Contract Freeze
 
 1. Finalize 5-tool contract and JSON schemas in this document.
 2. MCP tool surface is implemented in rag-api over the shared query orchestration.
@@ -320,7 +379,7 @@ Current status:
 
 - Completed in current implementation (embedded MCP in rag-api with the 5-tool surface).
 
-### Phase 1: Local Demo Integration
+### Stage 1: Local Demo Integration
 
 1. Validate initialize handshake against `http://localhost:8000/mcp`.
 2. Keep non-protocol diagnostics available at `/mcp/health`.
@@ -335,7 +394,7 @@ Current status:
 
 - Completed for local stack (`/mcp` and `/mcp/health` active, smoke test script present).
 
-### Phase 2: Staging Hardening
+### Stage 2: Staging Hardening
 
 1. Add centralized auth (service identity).
 2. Add policy gates per tool and environment.
@@ -347,7 +406,7 @@ Exit criteria:
 - Security review passed.
 - SLO monitoring and alerts active.
 
-### Phase 3: Production Launch
+### Stage 3: Production Launch
 
 1. Enable production identity and secret management.
 2. Enable audited tool access with retention policy.

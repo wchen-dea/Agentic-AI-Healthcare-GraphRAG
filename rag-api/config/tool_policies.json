@@ -2,12 +2,17 @@
   "roles": {
     "read_only": [
       "patient_context_get",
-      "vector_evidence_search"
+      "vector_evidence_search",
+      "skills_plan_get"
     ],
     "generation": [
       "query",
       "graphrag_answer_generate",
-      "risk_summary_generate"
+      "risk_summary_generate",
+      "timeline_explain",
+      "medication_risk_assess",
+      "coding_gap_detect",
+      "cohort_risk_summary"
     ],
     "export": [
       "evidence_bundle_export"

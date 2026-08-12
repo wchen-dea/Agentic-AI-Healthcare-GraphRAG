@@ -1,4 +1,4 @@
-# ADR-0004: Embed FastMCP in rag-api
+# ADR-0005: Embed FastMCP in rag-api
 
 - Status: accepted
 - Date: 2026-06-26
@@ -20,6 +20,12 @@ Embed FastMCP in the same rag-api process and expose MCP at `/mcp`.
 - Human diagnostic endpoint remains at `/mcp/health`.
 - `mcp-server/` remains as a standalone reference scaffold, not default runtime.
 
+Current implementation alignment:
+
+- Embedded MCP tools run in the same process as REST query orchestration.
+- Skills planning is available through both REST (`POST /skills/plan`) and MCP (`skills_plan_get`).
+- Tool policy gating is centralized in `rag-api/config/tool_policies.json`.
+
 ## Consequences
 
 Positive:
@@ -37,4 +43,5 @@ Trade-offs:
 
 - [Architecture](../architecture.md)
 - [MCP Layer Design](../mcp_layer_design.md)
+- [Skills Layer](../skills_layer.md)
 - [Runbook](../runbook.md)

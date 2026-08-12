@@ -1,0 +1,30 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Device-specific terminology mappings separated from the generic vocabulary inventory.
+local_mappings:
+  device_types:
+  - local_code: monitor
+    standard_system: LOCAL_DEVICE_TYPE
+    standard_code: monitor
+    display: Monitor
+  - local_code: wearable
+    standard_system: LOCAL_DEVICE_TYPE
+    standard_code: wearable
+    display: Wearable
+  - local_code: bedside
+    standard_system: LOCAL_DEVICE_TYPE
+    standard_code: bedside
+    display: Bedside
+  - local_code: implant
+    standard_system: LOCAL_DEVICE_TYPE
+    standard_code: implant
+    display: Implant
+  - local_code: patch
+    standard_system: LOCAL_DEVICE_TYPE
+    standard_code: patch
+    display: Patch
+  - local_code: infusion_pump
+    standard_system: LOCAL_DEVICE_TYPE
+    standard_code: infusion_pump
+    display: Infusion Pump

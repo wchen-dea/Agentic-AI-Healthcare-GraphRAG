@@ -7,14 +7,66 @@ on:
     paths:
       - .github/workflows/rag-api-contracts.yml
       - rag-api/**
+      - skills/**
+      - scripts/generate_agent_skills.py
+      - scripts/validate_agent_skills.py
   pull_request:
     branches:
       - dev
     paths:
       - .github/workflows/rag-api-contracts.yml
       - rag-api/**
+      - skills/**
+      - scripts/generate_agent_skills.py
+      - scripts/validate_agent_skills.py
 
 jobs:
+  skills-layer-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify generated skill packages are in sync
+        run: python scripts/generate_agent_skills.py --check
+
+      - name: Validate Agent Skills packages
+        run: python scripts/validate_agent_skills.py
+
+      - name: Optional upstream skills-ref validation
+        shell: bash
+        run: |
+          run_validation() {
+            echo "skills-ref detected; running upstream validation for each skill package"
+            for skill_dir in skills/*; do
+              if [[ -d "$skill_dir" ]]; then
+                skills-ref validate "$skill_dir"
+              fi
+            done
+          }
+
+          if command -v skills-ref >/dev/null 2>&1; then
+            run_validation
+            exit 0
+          fi
+
+          echo "skills-ref binary not found; attempting best-effort install"
+          python -m pip install --user skills-ref >/tmp/skills-ref-install.log 2>&1 || true
+          export PATH="$HOME/.local/bin:$PATH"
+
+          if command -v skills-ref >/dev/null 2>&1; then
+            echo "skills-ref install succeeded"
+            run_validation
+          else
+            echo "skills-ref install failed; skipping optional upstream validation"
+            echo "Install log tail:"
+            tail -n 20 /tmp/skills-ref-install.log || true
+          fi
   contract-tests:
     runs-on: ubuntu-latest
     steps:
@@ -36,6 +88,12 @@ jobs:
 
       - name: Run rag-api contract tests
         run: .venv311/bin/python rag-api/tests/test_contracts.py
+
+      - name: Run planner evaluation suite
+        run: .venv311/bin/python rag-api/tests/test_planner_evaluation.py
+
+      - name: Run planner edge-case suite
+        run: .venv311/bin/python rag-api/tests/test_planner_edge_cases.py
 
   container-build:
     runs-on: ubuntu-latest

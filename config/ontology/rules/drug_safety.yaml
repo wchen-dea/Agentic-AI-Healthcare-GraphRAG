@@ -1,0 +1,350 @@
+version: 0.1.0
+status: draft
+owner: clinical-rules
+source_of_truth:
+- neo4j/init.cypher
+- docs/neo4j_model.md
+purpose: Declarative drug safety knowledge used to seed graph edges and later drive normalization and reasoning.
+adverse_outcomes:
+- code: DE
+  description: Death
+- code: LT
+  description: Life-Threatening
+- code: HO
+  description: Hospitalization - Initial or Prolonged
+- code: DS
+  description: Disability
+- code: CA
+  description: Congenital Anomaly
+- code: OT
+  description: Other Serious (Important Medical Events)
+interactions:
+- from: Warfarin
+  to: Azithromycin
+  risk: bleeding_risk
+  severity: high
+  mechanism: CYP3A4_inhibition_increases_warfarin_exposure
+- from: Warfarin
+  to: Aspirin
+  risk: bleeding_risk
+  severity: high
+  mechanism: additive_anticoagulation_and_antiplatelet
+- from: Lisinopril
+  to: Spironolactone
+  risk: hyperkalemia_risk
+  severity: moderate
+  mechanism: dual_potassium_sparing_ACE_inhibitor_plus_K_sparing_diuretic
+- from: Albuterol
+  to: Metoprolol
+  risk: bronchospasm_risk
+  severity: moderate
+  mechanism: pharmacological_antagonism_beta2_agonist_vs_beta_blocker
+- from: Metformin
+  to: Vancomycin
+  risk: nephrotoxicity_risk
+  severity: moderate
+  mechanism: renal_competition_reduces_metformin_clearance
+- from: Warfarin
+  to: Fluconazole
+  risk: bleeding_risk
+  severity: high
+  mechanism: CYP2C9_inhibition_markedly_raises_warfarin_INR
+- from: Aspirin
+  to: Clopidogrel
+  risk: bleeding_risk
+  severity: high
+  mechanism: dual_antiplatelet_aggregation
+- from: Atorvastatin
+  to: Azithromycin
+  risk: myopathy_risk
+  severity: moderate
+  mechanism: CYP3A4_inhibition_raises_statin_levels
+- from: Losartan
+  to: Spironolactone
+  risk: hyperkalemia_risk
+  severity: moderate
+  mechanism: dual_RAAS_blockade
+- from: Furosemide
+  to: Vancomycin
+  risk: nephrotoxicity_risk
+  severity: high
+  mechanism: synergistic_renal_toxicity
+- from: Metoprolol
+  to: Insulin Glargine
+  risk: hypoglycemia_masking
+  severity: moderate
+  mechanism: beta_blockade_masks_tachycardia_warning_sign
+- from: Dexamethasone
+  to: Insulin Glargine
+  risk: hyperglycemia_risk
+  severity: moderate
+  mechanism: glucocorticoid_induced_insulin_resistance
+- from: Clopidogrel
+  to: Omeprazole
+  risk: reduced_antiplatelet_efficacy
+  severity: moderate
+  mechanism: CYP2C19_inhibition_reduces_clopidogrel_activation
+- from: Hydrochlorothiazide
+  to: Furosemide
+  risk: electrolyte_depletion
+  severity: moderate
+  mechanism: additive_diuresis_hypokalemia_hyponatremia
+- from: Morphine
+  to: Gabapentin
+  risk: respiratory_depression
+  severity: high
+  mechanism: additive_CNS_depression
+known_reactions:
+- medication: Warfarin
+  symptom: palpitations
+  severity: high
+  meddra_term: Palpitation
+- medication: Warfarin
+  symptom: confusion
+  severity: high
+  meddra_term: Confusion
+- medication: Lisinopril
+  symptom: cough
+  severity: moderate
+  meddra_term: Cough
+- medication: Lisinopril
+  symptom: dizziness
+  severity: low
+  meddra_term: Dizziness
+- medication: Atorvastatin
+  symptom: fatigue
+  severity: moderate
+  meddra_term: Fatigue
+- medication: Atorvastatin
+  symptom: leg cramps
+  severity: moderate
+  meddra_term: Myalgia
+- medication: Amoxicillin
+  symptom: swelling
+  severity: high
+  meddra_term: Angioedema
+- medication: Amoxicillin
+  symptom: shortness of breath
+  severity: high
+  meddra_term: Dyspnoea
+- medication: Metformin
+  symptom: nausea
+  severity: low
+  meddra_term: Nausea
+- medication: Metformin
+  symptom: vomiting
+  severity: low
+  meddra_term: Vomiting
+- medication: Metoprolol
+  symptom: dizziness
+  severity: moderate
+  meddra_term: Dizziness
+- medication: Metoprolol
+  symptom: fatigue
+  severity: low
+  meddra_term: Fatigue
+- medication: Albuterol
+  symptom: palpitations
+  severity: moderate
+  meddra_term: Palpitation
+- medication: Albuterol
+  symptom: chest pain
+  severity: moderate
+  meddra_term: Chest Pain
+- medication: Levothyroxine
+  symptom: palpitations
+  severity: moderate
+  meddra_term: Palpitation
+- medication: Levothyroxine
+  symptom: weight loss
+  severity: moderate
+  meddra_term: Weight loss
+- medication: Morphine
+  symptom: dizziness
+  severity: moderate
+  meddra_term: Dizziness
+- medication: Morphine
+  symptom: nausea
+  severity: low
+  meddra_term: Nausea
+- medication: Sertraline
+  symptom: headache
+  severity: low
+  meddra_term: Headache
+- medication: Sertraline
+  symptom: nausea
+  severity: low
+  meddra_term: Nausea
+- medication: Azithromycin
+  symptom: nausea
+  severity: low
+  meddra_term: Nausea
+- medication: Azithromycin
+  symptom: shortness of breath
+  severity: high
+  meddra_term: QT Prolongation/Dyspnoea
+- medication: Amlodipine
+  symptom: swelling
+  severity: moderate
+  meddra_term: Peripheral Oedema
+- medication: Amlodipine
+  symptom: dizziness
+  severity: low
+  meddra_term: Dizziness
+- medication: Omeprazole
+  symptom: headache
+  severity: low
+  meddra_term: Headache
+- medication: Omeprazole
+  symptom: nausea
+  severity: low
+  meddra_term: Nausea
+- medication: Losartan
+  symptom: dizziness
+  severity: low
+  meddra_term: Dizziness
+- medication: Losartan
+  symptom: headache
+  severity: low
+  meddra_term: Headache
+- medication: Gabapentin
+  symptom: dizziness
+  severity: moderate
+  meddra_term: Dizziness
+- medication: Gabapentin
+  symptom: confusion
+  severity: moderate
+  meddra_term: Confusion
+- medication: Gabapentin
+  symptom: blurred vision
+  severity: low
+  meddra_term: Vision Blurred
+- medication: Hydrochlorothiazide
+  symptom: dizziness
+  severity: moderate
+  meddra_term: Orthostatic Hypotension
+- medication: Hydrochlorothiazide
+  symptom: leg cramps
+  severity: moderate
+  meddra_term: Hypokalaemia/Muscle Cramp
+- medication: Prednisone
+  symptom: weight loss
+  severity: moderate
+  meddra_term: Weight Decreased
+- medication: Prednisone
+  symptom: fatigue
+  severity: low
+  meddra_term: Fatigue
+- medication: Prednisone
+  symptom: night sweats
+  severity: low
+  meddra_term: Night Sweats
+- medication: Heparin
+  symptom: shortness of breath
+  severity: high
+  meddra_term: Dyspnoea
+- medication: Heparin
+  symptom: swelling
+  severity: high
+  meddra_term: Heparin-Induced Thrombocytopenia
+- medication: Insulin Glargine
+  symptom: confusion
+  severity: high
+  meddra_term: Hypoglycaemia/Confusion
+- medication: Insulin Glargine
+  symptom: dizziness
+  severity: moderate
+  meddra_term: Hypoglycaemia/Dizziness
+- medication: Furosemide
+  symptom: dizziness
+  severity: moderate
+  meddra_term: Hypotension/Dizziness
+- medication: Furosemide
+  symptom: leg cramps
+  severity: moderate
+  meddra_term: Hypokalaemia/Muscle Cramp
+- medication: Clopidogrel
+  symptom: headache
+  severity: low
+  meddra_term: Headache
+- medication: Clopidogrel
+  symptom: dizziness
+  severity: low
+  meddra_term: Dizziness
+- medication: Dexamethasone
+  symptom: fatigue
+  severity: low
+  meddra_term: Fatigue
+- medication: Dexamethasone
+  symptom: weight loss
+  severity: moderate
+  meddra_term: Weight Decreased
+contraindications:
+- medication: Warfarin
+  condition: Anemia
+  reason: increased_bleeding_risk
+  severity: high
+- medication: Lisinopril
+  condition: Hyperkalemia
+  reason: worsens_hyperkalemia
+  severity: high
+- medication: Metformin
+  condition: Chronic Kidney Disease
+  reason: lactic_acidosis_risk
+  severity: high
+- medication: Spironolactone
+  condition: Hyperkalemia
+  reason: worsens_hyperkalemia
+  severity: high
+- medication: Albuterol
+  condition: Heart Failure
+  reason: tachycardia_risk
+  severity: moderate
+- medication: Vancomycin
+  condition: Chronic Kidney Disease
+  reason: nephrotoxicity
+  severity: high
+- medication: Heparin
+  condition: Anemia
+  reason: increased_bleeding_risk
+  severity: high
+- medication: Clopidogrel
+  condition: Anemia
+  reason: increased_bleeding_risk
+  severity: high
+- medication: Prednisone
+  condition: Diabetes Mellitus
+  reason: steroid_induced_hyperglycemia
+  severity: moderate
+- medication: Dexamethasone
+  condition: Diabetes Mellitus
+  reason: glucocorticoid_raises_blood_glucose
+  severity: moderate
+- medication: Hydrochlorothiazide
+  condition: Hyponatremia
+  reason: thiazide_worsens_hyponatremia
+  severity: high
+- medication: Losartan
+  condition: Hyperkalemia
+  reason: ARB_raises_serum_potassium
+  severity: high
+- medication: Furosemide
+  condition: Hyponatremia
+  reason: loop_diuretic_electrolyte_depletion
+  severity: moderate
+- medication: Morphine
+  condition: Chronic Kidney Disease
+  reason: active_metabolite_accumulation
+  severity: high
+- medication: Gabapentin
+  condition: Chronic Kidney Disease
+  reason: requires_renal_dose_adjustment
+  severity: moderate
+- medication: Aspirin
+  condition: Heart Failure
+  reason: fluid_retention_worsens_heart_failure
+  severity: moderate
+- medication: Metoprolol
+  condition: Asthma
+  reason: beta_blockade_induces_bronchospasm
+  severity: high

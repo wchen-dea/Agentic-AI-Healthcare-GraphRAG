@@ -305,13 +305,15 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 | `GET` | `/health` | None | Liveness probe |
 | `GET` | `/metrics` | None | Prometheus metrics (text/plain) |
 | `POST` | `/query` | `X-Caller-Role` header | Full GraphRAG query (vector + graph + LLM) |
+| `POST` | `/skills/plan` | `X-Caller-Role` header | Resolve Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools |
 | `GET` | `/mcp/health` | None | MCP diagnostic probe |
 | `*` | `/mcp` | MCP protocol | FastMCP Streamable HTTP endpoint |
 
-### MCP tools (5)
+### MCP tools (6)
 
 | Tool | Caller role | Backing path |
 |------|------------|-------------|
+| `skills_plan_get` | `read_only` | load_skills_layer() + build_skill_plan() |
 | `patient_context_get` | `read_only` | graph_context() |
 | `vector_evidence_search` | `read_only` | vector_context() |
 | `graphrag_answer_generate` | `generation` | run_query() + ask_ollama() |
@@ -322,7 +324,7 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 
 | Role | Permitted tools |
 |------|----------------|
-| `read_only` | `patient_context_get`, `vector_evidence_search` |
+| `read_only` | `skills_plan_get`, `patient_context_get`, `vector_evidence_search` |
 | `generation` | `query`, `graphrag_answer_generate`, `risk_summary_generate` |
 | `export` | `evidence_bundle_export` |
 
@@ -419,11 +421,12 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 ## 11. CI / CD Pipeline
 
 **File:** `.github/workflows/rag-api-contracts.yml`  
-**Trigger:** push or PR to `dev` branch touching `rag-api/**` or the workflow file itself
+**Trigger:** push or PR to `dev` branch touching `rag-api/**`, `skills/**`, skill-generation scripts, or the workflow file itself
 
 | Job | Runner | Steps |
 |-----|--------|-------|
-| `contract-tests` | ubuntu-latest | Checkout → Python 3.11 + pip cache → install `rag-api/requirements.txt` → `python rag-api/tests/test_contracts.py` (6 tests, ~1 s) |
+| `skills-layer-validation` | ubuntu-latest | Checkout → Python 3.11 → `python scripts/generate_agent_skills.py --check` → `python scripts/validate_agent_skills.py` → optional `skills-ref validate` pass (best-effort install, skip on unavailable binary) |
+| `contract-tests` | ubuntu-latest | Checkout → Python 3.11 + pip cache → install `rag-api/requirements.txt` → `python rag-api/tests/test_contracts.py` (10 tests, ~1-3 s) → `python rag-api/tests/test_planner_evaluation.py` (fixture-driven route/plan assertions) |
 | `container-build` | ubuntu-latest | Checkout → `docker build -f rag-api/Dockerfile` |
 
 Both jobs run in parallel. Neither requires live external services (all dependencies mocked in contract tests).
@@ -457,3 +460,4 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `FLINK_CHECKPOINT_INTERVAL_MS` | `10000` | flink-app | Checkpoint interval |
 | `RAG_API_DEFAULT_CALLER_ROLE` | `generation` | rag-api | Role when no header present |
 | `RAG_API_AUDIT_LOG_PATH` | `logs/rag_api_audit.log` | rag-api | Audit JSONL output path |
+| `RAG_API_SKILLS_LAYER_PATH` | `config/skills_layer.json` | rag-api | Skills layer source for plan resolution |

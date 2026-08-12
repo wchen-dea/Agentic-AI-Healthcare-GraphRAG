@@ -1,0 +1,79 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Medication reference semantics separated from the generic vocabulary inventory.
+local_mappings:
+  medication_drug_classes:
+  - local_code: Anticoagulant
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: anticoagulant
+    display: Anticoagulant
+  - local_code: Antihypertensive
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: antihypertensive
+    display: Antihypertensive
+  - local_code: Antidiabetic
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: antidiabetic
+    display: Antidiabetic
+  - local_code: Antibiotic
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: antibiotic
+    display: Antibiotic
+  - local_code: Bronchodilator
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: bronchodilator
+    display: Bronchodilator
+  - local_code: Statin
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: statin
+    display: Statin
+  - local_code: PPI
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: ppi
+    display: PPI
+  - local_code: Beta-Blocker
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: beta_blocker
+    display: Beta-Blocker
+  - local_code: Thyroid Hormone
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: thyroid_hormone
+    display: Thyroid Hormone
+  - local_code: Anticonvulsant
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: anticonvulsant
+    display: Anticonvulsant
+  - local_code: Antidepressant
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: antidepressant
+    display: Antidepressant
+  - local_code: Diuretic
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: diuretic
+    display: Diuretic
+  - local_code: Corticosteroid
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: corticosteroid
+    display: Corticosteroid
+  - local_code: Opioid Analgesic
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: opioid_analgesic
+    display: Opioid Analgesic
+  - local_code: Antiplatelet
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: antiplatelet
+    display: Antiplatelet
+  medication_safety_tiers:
+  - local_code: routine
+    standard_system: LOCAL_MEDICATION_SAFETY_TIER
+    standard_code: routine
+    display: Routine
+  - local_code: monitor
+    standard_system: LOCAL_MEDICATION_SAFETY_TIER
+    standard_code: monitor
+    display: Monitor
+  - local_code: high-alert
+    standard_system: LOCAL_MEDICATION_SAFETY_TIER
+    standard_code: high_alert
+    display: High-Alert

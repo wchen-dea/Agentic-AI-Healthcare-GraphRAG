@@ -114,6 +114,23 @@ Expected output starts with:
 
 - MCP smoke test passed
 
+### 5a) Skills Layer Plan Endpoint Check
+
+```bash
+curl -s -X POST http://localhost:8000/skills/plan \
+  -H "Content-Type: application/json" \
+  -H "X-Caller-Role: read_only" \
+  -d '{"business_goal":"medication_safety_review"}' | jq .
+```
+
+Expected response includes:
+
+- `business_goal`
+- `agent`
+- `skills`
+- `mcp_tools`
+- `runtime_tools`
+
 ### 6) Qdrant Collection
 
 ```bash
@@ -275,6 +292,26 @@ docker logs --tail=200 healthcare-flink-app
 Expected line after successful submission:
 
 - Job has been submitted with JobID ...
+
+## Skills Package Operations
+
+Generate Agent Skills package files from the runtime skills layer config:
+
+```bash
+python scripts/generate_agent_skills.py
+```
+
+Check for drift without modifying files:
+
+```bash
+python scripts/generate_agent_skills.py --check
+```
+
+Validate generated skill folders and SKILL.md frontmatter:
+
+```bash
+python scripts/validate_agent_skills.py
+```
 
 ## Common Failure Modes And Fixes
 

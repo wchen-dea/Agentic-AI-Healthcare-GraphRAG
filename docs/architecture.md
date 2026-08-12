@@ -10,10 +10,14 @@ It is optimized for reproducible local experimentation with clear lineage and fu
 
 Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
 
-- [ADR-0001: Use dual persistence (Qdrant + Neo4j)](adrs/0001-dual-persistence-qdrant-neo4j.md)
-- [ADR-0002: Qdrant as the streaming vector store for real-time RAG](adrs/0002-qdrant-streaming-vector-store.md)
-- [ADR-0003: Local-first LLM with provider routing](adrs/0003-local-first-llm-provider-routing.md)
-- [ADR-0004: Embed FastMCP in rag-api](adrs/0004-embed-fastmcp-in-rag-api.md)
+- [ADR-0002: Use dual persistence (Qdrant + Neo4j)](adrs/0002-dual-persistence-qdrant-neo4j.md)
+- [ADR-0003: Qdrant as the streaming vector store for real-time RAG](adrs/0003-qdrant-streaming-vector-store.md)
+- [ADR-0006: Local-first LLM with provider routing](adrs/0006-local-first-llm-provider-routing.md)
+- [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
+
+Roadmap design strategy is documented in [docs/target_architecture.md](target_architecture.md), and execution backlog details are maintained in [docs/future_improvements.md](future_improvements.md).
+
+Runtime skill orchestration flow and contracts are documented in [docs/skills_layer.md](skills_layer.md).
 
 ## Why This Architecture Scales Across Healthcare Sections
 
@@ -70,7 +74,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 | Contract-First Tooling | MCP tool request/response schemas and contract tests | Keeps tool semantics stable while internals change | Implemented |
 | Bounded Context Window | Max question/context/evidence/answer and response-byte budgets | Prevents unbounded prompt/output growth and latency spikes | Implemented |
 | Observability by Design | Prometheus metrics + Grafana latency dashboards + health probes | Makes latency and failure modes visible during iteration | Implemented |
-| Adapter Pattern for LLM Providers | Provider-agnostic client sketch in architecture doc | Enables future Anthropic/OpenAI routing without rewriting retrieval | Planned extension |
+| Adapter Pattern for LLM Providers | Provider-agnostic client sketch in architecture doc | Enables Anthropic/OpenAI routing without rewriting retrieval | Roadmap |
 
 ### Pattern Mapping to Repository Components
 
@@ -81,7 +85,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 - Contract-First Tooling: [rag-api/tests/test_contracts.py](../rag-api/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
 - Bounded Context Window: [rag-api/app.py](../rag-api/app.py) (`max_*` settings and truncation/budget helpers)
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
-- Adapter Pattern (planned): [docs/adrs/0003-local-first-llm-provider-routing.md](adrs/0003-local-first-llm-provider-routing.md)
+- Adapter Pattern (roadmap): [docs/adrs/0006-local-first-llm-provider-routing.md](adrs/0006-local-first-llm-provider-routing.md)
 
 ## Architecture At A Glance
 
@@ -259,11 +263,11 @@ MCP delivery in the current implementation:
 - MCP protocol endpoint: `POST /mcp` (streamable HTTP).
 - Human diagnostic endpoint: `GET /mcp/health`.
 
-### Future Extension: Anthropic/OpenAI Routing
+### Roadmap Extension: Anthropic/OpenAI Routing
 
 The current repository runtime does not yet include a provider adapter in `rag-api/app.py`.
 
-For a future production extension, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
+For production extension, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
 
 Recommended provider adapter contract:
 
@@ -414,7 +418,7 @@ Query flow:
 5. Build a synthesis prompt and call Ollama /api/generate.
 6. Return answer plus vector_context and graph_context.
 
-#### Provider-Agnostic LLM Interface Sketch (Future)
+#### Provider-Agnostic LLM Interface Sketch (Roadmap)
 
 The API can keep retrieval logic unchanged and swap only generation providers through an adapter.
 This sketch is design guidance and is not the current implementation.
@@ -494,7 +498,7 @@ def ask_llm(prompt: str) -> str:
   return LLM_CLIENT.generate(prompt, LLM_CFG)
 ```
 
-Environment-driven routing variables for future adapter mode:
+Environment-driven routing variables for adapter mode:
 
 - LLM_PROVIDER: ollama, anthropic, or openai
 - LLM_MODEL: provider-specific model name
@@ -553,7 +557,7 @@ Producer master topic write
 - Flink starts from earliest offsets, so local restarts can replay historical topic data.
 - Processor writes are designed around stable identifiers to keep upserts deterministic.
 - Reference store is process memory; recovery of reference context relies on replay.
-- healthcare.dlq.events currently exists for future hardening but is not populated by the active processor.
+- healthcare.dlq.events currently exists for hardening but is not populated by the active processor.
 
 ## Security And Scope
 

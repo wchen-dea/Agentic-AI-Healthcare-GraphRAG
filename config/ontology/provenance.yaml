@@ -1,0 +1,44 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Provenance, trust, and policy classes for canonical evidence.
+source_system_classes:
+- source_type: EHR
+  trust_level: high
+  phi_class: clinical_phi
+  retention_class: standard_clinical
+- source_type: LAB
+  trust_level: high
+  phi_class: clinical_phi
+  retention_class: standard_clinical
+- source_type: DEVICE
+  trust_level: medium
+  phi_class: clinical_phi
+  retention_class: standard_clinical
+- source_type: PHARMACY
+  trust_level: high
+  phi_class: medication_phi
+  retention_class: medication_safety
+- source_type: CLAIMS
+  trust_level: medium
+  phi_class: financial_phi
+  retention_class: revenue_cycle
+- source_type: REFERENCE
+  trust_level: curated
+  phi_class: reference_data
+  retention_class: master_data
+evidence_classes:
+- id: vector_event_text
+  description: Rendered event text suitable for vector retrieval.
+  default_access: bounded
+- id: graph_fact
+  description: Structured relationship or property evidence from Neo4j.
+  default_access: standard
+- id: llm_summary
+  description: Generated synthesis over bounded evidence.
+  default_access: generated
+policy_defaults:
+  raw_payload_returned: false
+  redact_vector_text_for_roles: [read_only, generation]
+  broader_graph_access_roles: [export]
+  audit_required: true

@@ -114,8 +114,27 @@ Ops/UI
 - Local observability for Kafka, Flink, Neo4j, and Qdrant.
 - Provider-facing UI for query workflows without curl.
 - Embedded MCP tool endpoint in rag-api for agent integration without a separate MCP service.
+- Runtime Skills layer planning endpoint and MCP tool (`/skills/plan`, `skills_plan_get`) to map business goals to executable tool chains.
 - Role-based API and MCP guardrails with caller-policy authorization, evidence redaction rules, and response budget metadata.
 - CI-backed rag-api contract checks plus container build validation for the hardened API surface.
+
+## Skills Layer And Agent Skills Packages
+
+This repository includes a runtime Skills layer plus generated Agent Skills packages.
+
+- Runtime planner config: `rag-api/config/skills_layer.json`
+- Runtime resolver: `rag-api/skills_layer.py`
+- REST endpoint: `POST /skills/plan`
+- MCP tool: `skills_plan_get`
+- Generated Agent Skills packages: `skills/`
+
+Generate and validate skill packages:
+
+```bash
+python scripts/generate_agent_skills.py
+python scripts/generate_agent_skills.py --check
+python scripts/validate_agent_skills.py
+```
 
 ## MCP Quick Verify
 
@@ -228,6 +247,7 @@ Use this service for local-only integration and smoke testing. It is separate fr
 | RAG API docs | <http://localhost:8000/docs> |
 | RAG API health | <http://localhost:8000/health> |
 | RAG API metrics | <http://localhost:8000/metrics> |
+| RAG API skills plan | <http://localhost:8000/skills/plan> |
 | MCP server endpoint | <http://localhost:8000/mcp> |
 | MCP diagnostic health | <http://localhost:8000/mcp/health> |
 | Provider web app | <http://localhost:8088> |
@@ -320,6 +340,7 @@ monitoring/     Prometheus, Grafana, alerting, and blackbox config
 neo4j/          Constraints and seed graph relationships
 producer/       Synthetic event producer
 rag-api/        FastAPI GraphRAG API
+skills/         Generated Agent Skills packages (`SKILL.md` + references)
 schemas/        Avro envelope schema
 scripts/        Validation and query helper scripts
 webapp/         Provider-facing static UI
@@ -346,6 +367,7 @@ deploy/production/k8s/ Kubernetes-ready AI component manifests
 | [docs/kafka_schema.md](docs/kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
 | [docs/neo4j_model.md](docs/neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
 | [docs/mcp_layer_design.md](docs/mcp_layer_design.md) | MCP tool contracts, schemas, rollout phases |
+| [docs/skills_layer.md](docs/skills_layer.md) | Skills layer flow, generated packages, and validation |
 | [docs/runbook.md](docs/runbook.md) | Operations runbook, health checks, failure modes |
 | [docs/ai_qa.md](docs/ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
 | [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |

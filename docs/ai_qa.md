@@ -7,6 +7,8 @@ across its three evidence paths: vector retrieval (Qdrant), graph traversal (Neo
 LLM answer generation (Ollama). Each path has distinct failure modes and requires a
 different validation technique.
 
+Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [target_architecture.md](target_architecture.md), [future_improvements.md](future_improvements.md), [skills_layer.md](skills_layer.md), and [technical_specs.md](technical_specs.md).
+
 ```
 Question
   │
@@ -41,6 +43,35 @@ live stack is required.
 | `test_generation_and_export_have_different_evidence_defaults` | `graphrag_answer_generate` redacts text (`access_level: none`); `evidence_bundle_export` returns bounded text (`access_level: bounded`) |
 | `test_query_accepts_explicit_generation_role_header` | `X-Caller-Role: generation` header is respected |
 | `test_query_trims_response_to_configured_budget` | Response byte budget (`RAG_API_MAX_RESPONSE_BYTES`) is enforced; `guardrails.response_truncated` is set when trimmed |
+| `test_skills_plan_endpoint_returns_flow_and_tools` | `/skills/plan` resolves the configured skill flow and returns MCP/runtime tool chains |
+| `test_skills_plan_endpoint_rejects_unknown_goal` | `/skills/plan` returns a validation error for unknown business goals |
+| `test_query_includes_planner_metadata` | `/query` response includes deterministic planner metadata (`request_type`, `retrieval_plan`) |
+| `test_expanded_mcp_tools_return_expected_shapes` | Expanded MCP tools (`timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`) return expected payload shapes |
+
+### Planner evaluation suite (Stage 2)
+
+**Files:** `rag-api/tests/test_planner_evaluation.py`, `rag-api/tests/fixtures/planner_route_fixtures.json`  
+**Runner:** `python rag-api/tests/test_planner_evaluation.py`
+
+This suite validates planner route selection and plan generation with fixture-driven assertions:
+
+- request-type classification for medication safety, lab interpretation, coding review, cohort triage, and patient summary
+- precedence behavior when multiple semantic cues appear in one question
+- expected plan fields (`name`, `query_text` prefix, `top_k`, `reason`)
+- bounded `top_k` behavior so plan limits do not exceed configured caps
+
+### Planner edge-case suite (Stage 2)
+
+**File:** `rag-api/tests/test_planner_edge_cases.py`  
+**Runner:** `python rag-api/tests/test_planner_edge_cases.py`
+
+This suite focuses on negative and edge conditions that are easy to miss in happy-path fixtures:
+
+- ambiguous prompt precedence (medication semantics over mixed cues)
+- empty patient scope transition to cohort routing
+- non-positive `max_top_k` bound handling
+- deterministic vector ranking order (priority, score, stable tie-break)
+- deterministic cohort graph ranking order
 
 ### How to run locally
 
@@ -53,12 +84,14 @@ cd /path/to/Agentic-AI-Healthcare-GraphRAG
 python3.11 -m venv .venv311
 .venv311/bin/pip install -r rag-api/requirements.txt
 .venv311/bin/python rag-api/tests/test_contracts.py
+.venv311/bin/python rag-api/tests/test_planner_evaluation.py
+.venv311/bin/python rag-api/tests/test_planner_edge_cases.py
 ```
 
 Expected output:
 
 ```
-Ran 6 tests in ~1s
+Ran 10 tests in ~1-3s
 
 OK
 ```
@@ -347,10 +380,17 @@ Expected output:
 ```
 git push → dev branch
   │
+  ├── skills-layer-validation job
+  │     ├── python scripts/generate_agent_skills.py --check
+  │     ├── python scripts/validate_agent_skills.py
+  │     └── optional skills-ref validate (best-effort install, non-blocking if unavailable)
+  │
   ├── contract-tests job
   │     ├── python 3.11 venv
   │     ├── pip install rag-api/requirements.txt
-  │     └── python rag-api/tests/test_contracts.py  ← 6 tests, ~2 s
+  │     ├── python rag-api/tests/test_contracts.py  ← 10 tests, ~2-4 s
+  │     ├── python rag-api/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
+  │     └── python rag-api/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
   │
   └── container-build job
         └── docker build -f rag-api/Dockerfile      ← validates image builds
@@ -358,7 +398,7 @@ git push → dev branch
 
 Neither job requires live external services. The contract tests mock all three
 dependencies (Qdrant, Neo4j, Ollama) and validate response shape, guardrail metadata,
-role enforcement, text redaction, and byte-budget trimming.
+role enforcement, text redaction, byte-budget trimming, and skills-plan resolution behavior.
 
 ---
 
@@ -366,6 +406,7 @@ role enforcement, text redaction, and byte-budget trimming.
 
 | Gap | Recommended next step |
 |-----|-----------------------|
+| Ontology and rule-pack conformance | Validate `config/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
 | Graph integration tests after event injection | Add `rag-api/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
 | Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
 | Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |

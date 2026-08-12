@@ -191,13 +191,11 @@ services:
     depends_on:
       - neo4j
     entrypoint: ["/bin/sh", "-c"]
-    command: |
-      "
-      sleep 25
-      cypher-shell -a ${NEO4J_URI:-bolt://neo4j:7687} -u ${NEO4J_USER:-neo4j} -p ${NEO4J_PASSWORD:-healthcare123} -f /init.cypher || true
-      "
+    command: /bin/sh /bootstrap.sh
     volumes:
       - ./neo4j/init.cypher:/init.cypher
+      - ./neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
+      - ./neo4j/bootstrap.sh:/bootstrap.sh
 
   neodash:
     image: neo4jlabs/neodash:latest

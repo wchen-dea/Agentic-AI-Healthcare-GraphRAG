@@ -1,0 +1,22 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Provider-specific terminology mappings separated from the generic vocabulary inventory.
+local_mappings:
+  provider_specialties:
+  - local_code: cardiology
+    standard_system: NUCC_TAXONOMY_GROUPING
+    standard_code: TBD
+    display: Cardiology
+  - local_code: internal medicine
+    standard_system: NUCC_TAXONOMY_GROUPING
+    standard_code: TBD
+    display: Internal Medicine
+  - local_code: family medicine
+    standard_system: NUCC_TAXONOMY_GROUPING
+    standard_code: TBD
+    display: Family Medicine
+  - local_code: pulmonology
+    standard_system: NUCC_TAXONOMY_GROUPING
+    standard_code: TBD
+    display: Pulmonology

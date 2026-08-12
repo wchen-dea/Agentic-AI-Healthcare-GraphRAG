@@ -1,0 +1,107 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Canonical healthcare entity definitions shared across ingestion, graph, retrieval, and tool layers.
+entities:
+- id: patient
+  canonical_name: Patient
+  aliases: [member, subject]
+  source_types: [REFERENCE, EHR, LAB, DEVICE, PHARMACY, CLAIMS]
+  required_properties: [id]
+  optional_properties: [name, sex, age, risk_tier]
+- id: encounter
+  canonical_name: Encounter
+  aliases: [episode_of_care, visit]
+  source_types: [EHR, LAB, DEVICE, PHARMACY, CLAIMS]
+  required_properties: [id]
+  optional_properties: [encounter_class, location]
+- id: clinical_event
+  canonical_name: ClinicalEvent
+  aliases: [event, source_event]
+  source_types: [EHR, LAB, DEVICE, PHARMACY, CLAIMS]
+  required_properties: [event_id, event_ts, event_type, source_system, source_type]
+  optional_properties: [schema_version, payload_hash]
+- id: observation
+  canonical_name: Observation
+  aliases: [lab_result, measurement]
+  source_types: [LAB]
+  required_properties: [id, name, value]
+  optional_properties: [unit, abnormal, lab_panel, specimen_type]
+- id: condition
+  canonical_name: Condition
+  aliases: [diagnosis, problem]
+  source_types: [EHR, LAB, PHARMACY, CLAIMS]
+  required_properties: [name]
+  optional_properties: [first_seen_ts, last_seen_ts, severity]
+- id: symptom
+  canonical_name: Symptom
+  aliases: [finding, complaint]
+  source_types: [EHR]
+  required_properties: [name]
+  optional_properties: [display]
+- id: medication
+  canonical_name: Medication
+  aliases: [drug, therapeutic_agent]
+  source_types: [PHARMACY, REFERENCE]
+  required_properties: [name]
+  optional_properties: [drug_class, active_ingredient, safety_tier]
+- id: medication_order
+  canonical_name: MedicationOrder
+  aliases: [order, prescription]
+  source_types: [PHARMACY]
+  required_properties: [id]
+  optional_properties: [dose, route, frequency, order_type, days_supply]
+- id: device
+  canonical_name: Device
+  aliases: [monitor, sensor]
+  source_types: [DEVICE, REFERENCE]
+  required_properties: [id]
+  optional_properties: [device_type, model, vendor, firmware_version, connectivity]
+- id: device_reading
+  canonical_name: DeviceReading
+  aliases: [telemetry_event, vital_sign]
+  source_types: [DEVICE]
+  required_properties: [id]
+  optional_properties: [heart_rate, spo2, systolic_bp, diastolic_bp, temperature_c, respiratory_rate, glucose_mg_dl, alert]
+- id: claim
+  canonical_name: Claim
+  aliases: [claims_event, reimbursement_claim]
+  source_types: [CLAIMS]
+  required_properties: [id]
+  optional_properties: [status, claim_type, diagnosis_code, billed_amount, allowed_amount, service_date]
+- id: procedure
+  canonical_name: Procedure
+  aliases: [cpt, service]
+  source_types: [CLAIMS]
+  required_properties: [code]
+  optional_properties: [description]
+- id: provider
+  canonical_name: Provider
+  aliases: [clinician, practitioner]
+  source_types: [REFERENCE, EHR]
+  required_properties: [id]
+  optional_properties: [name, specialty, organization, npi]
+- id: payer
+  canonical_name: Payer
+  aliases: [insurer, plan]
+  source_types: [REFERENCE, CLAIMS]
+  required_properties: [name]
+  optional_properties: [plan_type, region, network_tier]
+- id: adverse_event
+  canonical_name: AdverseEvent
+  aliases: [drug_reaction, pharmacovigilance_signal]
+  source_types: [EHR, PHARMACY]
+  required_properties: [id, symptom_name]
+  optional_properties: [detected_ts, severity, meddra_term, source_event_id]
+- id: adverse_outcome
+  canonical_name: AdverseOutcome
+  aliases: [faers_outcome]
+  source_types: [CLAIMS]
+  required_properties: [code]
+  optional_properties: [description]
+- id: icd10_code
+  canonical_name: ICD10Code
+  aliases: [diagnosis_code]
+  source_types: [EHR, CLAIMS]
+  required_properties: [code]
+  optional_properties: [display]

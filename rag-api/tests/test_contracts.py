@@ -39,8 +39,16 @@ class RagApiContractTests(unittest.TestCase):
             json.dumps(
                 {
                     "roles": {
-                        "read_only": ["patient_context_get", "vector_evidence_search"],
-                        "generation": ["query", "graphrag_answer_generate", "risk_summary_generate"],
+                        "read_only": ["patient_context_get", "vector_evidence_search", "skills_plan_get"],
+                        "generation": [
+                            "query",
+                            "graphrag_answer_generate",
+                            "risk_summary_generate",
+                            "timeline_explain",
+                            "medication_risk_assess",
+                            "coding_gap_detect",
+                            "cohort_risk_summary",
+                        ],
                         "export": ["evidence_bundle_export"],
                     }
                 }
@@ -297,6 +305,109 @@ class RagApiContractTests(unittest.TestCase):
         encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         self.assertLessEqual(len(encoded), 750)
         self.assertTrue(payload["guardrails"]["response_truncated"])
+
+    def test_skills_plan_endpoint_returns_flow_and_tools(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "skills-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+        client = TestClient(rag_app.app)
+
+        response = client.post(
+            "/skills/plan",
+            json={"business_goal": "medication_safety_review"},
+            headers={"X-Caller-Role": "read_only"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["business_goal"], "medication_safety_review")
+        self.assertEqual(payload["flow"], ["Business Goals", "Agent", "Skills", "Context", "Ontology", "MCP", "Tools"])
+        self.assertIn("patient_context_get", payload["mcp_tools"])
+        self.assertIn("evidence_bundle_export", payload["mcp_tools"])
+
+    def test_skills_plan_endpoint_rejects_unknown_goal(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "skills-error-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+        client = TestClient(rag_app.app)
+
+        response = client.post(
+            "/skills/plan",
+            json={"business_goal": "unknown_goal"},
+            headers={"X-Caller-Role": "read_only"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Unknown business_goal", response.json()["detail"])
+
+    def test_query_includes_planner_metadata(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "planner-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+        client = TestClient(rag_app.app)
+
+        with patch.object(rag_app, "vector_context", return_value=[]), patch.object(
+            rag_app, "graph_context", return_value=[]
+        ), patch.object(rag_app, "ask_ollama", return_value="Planner path"):
+            response = client.post(
+                "/query",
+                json={"question": "Review medication contraindication risk", "patient_id": "patient-77"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["request_type"], "medication_safety")
+        self.assertEqual(payload["retrieval_plan"]["name"], "medication_safety")
+        self.assertIn("reason", payload["retrieval_plan"])
+
+    def test_expanded_mcp_tools_return_expected_shapes(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "expanded-tools-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+
+        fake_result = {
+            "question": "demo",
+            "request_type": "patient_summary",
+            "retrieval_plan": {"name": "patient_summary", "top_k": 5, "reason": "demo"},
+            "patients": ["patient-9"],
+            "vector_context": [
+                {
+                    "score": 0.88,
+                    "event_id": "evt-10",
+                    "patient_id": "patient-9",
+                    "event_type": "clinical_note",
+                    "text": "raw evidence text",
+                }
+            ],
+            "graph_context": [
+                {
+                    "patient_id": "patient-9",
+                    "claims": [{"status": "submitted"}],
+                    "icd10_codes": [{"condition": "HF", "icd10": "I50.9"}],
+                    "contraindications": [{"medication": "Metformin", "condition": "CKD"}],
+                    "adverse_events": [{"symptom": "cough", "medication": "Lisinopril"}],
+                }
+            ],
+            "answer": "synthetic summary",
+        }
+
+        with patch.object(rag_app, "run_query", return_value=fake_result):
+            timeline = rag_app.timeline_explain("patient-9", time_window_hours=24)
+            med_risk = rag_app.medication_risk_assess("patient-9")
+            coding = rag_app.coding_gap_detect("patient-9")
+            cohort = rag_app.cohort_risk_summary("Summarize high-risk cohort")
+
+        self.assertEqual(timeline["patient_id"], "patient-9")
+        self.assertIn("timeline_summary", timeline)
+        self.assertIn("contraindications", med_risk)
+        self.assertIn("adverse_events", med_risk)
+        self.assertIn("icd10_codes", coding)
+        self.assertIn("claims", coding)
+        self.assertEqual(cohort["guardrails"]["evidence_access_level"], "none")
 
 
 if __name__ == "__main__":

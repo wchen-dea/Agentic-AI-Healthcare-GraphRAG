@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y python3 python3-pip python3-dev default
 WORKDIR /app
 COPY flink-app/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
+COPY flink-app/app /app/app
 COPY flink-app/healthcare_graph_rag_job.py /app/healthcare_graph_rag_job.py
 COPY flink-app/healthcare_graph_rag_pyflink_job.py /app/healthcare_graph_rag_pyflink_job.py
+COPY config/ontology /app/config/ontology
 USER flink

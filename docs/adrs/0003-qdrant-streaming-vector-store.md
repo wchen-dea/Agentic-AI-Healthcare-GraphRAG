@@ -1,4 +1,4 @@
-# ADR-0002: Qdrant as the Streaming Vector Store for Real-Time RAG
+# ADR-0003: Qdrant as the Streaming Vector Store for Real-Time RAG
 
 - Status: accepted
 - Date: 2026-06-26
@@ -27,7 +27,7 @@ Use **Qdrant** as the primary vector store for streaming healthcare embeddings.
 
 Qdrant is a Rust-based open-source vector database designed for high-throughput upserts and millisecond ANN queries. Its architecture aligns directly with the streaming embedding pipeline described in this system:
 
-- **Named collections per embedding model** — `medical_events_v1` (1 536 dims, cosine) and future collections for upgraded models allow parallel serving during model transitions.
+- **Named collections per embedding model** — `medical_events_v1` (1 536 dims, cosine) and additional collections for upgraded models allow parallel serving during model transitions.
 - **Payload indexing** — `patient_id`, `event_type`, `icd10_code`, and `source_system` are indexed as payload fields, enabling filtered ANN without post-query pruning.
 - **Sparse + dense hybrid search** — Qdrant's native sparse vector support allows BM25-style term matching alongside dense similarity, addressing clinical terminology gaps in embeddings.
 - **Streaming upsert via gRPC** — Flink's Qdrant sink uses the gRPC `UpsertPoints` API; batched micro-upserts (default batch size 64) balance throughput against indexing latency.
@@ -106,7 +106,7 @@ Trade-offs:
 
 ## Related
 
-- [ADR-0001: Dual Persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
+- [ADR-0002: Dual Persistence (Qdrant + Neo4j)](./0002-dual-persistence-qdrant-neo4j.md)
 - [Architecture](../architecture.md)
 - [Kafka Schema](../kafka_schema.md)
 - [Conduktor — Vector Embeddings in Streaming](https://www.conduktor.io/glossary/vector-embeddings-in-streaming)

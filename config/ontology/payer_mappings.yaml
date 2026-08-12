@@ -1,0 +1,47 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Payer-specific terminology mappings separated from the generic vocabulary inventory.
+local_mappings:
+  payer_plan_types:
+  - local_code: HMO
+    standard_system: LOCAL_PAYER_PLAN_TYPE
+    standard_code: HMO
+    display: HMO
+  - local_code: PPO
+    standard_system: LOCAL_PAYER_PLAN_TYPE
+    standard_code: PPO
+    display: PPO
+  - local_code: EPO
+    standard_system: LOCAL_PAYER_PLAN_TYPE
+    standard_code: EPO
+    display: EPO
+  - local_code: POS
+    standard_system: LOCAL_PAYER_PLAN_TYPE
+    standard_code: POS
+    display: POS
+  - local_code: HDHP
+    standard_system: LOCAL_PAYER_PLAN_TYPE
+    standard_code: HDHP
+    display: HDHP
+  - local_code: Government
+    standard_system: LOCAL_PAYER_PLAN_TYPE
+    standard_code: GOVERNMENT
+    display: Government
+  - local_code: Medicaid Managed Care
+    standard_system: LOCAL_PAYER_PLAN_TYPE
+    standard_code: MEDICAID_MANAGED_CARE
+    display: Medicaid Managed Care
+  payer_network_tiers:
+  - local_code: in-network
+    standard_system: LOCAL_NETWORK_TIER
+    standard_code: in-network
+    display: In-Network
+  - local_code: out-of-network
+    standard_system: LOCAL_NETWORK_TIER
+    standard_code: out-of-network
+    display: Out-Of-Network
+  - local_code: preferred
+    standard_system: LOCAL_NETWORK_TIER
+    standard_code: preferred
+    display: Preferred

@@ -1,0 +1,27 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Patient reference semantics separated from the generic vocabulary inventory.
+local_mappings:
+  patient_risk_tiers:
+  - local_code: low
+    standard_system: LOCAL_RISK_TIER
+    standard_code: low
+    display: Low
+  - local_code: medium
+    standard_system: LOCAL_RISK_TIER
+    standard_code: medium
+    display: Medium
+  - local_code: high
+    standard_system: LOCAL_RISK_TIER
+    standard_code: high
+    display: High
+  patient_sex:
+  - local_code: F
+    standard_system: HL7_ADMINISTRATIVE_SEX
+    standard_code: F
+    display: Female
+  - local_code: M
+    standard_system: HL7_ADMINISTRATIVE_SEX
+    standard_code: M
+    display: Male

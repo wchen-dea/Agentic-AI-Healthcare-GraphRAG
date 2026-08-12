@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hashlib
 import json
 import os
@@ -12,15 +10,22 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-import requests
+from domain import (
+    classify_request_type,
+    rank_graph_context,
+    rank_vector_context,
+    select_retrieval_plan,
+)
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
+from llm_provider import LLMProviderError, create_provider
 from mcp.server.fastmcp import FastMCP
 from neo4j import GraphDatabase
 from pydantic import BaseModel, ConfigDict, Field
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from qdrant_client import QdrantClient
+from skills_layer import SkillsLayerError, build_skill_plan, load_skills_layer
 
 
 def _to_bool(value: str | None, default: bool = False) -> bool:
@@ -45,8 +50,10 @@ class Settings:
     neo4j_password: str
     ollama_url: str
     ollama_model: str
+    llm_provider: str
     mcp_server_name: str
     tool_policy_path: Path
+    skills_layer_path: Path
     default_caller_role: str
     allowed_origins: list[str]
     audit_log_path: Path
@@ -67,6 +74,12 @@ def get_settings() -> Settings:
     if not tool_policy_path.is_absolute():
         tool_policy_path = root / tool_policy_path
 
+    skills_layer_path = Path(
+        os.getenv("RAG_API_SKILLS_LAYER_PATH", str(root / "config" / "skills_layer.json"))
+    )
+    if not skills_layer_path.is_absolute():
+        skills_layer_path = root / skills_layer_path
+
     audit_log_path = Path(
         os.getenv("RAG_API_AUDIT_LOG_PATH", str(root / "logs" / "rag_api_audit.log"))
     )
@@ -81,8 +94,10 @@ def get_settings() -> Settings:
         neo4j_password=os.getenv("NEO4J_PASSWORD", "healthcare123"),
         ollama_url=os.getenv("OLLAMA_URL", "http://ollama:11434"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.1"),
+        llm_provider=os.getenv("LLM_PROVIDER", "ollama"),
         mcp_server_name=os.getenv("MCP_SERVER_NAME", "HealthcareGraphRAG MCP"),
         tool_policy_path=tool_policy_path,
+        skills_layer_path=skills_layer_path,
         default_caller_role=os.getenv("RAG_API_DEFAULT_CALLER_ROLE", "generation"),
         allowed_origins=_split_csv(os.getenv("RAG_API_ALLOW_ORIGINS"), ["*"]),
         audit_log_path=audit_log_path,
@@ -160,6 +175,11 @@ neo4j = GraphDatabase.driver(
     settings.neo4j_uri,
     auth=(settings.neo4j_user, settings.neo4j_password),
 )
+llm_provider = create_provider(
+    settings.llm_provider,
+    base_url=settings.ollama_url,
+    configured_model=settings.ollama_model,
+)
 
 
 class AuthorizationError(RuntimeError):
@@ -212,6 +232,44 @@ class EvidenceBundleExportRequest(BaseModel):
     include_raw_payload: bool = False
 
 
+class TimelineExplainRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(min_length=1, max_length=128)
+    time_window_hours: int = Field(default=168, ge=1, le=720)
+
+
+class MedicationRiskAssessRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(min_length=1, max_length=128)
+
+
+class CodingGapDetectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: str = Field(min_length=1, max_length=128)
+    question: str = Field(
+        default="Review coding and claims consistency gaps for this patient.",
+        min_length=3,
+        max_length=settings.max_question_chars,
+    )
+
+
+class CohortRiskSummaryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=3, max_length=settings.max_question_chars)
+    top_k: int = Field(default=5, ge=1, le=max(settings.max_context_items, 8))
+
+
+class SkillsPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    business_goal: str = Field(min_length=3, max_length=128)
+    agent: str | None = Field(default=None, min_length=1, max_length=128)
+
+
 def _ts() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -235,6 +293,11 @@ def load_policy(path: str) -> dict[str, Any]:
         return {"roles": {}}
     with policy_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+@lru_cache(maxsize=2)
+def load_skills(path: str) -> dict[str, Any]:
+    return load_skills_layer(path)
 
 
 def _authorize(*, tool_name: str, caller_role: str) -> str:
@@ -415,42 +478,6 @@ def graph_context(patient_ids: list[str]) -> list[dict[str, Any]]:
         return [dict(record) for record in records]
 
 
-def _model_base_name(model_name: str) -> str:
-    return model_name.split(":", 1)[0]
-
-
-def _available_ollama_models() -> list[str]:
-    try:
-        response = requests.get(f"{settings.ollama_url}/api/tags", timeout=10)
-        if response.status_code != 200:
-            return []
-        models = response.json().get("models", [])
-        return [model.get("name") for model in models if model.get("name")]
-    except Exception:
-        return []
-
-
-def _resolve_ollama_model() -> tuple[str | None, list[str]]:
-    configured = (settings.ollama_model or "").strip()
-    available = _available_ollama_models()
-
-    if not configured:
-        return (available[0], available) if available else (None, [])
-
-    if configured in available:
-        return configured, available
-
-    configured_base = _model_base_name(configured)
-    for name in available:
-        if _model_base_name(name) == configured_base:
-            return name, available
-
-    if available:
-        return available[0], available
-
-    return None, []
-
-
 def _compact_vector_context(vector_ctx: list[dict[str, Any]]) -> str:
     if not vector_ctx:
         return "- none"
@@ -554,59 +581,35 @@ Answer with:
 3. Evidence snippets
 4. Safety caveat
 """
-    selected_model, available_models = _resolve_ollama_model()
-    if not selected_model:
-        return (
-            "LLM error: no Ollama models are installed. "
-            "Pull one with: docker exec -it healthcare-ollama ollama pull llama3.1"
-        )
-
-    try:
-        response = requests.post(
-            f"{settings.ollama_url}/api/generate",
-            json={
-                "model": selected_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "num_predict": settings.llm_max_tokens,
-                    "temperature": 0.2,
-                },
-            },
-            timeout=settings.llm_timeout_seconds,
-        )
-    except requests.Timeout:
-        return (
-            "LLM error: Ollama request timed out after "
-            f"{settings.llm_timeout_seconds} seconds. "
-            "Check model availability, prompt size, or increase LLM_TIMEOUT_SECONDS."
-        )
-    except requests.RequestException as exc:
-        return f"LLM error: unable to reach Ollama at {settings.ollama_url}: {exc}"
-
-    if response.status_code != 200:
-        body = response.text
-        if "not found" in body.lower():
-            available_msg = ", ".join(available_models) if available_models else "none"
-            return (
-                f"LLM error: requested model '{selected_model}' was not found. "
-                f"Configured model: '{settings.ollama_model}'. Available models: {available_msg}. "
-                "Pull a model with: docker exec -it healthcare-ollama ollama pull llama3.1"
-            )
-        return f"LLM error: {body}"
-    return str(response.json().get("response") or "")
+    return llm_provider.generate(
+        prompt=prompt,
+        timeout_seconds=settings.llm_timeout_seconds,
+        max_tokens=settings.llm_max_tokens,
+        temperature=0.2,
+    )
 
 
 def run_query(question: str, patient_id: str | None = None, top_k: int | None = None) -> dict[str, Any]:
-    context_limit = min(top_k or settings.max_context_items, settings.max_context_items)
-    vector_items = vector_context(question, patient_id, context_limit)
+    context_limit = min(top_k or settings.max_context_items, max(settings.max_context_items, 8))
+    request_type = classify_request_type(question, patient_id)
+    plan = select_retrieval_plan(request_type, question, patient_id, context_limit)
+
+    vector_items_raw = vector_context(plan.query_text, patient_id, plan.top_k)
+    vector_items = rank_vector_context(vector_items_raw, request_type)
     patient_ids = list({item["patient_id"] for item in vector_items if item.get("patient_id")})
     if patient_id:
         patient_ids = list(set(patient_ids + [patient_id]))
-    graph_items = graph_context(patient_ids) if patient_ids else []
+    graph_items_raw = graph_context(patient_ids) if patient_ids else []
+    graph_items = rank_graph_context(graph_items_raw, request_type)
     answer = ask_ollama(question, vector_items, graph_items)
     return {
         "question": question,
+        "request_type": request_type,
+        "retrieval_plan": {
+            "name": plan.name,
+            "top_k": plan.top_k,
+            "reason": plan.reason,
+        },
         "patients": patient_ids,
         "vector_context": vector_items,
         "graph_context": graph_items,
@@ -748,6 +751,8 @@ def _build_query_response(
     text_mode = _vector_text_mode(caller_role)
     payload = {
         "question": result["question"],
+        "request_type": result.get("request_type"),
+        "retrieval_plan": result.get("retrieval_plan"),
         "patients": result.get("patients", []),
         "vector_context": _sanitize_vector_context_for_role(
             result.get("vector_context", []),
@@ -841,7 +846,44 @@ def mcp_health() -> dict[str, Any]:
             "endpoint": "/mcp",
             "note": "Diagnostic route only; use /mcp for MCP protocol traffic.",
         },
+        "skills_layer": {
+            "enabled": settings.skills_layer_path.exists(),
+            "path": str(settings.skills_layer_path),
+        },
     }
+
+
+@app.post("/skills/plan")
+def skills_plan(
+    req: SkillsPlanRequest,
+    x_caller_role: str | None = Header(default=None, alias="X-Caller-Role"),
+) -> dict[str, Any]:
+    request_payload = req.model_dump(exclude_none=True)
+    caller_role = x_caller_role or settings.default_caller_role
+    try:
+        return _execute_with_audit(
+            tool_name="skills_plan_get",
+            caller_role=caller_role,
+            request_payload=request_payload,
+            patient_scope="none",
+            fn=lambda trace_id: _apply_response_budget(
+                {
+                    **build_skill_plan(
+                        load_skills(str(settings.skills_layer_path)),
+                        business_goal=req.business_goal,
+                        agent=req.agent,
+                    ),
+                    "retrieved_at": _ts(),
+                    "trace_id": trace_id,
+                }
+            ),
+        )
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except SkillsLayerError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/")
@@ -931,10 +973,10 @@ def patient_context_get(
 @mcp.tool()
 def vector_evidence_search(
     question: str,
-    patient_id: str | None = None,
+    patient_id: str = "",
     top_k: int = 5,
 ) -> dict[str, Any]:
-    req = VectorEvidenceSearchRequest(question=question, patient_id=patient_id, top_k=top_k)
+    req = VectorEvidenceSearchRequest(question=question, patient_id=(patient_id or None), top_k=top_k)
     return _execute_with_audit(
         tool_name="vector_evidence_search",
         caller_role="read_only",
@@ -964,10 +1006,10 @@ def vector_evidence_search(
 @mcp.tool()
 def graphrag_answer_generate(
     question: str,
-    patient_id: str | None = None,
+    patient_id: str = "",
     response_style: str = "concise",
 ) -> dict[str, Any]:
-    req = GraphRagAnswerRequest(question=question, patient_id=patient_id, response_style=response_style)
+    req = GraphRagAnswerRequest(question=question, patient_id=(patient_id or None), response_style=response_style)
     style_prefix = {
         "concise": "Answer concisely. ",
         "clinical": "Use clinically oriented language. ",
@@ -1030,10 +1072,10 @@ def risk_summary_generate(
 @mcp.tool()
 def evidence_bundle_export(
     question: str,
-    patient_id: str | None = None,
+    patient_id: str = "",
     include_raw_payload: bool = False,
 ) -> dict[str, Any]:
-    req = EvidenceBundleExportRequest(question=question, patient_id=patient_id, include_raw_payload=include_raw_payload)
+    req = EvidenceBundleExportRequest(question=question, patient_id=(patient_id or None), include_raw_payload=include_raw_payload)
 
     def _handler(trace_id: str) -> dict[str, Any]:
         result = run_query(req.question, req.patient_id)
@@ -1070,6 +1112,201 @@ def evidence_bundle_export(
         caller_role="export",
         request_payload=req.model_dump(exclude_none=True),
         patient_scope=_patient_scope(req.patient_id),
+        fn=_handler,
+    )
+
+
+@mcp.tool()
+def timeline_explain(
+    patient_id: str,
+    time_window_hours: int = 168,
+) -> dict[str, Any]:
+    req = TimelineExplainRequest(patient_id=patient_id, time_window_hours=time_window_hours)
+
+    def _handler(trace_id: str) -> dict[str, Any]:
+        result = run_query(
+            f"Explain timeline progression for patient {req.patient_id} across the last {req.time_window_hours} hours.",
+            req.patient_id,
+        )
+        graph_items = _sanitize_graph_context_for_role(
+            result.get("graph_context", []),
+            caller_role="generation",
+        )
+        return _apply_response_budget(
+            {
+                "patient_id": req.patient_id,
+                "time_window_hours": req.time_window_hours,
+                "timeline_summary": _truncate_text(
+                    str(result.get("answer") or ""), settings.max_answer_chars
+                ),
+                "graph_context": graph_items,
+                "retrieved_at": _ts(),
+                "trace_id": trace_id,
+                "guardrails": {
+                    "evidence_text_redacted": True,
+                    "evidence_access_level": "none",
+                    "graph_access_level": "standard",
+                    "max_response_bytes": settings.max_response_bytes,
+                    "response_truncated": False,
+                },
+            }
+        )
+
+    return _execute_with_audit(
+        tool_name="timeline_explain",
+        caller_role="generation",
+        request_payload=req.model_dump(),
+        patient_scope=[req.patient_id],
+        fn=_handler,
+    )
+
+
+@mcp.tool()
+def medication_risk_assess(patient_id: str) -> dict[str, Any]:
+    req = MedicationRiskAssessRequest(patient_id=patient_id)
+
+    def _handler(trace_id: str) -> dict[str, Any]:
+        result = run_query(
+            f"Assess medication risk, contraindications, interactions, and adverse events for patient {req.patient_id}.",
+            req.patient_id,
+        )
+        graph_items = result.get("graph_context", [])
+        first_patient = graph_items[0] if graph_items else {}
+        return _apply_response_budget(
+            {
+                "patient_id": req.patient_id,
+                "risk_assessment": _truncate_text(
+                    str(result.get("answer") or ""), settings.max_answer_chars
+                ),
+                "contraindications": first_patient.get("contraindications", [])[: settings.max_context_items],
+                "adverse_events": first_patient.get("adverse_events", [])[: settings.max_context_items],
+                "retrieved_at": _ts(),
+                "trace_id": trace_id,
+                "guardrails": {
+                    "evidence_text_redacted": True,
+                    "evidence_access_level": "none",
+                    "graph_access_level": "standard",
+                    "max_response_bytes": settings.max_response_bytes,
+                    "response_truncated": False,
+                },
+            }
+        )
+
+    return _execute_with_audit(
+        tool_name="medication_risk_assess",
+        caller_role="generation",
+        request_payload=req.model_dump(),
+        patient_scope=[req.patient_id],
+        fn=_handler,
+    )
+
+
+@mcp.tool()
+def coding_gap_detect(
+    patient_id: str,
+    question: str = "Review coding and claims consistency gaps for this patient.",
+) -> dict[str, Any]:
+    req = CodingGapDetectRequest(patient_id=patient_id, question=question)
+
+    def _handler(trace_id: str) -> dict[str, Any]:
+        result = run_query(req.question, req.patient_id)
+        graph_items = result.get("graph_context", [])
+        first_patient = graph_items[0] if graph_items else {}
+        return _apply_response_budget(
+            {
+                "patient_id": req.patient_id,
+                "coding_gap_summary": _truncate_text(
+                    str(result.get("answer") or ""), settings.max_answer_chars
+                ),
+                "claims": first_patient.get("claims", [])[: settings.max_context_items],
+                "icd10_codes": first_patient.get("icd10_codes", [])[: settings.max_context_items],
+                "retrieved_at": _ts(),
+                "trace_id": trace_id,
+                "guardrails": {
+                    "evidence_text_redacted": True,
+                    "evidence_access_level": "none",
+                    "graph_access_level": "standard",
+                    "max_response_bytes": settings.max_response_bytes,
+                    "response_truncated": False,
+                },
+            }
+        )
+
+    return _execute_with_audit(
+        tool_name="coding_gap_detect",
+        caller_role="generation",
+        request_payload=req.model_dump(),
+        patient_scope=[req.patient_id],
+        fn=_handler,
+    )
+
+
+@mcp.tool()
+def cohort_risk_summary(
+    question: str,
+    top_k: int = 5,
+) -> dict[str, Any]:
+    req = CohortRiskSummaryRequest(question=question, top_k=top_k)
+
+    def _handler(trace_id: str) -> dict[str, Any]:
+        result = run_query(req.question, patient_id=None, top_k=req.top_k)
+        return _apply_response_budget(
+            {
+                "question": req.question,
+                "cohort_summary": _truncate_text(
+                    str(result.get("answer") or ""), settings.max_answer_chars
+                ),
+                "patients": result.get("patients", []),
+                "vector_context": _sanitize_vector_context_for_role(
+                    result.get("vector_context", []),
+                    caller_role="generation",
+                ),
+                "retrieved_at": _ts(),
+                "trace_id": trace_id,
+                "guardrails": {
+                    "evidence_text_redacted": True,
+                    "evidence_access_level": "none",
+                    "graph_access_level": "standard",
+                    "max_response_bytes": settings.max_response_bytes,
+                    "response_truncated": False,
+                },
+            }
+        )
+
+    return _execute_with_audit(
+        tool_name="cohort_risk_summary",
+        caller_role="generation",
+        request_payload=req.model_dump(),
+        patient_scope="cohort",
+        fn=_handler,
+    )
+
+
+@mcp.tool()
+def skills_plan_get(
+    business_goal: str,
+    agent: str = "",
+) -> dict[str, Any]:
+    req = SkillsPlanRequest(business_goal=business_goal, agent=(agent or None))
+
+    def _handler(trace_id: str) -> dict[str, Any]:
+        return _apply_response_budget(
+            {
+                **build_skill_plan(
+                    load_skills(str(settings.skills_layer_path)),
+                    business_goal=req.business_goal,
+                    agent=req.agent,
+                ),
+                "retrieved_at": _ts(),
+                "trace_id": trace_id,
+            }
+        )
+
+    return _execute_with_audit(
+        tool_name="skills_plan_get",
+        caller_role="read_only",
+        request_payload=req.model_dump(exclude_none=True),
+        patient_scope="none",
         fn=_handler,
     )
 

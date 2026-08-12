@@ -1,0 +1,90 @@
+[
+  {
+    "id": "medication_safety_route",
+    "question": "Assess medication contraindication and interaction risk for this patient",
+    "patient_id": "patient-001",
+    "max_top_k": 5,
+    "expected_request_type": "medication_safety",
+    "expected_plan_name": "medication_safety",
+    "expected_query_prefix": "Medication safety focus:",
+    "expected_top_k": 5,
+    "expected_reason_contains": "medication safety semantics"
+  },
+  {
+    "id": "lab_interpretation_route",
+    "question": "Interpret lab potassium trend and vital alerts",
+    "patient_id": "patient-002",
+    "max_top_k": 6,
+    "expected_request_type": "lab_interpretation",
+    "expected_plan_name": "lab_interpretation",
+    "expected_query_prefix": "Lab interpretation focus:",
+    "expected_top_k": 6,
+    "expected_reason_contains": "lab or observation semantics"
+  },
+  {
+    "id": "coding_review_route",
+    "question": "Find claim denial and ICD coding mismatch signals",
+    "patient_id": "patient-003",
+    "max_top_k": 4,
+    "expected_request_type": "coding_review",
+    "expected_plan_name": "coding_review",
+    "expected_query_prefix": "Coding and claims focus:",
+    "expected_top_k": 4,
+    "expected_reason_contains": "coding or claims semantics"
+  },
+  {
+    "id": "cohort_route_by_text",
+    "question": "Summarize cohort risk across patients with acute deterioration",
+    "patient_id": "patient-004",
+    "max_top_k": 8,
+    "expected_request_type": "cohort_triage",
+    "expected_plan_name": "cohort_triage",
+    "expected_query_prefix": "Cohort triage focus (patient plus cohort):",
+    "expected_top_k": 8,
+    "expected_reason_contains": "cohort-level triage"
+  },
+  {
+    "id": "cohort_route_by_missing_scope",
+    "question": "Which records show rising risk trend",
+    "patient_id": null,
+    "max_top_k": 7,
+    "expected_request_type": "cohort_triage",
+    "expected_plan_name": "cohort_triage",
+    "expected_query_prefix": "Cohort triage focus (cohort):",
+    "expected_top_k": 7,
+    "expected_reason_contains": "lacks explicit patient scope"
+  },
+  {
+    "id": "patient_summary_default",
+    "question": "Provide a concise patient update",
+    "patient_id": "patient-005",
+    "max_top_k": 5,
+    "expected_request_type": "patient_summary",
+    "expected_plan_name": "patient_summary",
+    "expected_query_prefix": "Provide a concise patient update",
+    "expected_top_k": 5,
+    "expected_reason_contains": "Default patient summary path"
+  },
+  {
+    "id": "precedence_medication_over_lab",
+    "question": "Medication review with lab potassium finding",
+    "patient_id": "patient-006",
+    "max_top_k": 6,
+    "expected_request_type": "medication_safety",
+    "expected_plan_name": "medication_safety",
+    "expected_query_prefix": "Medication safety focus:",
+    "expected_top_k": 6,
+    "expected_reason_contains": "medication safety semantics"
+  },
+  {
+    "id": "cohort_low_top_k_bounds",
+    "question": "Population triage summary",
+    "patient_id": null,
+    "max_top_k": 2,
+    "expected_request_type": "cohort_triage",
+    "expected_plan_name": "cohort_triage",
+    "expected_query_prefix": "Cohort triage focus (cohort):",
+    "expected_top_k": 2,
+    "expected_reason_contains": "cohort-level triage"
+  }
+]

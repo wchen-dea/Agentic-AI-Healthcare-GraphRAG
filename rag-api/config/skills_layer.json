@@ -1,0 +1,152 @@
+{
+  "version": "1.0.0",
+  "flow": [
+    "Business Goals",
+    "Agent",
+    "Skills",
+    "Context",
+    "Ontology",
+    "MCP",
+    "Tools"
+  ],
+  "business_goals": {
+    "clinical_deterioration_triage": {
+      "description": "Prioritize acute patient risk and explain evidence-backed rationale for escalation.",
+      "default_agent": "clinical_triage_agent",
+      "skills": [
+        "patient_snapshot",
+        "risk_signal_detection",
+        "grounded_answer"
+      ]
+    },
+    "medication_safety_review": {
+      "description": "Detect contraindications, known adverse reactions, and high-risk interactions for active medications.",
+      "default_agent": "medication_safety_agent",
+      "skills": [
+        "medication_safety_graph_review",
+        "evidence_bundle_export"
+      ]
+    },
+    "claims_denial_prevention": {
+      "description": "Surface claim-risk patterns and supporting evidence prior to submission.",
+      "default_agent": "claims_review_agent",
+      "skills": [
+        "claim_outcome_risk_review",
+        "grounded_answer"
+      ]
+    }
+  },
+  "skills": {
+    "patient_snapshot": {
+      "description": "Retrieve patient graph context with core conditions, symptoms, observations, medications, and vitals.",
+      "context_requirements": [
+        "patient_id"
+      ],
+      "ontology_dependencies": [
+        "entities",
+        "relationships"
+      ],
+      "mcp_tools": [
+        "patient_context_get"
+      ],
+      "runtime_tools": [
+        "neo4j"
+      ]
+    },
+    "risk_signal_detection": {
+      "description": "Detect risk signals from vector evidence and graph patterns.",
+      "context_requirements": [
+        "question",
+        "patient_id"
+      ],
+      "ontology_dependencies": [
+        "lab_signals",
+        "drug_safety",
+        "claims_outcomes"
+      ],
+      "mcp_tools": [
+        "vector_evidence_search",
+        "risk_summary_generate",
+        "timeline_explain",
+        "cohort_risk_summary"
+      ],
+      "runtime_tools": [
+        "qdrant",
+        "neo4j"
+      ]
+    },
+    "grounded_answer": {
+      "description": "Generate a grounded answer with bounded guardrails from vector and graph evidence.",
+      "context_requirements": [
+        "question",
+        "patient_id"
+      ],
+      "ontology_dependencies": [
+        "prompt_policy",
+        "provenance"
+      ],
+      "mcp_tools": [
+        "graphrag_answer_generate"
+      ],
+      "runtime_tools": [
+        "rag_api",
+        "ollama"
+      ]
+    },
+    "medication_safety_graph_review": {
+      "description": "Review active medications against contraindications, known reactions, and interaction mechanisms.",
+      "context_requirements": [
+        "patient_id"
+      ],
+      "ontology_dependencies": [
+        "drug_safety",
+        "graph_seeds"
+      ],
+      "mcp_tools": [
+        "patient_context_get",
+        "risk_summary_generate",
+        "medication_risk_assess"
+      ],
+      "runtime_tools": [
+        "neo4j"
+      ]
+    },
+    "evidence_bundle_export": {
+      "description": "Export evidence bundle for traceability, review, and audit workflows.",
+      "context_requirements": [
+        "question",
+        "patient_id"
+      ],
+      "ontology_dependencies": [
+        "provenance",
+        "guardrails"
+      ],
+      "mcp_tools": [
+        "evidence_bundle_export"
+      ],
+      "runtime_tools": [
+        "rag_api"
+      ]
+    },
+    "claim_outcome_risk_review": {
+      "description": "Analyze claim status and procedure context using claims outcome rules.",
+      "context_requirements": [
+        "question",
+        "patient_id"
+      ],
+      "ontology_dependencies": [
+        "claims_outcomes",
+        "adverse_outcomes"
+      ],
+      "mcp_tools": [
+        "vector_evidence_search",
+        "patient_context_get",
+        "coding_gap_detect"
+      ],
+      "runtime_tools": [
+        "qdrant",
+        "neo4j"
+      ]
+    }
+  }
+}

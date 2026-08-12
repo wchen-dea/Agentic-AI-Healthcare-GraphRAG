@@ -1,0 +1,81 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Standard terminology bindings and local-to-standard mapping inventory.
+standard_systems:
+- id: ICD10
+  canonical_uri: https://hl7.org/fhir/sid/icd-10-cm
+  scope: diagnosis_and_claim_coding
+- id: LOINC
+  canonical_uri: https://loinc.org
+  scope: laboratory_and_observation_codes
+- id: RxNorm
+  canonical_uri: https://www.nlm.nih.gov/research/umls/rxnorm/
+  scope: medication_normalization
+- id: SNOMED_CT
+  canonical_uri: http://snomed.info/sct
+  scope: clinical_concepts_and_findings
+- id: MedDRA
+  canonical_uri: https://www.meddra.org
+  scope: adverse_event_terminology
+mapping_policies:
+  default_match_strategy: exact_then_alias
+  unresolved_code_behavior: preserve_local_and_flag
+  versioned_mappings_required: true
+local_mappings:
+  labs:
+  - local_code: Potassium
+    standard_system: LOINC
+    standard_code: TBD
+    display: Potassium [Moles/volume] in Serum or Plasma
+  - local_code: Glucose
+    standard_system: LOINC
+    standard_code: TBD
+    display: Glucose [Mass/volume] in Blood
+  - local_code: HbA1c
+    standard_system: LOINC
+    standard_code: TBD
+    display: Hemoglobin A1c/Hemoglobin.total in Blood
+  - local_code: Troponin I
+    standard_system: LOINC
+    standard_code: TBD
+    display: Troponin I.cardiac [Mass/volume] in Serum or Plasma
+  conditions:
+  - local_code: Hyperkalemia
+    standard_system: SNOMED_CT
+    standard_code: TBD
+    display: Hyperkalemia
+  - local_code: Chronic Kidney Disease
+    standard_system: SNOMED_CT
+    standard_code: TBD
+    display: Chronic kidney disease
+  - local_code: Diabetes Mellitus
+    standard_system: SNOMED_CT
+    standard_code: TBD
+    display: Diabetes mellitus
+  medications:
+  - local_code: Warfarin
+    standard_system: RxNorm
+    standard_code: TBD
+    display: Warfarin
+  - local_code: Metformin
+    standard_system: RxNorm
+    standard_code: TBD
+    display: Metformin
+  - local_code: Lisinopril
+    standard_system: RxNorm
+    standard_code: TBD
+    display: Lisinopril
+  adverse_reactions:
+  - local_code: cough
+    standard_system: MedDRA
+    standard_code: TBD
+    display: Cough
+  - local_code: palpitations
+    standard_system: MedDRA
+    standard_code: TBD
+    display: Palpitations
+  - local_code: shortness of breath
+    standard_system: MedDRA
+    standard_code: TBD
+    display: Dyspnoea
