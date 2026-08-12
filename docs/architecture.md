@@ -93,13 +93,13 @@ This architecture intentionally combines several patterns so streaming ingestion
 Synthetic Producer
   -> Kafka topics + Schema Registry
   -> Native PyFlink DataStream job
-     -> reference-state enrichment
+    -> ontology loader + normalization + rules
      -> Qdrant upsert (semantic evidence)
      -> Neo4j merge (relationship evidence)
   -> FastAPI GraphRAG API
-     -> vector retrieval from Qdrant
-     -> graph retrieval from Neo4j
-     -> response generation via Ollama
+    -> request classification + retrieval planning
+    -> vector and graph retrieval + evidence ranking
+    -> provider-adapter generation (current runtime: Ollama)
       -> embedded MCP endpoint (/mcp)
 
 Operational Plane
@@ -119,19 +119,27 @@ flowchart LR
     P[Producer] --> K[Kafka]
     SR[Schema Registry] --> K
     K --> F[PyFlink]
+    F --> OL[Ontology loader]
+    OL --> NM[Normalization and rules]
   end
 
   subgraph Persistence[Dual Persistence]
-    F --> Q[Qdrant]
-    F --> N[Neo4j]
+    NM --> Q[Qdrant]
+    NM --> N[Neo4j]
   end
 
   subgraph APIProc[rag-api Process]
     RAG[RAG REST API]
     MCP[FastMCP API]
-    CORE[Shared RAG Core]
+    CORE[Shared planner and retrieval core]
+    PLAN[Request classifier and planner]
+    RANK[Evidence ranker and policy shaper]
+    ADAPT[LLM provider adapter]
     RAG --> CORE
     MCP --> CORE
+    CORE --> PLAN
+    PLAN --> RANK
+    RANK --> ADAPT
   end
 
   subgraph AI[AI Application Layer]
@@ -139,7 +147,7 @@ flowchart LR
     MCPClient[MCP Client] --> MCP
     CORE --> Q
     CORE --> N
-    CORE --> L[LLM]
+    ADAPT --> L[LLM runtime]
   end
 
   subgraph Ops[Operations]
@@ -165,24 +173,33 @@ sequenceDiagram
   participant MCP as MCP Client
   participant RAG as RAG REST API
   participant MCPAPI as FastMCP API
-  participant Core as Shared RAG Core
+  participant Core as Shared planner and retrieval core
+  participant Planner as Request classifier and planner
+  participant Rank as Evidence ranker and policy shaper
+  participant Adapter as LLM provider adapter
   participant Qdrant
   participant Neo4j
   participant LLM
 
   UI->>RAG: call query endpoint
-  RAG->>Core: orchestrate retrieval
-  Core->>Qdrant: vector search
-  Core->>Neo4j: graph lookup
-  Core->>LLM: grounded generation
+  RAG->>Core: orchestrate query
+  Core->>Planner: classify and select retrieval plan
+  Planner-->>Core: retrieval plan
+  Core->>Qdrant: vector retrieval
+  Core->>Neo4j: graph retrieval
+  Core->>Rank: deterministic evidence ranking
+  Rank->>Adapter: grounded synthesis request
+  Adapter->>LLM: provider generate
   LLM-->>Core: answer text
   Core-->>RAG: evidence and answer
   RAG-->>UI: JSON response
 
   MCP->>MCPAPI: initialize session
   MCPAPI-->>MCP: handshake and tool list
-  MCP->>MCPAPI: call tool
+  MCP->>MCPAPI: call MCP tool
   MCPAPI->>Core: invoke tool handler
+  Core->>Planner: classify and select plan
+  Core->>Rank: rank and shape outputs
   Core-->>MCPAPI: tool result
   MCPAPI-->>MCP: MCP tool response
 ```
@@ -191,34 +208,23 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-  A[Generate Event] --> B{Reference Event?}
-  B -->|Yes| C[Update Reference Store]
-  B -->|No| D[Load Transactional Payload]
-  C --> E[Wait for Next Event]
-  D --> F[Apply Enrichment]
-  F --> G[Render Clinical Text]
-  G --> H[Build Embedding]
-  H --> I[Upsert to Qdrant]
-  F --> J[Merge Base Event to Neo4j]
-  J --> K{Event Type?}
-  K -->|CLINICAL_NOTE| L[Merge Condition + Symptom + ICD10Code]
-  K -->|LAB_RESULT| M[Merge Observation + run 14 lab signal rules]
-  K -->|VITAL_SIGN| N[Merge DeviceReading with temp/RR/alert]
-  K -->|MEDICATION_ORDER| O[Merge MedicationOrder + drug_class]
-  K -->|CLAIM_STATUS| P[Merge Claim + Procedure + Payer + AdverseOutcome]
-  L --> Q[merge_adverse_event_signal]
-  Q --> R[AdverseEvent if HAS_KNOWN_REACTION match]
-  M --> S[MAY_INDICATE edges to Condition]
-  I --> T[Expose Evidence to API Core]
-  R --> T
-  S --> T
-  N --> T
-  O --> T
-  P --> T
-  T --> U[RAG REST Surface]
-  K --> M[FastMCP Surface]
-  I --> E
+  A[Generate Event] --> B{Reference payload?}
+  B -->|Yes| C[Update reference state]
+  B -->|No| D[Load transactional payload]
+  C --> E[Next event]
+  D --> F[Ontology loader and normalization]
+  F --> G[Terminology mapping and rules]
+  G --> H[Canonical event and provenance tags]
+  H --> I[Build semantic text and embedding]
+  I --> J[Upsert semantic evidence to Qdrant]
+  H --> K[Merge ontology-aligned entities and edges in Neo4j]
+  J --> L[Shared retrieval core consumes vector evidence]
+  K --> M[Shared retrieval core consumes graph evidence]
+  L --> N[Planner-selected retrieval and ranking]
+  M --> N
+  N --> O[REST response and MCP tool outputs]
   J --> E
+  K --> E
 ```
 
 ## AI App Process Flow Diagram
@@ -228,20 +234,23 @@ flowchart TD
   E1[Receive Request] --> E2{API Surface}
   E2 -->|RAG REST| E3[RAG Query Endpoint]
   E2 -->|FastMCP| E4[MCP Session and Tool Endpoint]
-  E3 --> C1[Normalize Scope]
+  E3 --> C1[Normalize input and scope]
   E4 --> C1
-  C1 --> C2[Build Embedding]
-  C2 --> C3[Search Qdrant Top-K]
-  C3 --> C4[Derive Patient Scope]
-  C4 --> C5[Fetch Neo4j Context]
-  C5 --> C6[Compose Grounded Prompt]
-  C6 --> C7{LLM Provider}
-  C7 -->|Local| C8[Ollama]
-  C7 -->|Production| C9[Anthropic or OpenAI]
-  C8 --> C10[Build Unified Result]
-  C9 --> C10
-  C10 --> O1[REST JSON]
-  C10 --> O2[MCP Tool Response]
+  C1 --> C2[Classify request type]
+  C2 --> C3[Select retrieval plan]
+  C3 --> C4[Vector retrieval from Qdrant]
+  C3 --> C5[Graph retrieval from Neo4j]
+  C4 --> C6[Deterministic evidence ranking]
+  C5 --> C6
+  C6 --> C7[Plan-aware grounded prompt]
+  C7 --> C8[LLM provider adapter]
+  C8 --> C9{Runtime provider}
+  C9 -->|Current| C10[Ollama]
+  C9 -->|Future| C11[Additional providers]
+  C10 --> C12[Unified result with planner metadata]
+  C11 --> C12
+  C12 --> O1[REST JSON response]
+  C12 --> O2[MCP tool response]
 ```
 
 ## LLM Selection Strategy (Local and Production)
@@ -265,7 +274,7 @@ MCP delivery in the current implementation:
 
 ### Roadmap Extension: Anthropic/OpenAI Routing
 
-The current repository runtime does not yet include a provider adapter in `rag-api/app.py`.
+The current repository runtime includes a provider adapter in `rag-api/llm_provider.py` and uses Ollama as the default configured provider.
 
 For production extension, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
 

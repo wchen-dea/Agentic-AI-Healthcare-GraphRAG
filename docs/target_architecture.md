@@ -139,6 +139,14 @@ flowchart LR
     G --> MET
     LLM --> MET
   end
+
+   classDef done fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px,color:#1b5e20;
+   classDef progress fill:#fff8e1,stroke:#e65100,stroke-width:1px,color:#e65100;
+   classDef pending fill:#ffebee,stroke:#b71c1c,stroke-width:1px,color:#b71c1c;
+
+   class NORM,RULES,PROV,Q,G,CLS,PLAN,SK,RANK,LLM,REST,MCP,UI done;
+   class TERM,ER,QA progress;
+   class AUDIT pending;
 ```
 
 ## Ontology Model Needed

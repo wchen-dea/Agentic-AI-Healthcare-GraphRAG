@@ -91,6 +91,26 @@ Suggested repo touchpoints:
 
 ## Staged Plan Status
 
+```mermaid
+flowchart LR
+	S0[Stage 0\nDocumentation baseline]
+	S1[Stage 1\nOntology normalization]
+	S2[Stage 2\nPlanner and ranking]
+	S3[Stage 3\nMCP expansion]
+	S4[Stage 4\nEvaluation and provider breadth]
+	S5[Stage 5\nProduction controls]
+
+	S0 --> S1 --> S2 --> S3 --> S4 --> S5
+
+	classDef done fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px,color:#1b5e20;
+	classDef progress fill:#fff8e1,stroke:#e65100,stroke-width:1px,color:#e65100;
+	classDef pending fill:#ffebee,stroke:#b71c1c,stroke-width:1px,color:#b71c1c;
+
+	class S0,S2,S3 done;
+	class S1,S4 progress;
+	class S5 pending;
+```
+
 | Stage | Focus | Status | Notes |
 | --- | --- | --- | --- |
 | Stage 0 | Documentation and semantic contract baseline | Completed | Architecture, ADRs, and references are in place. |
