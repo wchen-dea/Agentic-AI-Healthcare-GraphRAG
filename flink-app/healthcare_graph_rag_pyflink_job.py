@@ -28,22 +28,31 @@ PARALLELISM = int(os.getenv("FLINK_JOB_PARALLELISM", "1"))
 
 
 class GraphRagSideEffectMap(MapFunction):
+    # All topics share one HealthcareGraphRagProcessor so that reference data
+    # written from the master-data topics is visible to event enrichment
+    # (each topic gets its own KafkaSource/map operator, but Flink's Python
+    # process-mode runs them in the same worker process per slot).
+    _shared_processor = None
+
     def __init__(self, topic):
         self.topic = topic
-        self.processor = None
+
+    def _get_processor(self):
+        if GraphRagSideEffectMap._shared_processor is None:
+            GraphRagSideEffectMap._shared_processor = HealthcareGraphRagProcessor()
+        return GraphRagSideEffectMap._shared_processor
 
     def map(self, value):
-        if self.processor is None:
-            self.processor = HealthcareGraphRagProcessor()
+        processor = self._get_processor()
 
         # Preserve exact byte values from Kafka by round-tripping through ISO-8859-1.
         raw = value.encode("ISO-8859-1") if isinstance(value, str) else value
 
         if self.topic in REFERENCE_TOPICS:
-            self.processor.process_reference_event(self.topic, raw)
+            processor.process_reference_event(self.topic, raw)
             return f"reference:{self.topic}"
         if self.topic in TOPICS:
-            self.processor.process_event(raw, self.topic)
+            processor.process_event(raw, self.topic)
             return f"event:{self.topic}"
         return f"skipped:{self.topic}"
 

@@ -9,7 +9,16 @@ import yaml
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    # Directory depth from this file to the repo root differs between local
+    # checkouts (flink-app/app/...) and the container image (/app/app/...),
+    # so walk up until we find the config/ontology directory.
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / "config" / "ontology").is_dir():
+            return candidate
+    raise FileNotFoundError(
+        "Could not locate 'config/ontology' relative to "
+        f"{__file__}; set ONTOLOGY_CONFIG_DIR to override."
+    )
 
 
 def ontology_dir() -> Path:

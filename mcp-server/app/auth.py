@@ -34,7 +34,7 @@ def authorize(
             raise AuthorizationError("Invalid auth token")
 
     policy = load_policy(policy_path)
-    allowed_tools = set(policy.get("roles", {}).get(caller_role, []))
+    allowed_tools = set((policy.get("roles") or {}).get(caller_role) or [])
     if tool_name not in allowed_tools:
         raise AuthorizationError(
             f"Role '{caller_role}' is not authorized for tool '{tool_name}'"

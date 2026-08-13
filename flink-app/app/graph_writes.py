@@ -54,13 +54,13 @@ def merge_base_event(tx, event: dict[str, Any], text: str) -> None:
 
 
 def merge_reference_context(tx, event: dict[str, Any], payload: dict[str, Any]) -> None:
-    reference = payload.get("reference_data", {})
-    reference_semantics = payload.get("semantic", {}).get("reference_context", {})
-    patient_semantics = reference_semantics.get("patient", {})
-    provider_semantics = reference_semantics.get("provider", {})
-    device_semantics = reference_semantics.get("device", {})
-    medication_semantics = reference_semantics.get("medication", {})
-    payer_semantics = reference_semantics.get("payer", {})
+    reference = payload.get("reference_data") or {}
+    reference_semantics = (payload.get("semantic") or {}).get("reference_context") or {}
+    patient_semantics = reference_semantics.get("patient") or {}
+    provider_semantics = reference_semantics.get("provider") or {}
+    device_semantics = reference_semantics.get("device") or {}
+    medication_semantics = reference_semantics.get("medication") or {}
+    payer_semantics = reference_semantics.get("payer") or {}
     tx.run(
         """
         MATCH (p:Patient {id: $patient_id})
@@ -188,9 +188,10 @@ def merge_reference_context(tx, event: dict[str, Any], payload: dict[str, Any]) 
 
 
 def merge_clinical_note(tx, event: dict[str, Any], payload: dict[str, Any]) -> None:
-    condition_mapping = payload.get("semantic", {}).get("condition", {}).get("mapping", {})
-    symptom_mapping = payload.get("semantic", {}).get("symptom", {}).get("mapping", {})
-    provenance = payload.get("semantic", {}).get("provenance", {})
+    semantic = payload.get("semantic") or {}
+    condition_mapping = (semantic.get("condition") or {}).get("mapping") or {}
+    symptom_mapping = (semantic.get("symptom") or {}).get("mapping") or {}
+    provenance = semantic.get("provenance") or {}
     tx.run(
         """
         MATCH (p:Patient {id: $patient_id})
@@ -243,8 +244,9 @@ def merge_clinical_note(tx, event: dict[str, Any], payload: dict[str, Any]) -> N
 
 
 def merge_lab_result(tx, event: dict[str, Any], payload: dict[str, Any]) -> None:
-    observation_mapping = payload.get("semantic", {}).get("observation", {}).get("mapping", {})
-    provenance = payload.get("semantic", {}).get("provenance", {})
+    semantic = payload.get("semantic") or {}
+    observation_mapping = (semantic.get("observation") or {}).get("mapping") or {}
+    provenance = semantic.get("provenance") or {}
     tx.run(
         """
         MATCH (p:Patient {id: $patient_id})
@@ -338,8 +340,9 @@ def merge_device_reading(tx, event: dict[str, Any], payload: dict[str, Any]) -> 
 
 
 def merge_medication_order(tx, event: dict[str, Any], payload: dict[str, Any]) -> None:
-    medication_mapping = payload.get("semantic", {}).get("medication", {}).get("mapping", {})
-    provenance = payload.get("semantic", {}).get("provenance", {})
+    semantic = payload.get("semantic") or {}
+    medication_mapping = (semantic.get("medication") or {}).get("mapping") or {}
+    provenance = semantic.get("provenance") or {}
     tx.run(
         """
         MATCH (p:Patient {id: $patient_id})
@@ -381,10 +384,11 @@ def merge_medication_order(tx, event: dict[str, Any], payload: dict[str, Any]) -
 
 
 def merge_claim(tx, event: dict[str, Any], payload: dict[str, Any], claim_outcomes: list[dict[str, str]]) -> None:
-    claim_mapping = payload.get("semantic", {}).get("claim", {})
+    semantic = payload.get("semantic") or {}
+    claim_mapping = semantic.get("claim") or {}
     diagnosis_mapping = claim_mapping.get("diagnosis_mapping") or {}
     procedure_mapping = claim_mapping.get("procedure_mapping") or {}
-    provenance = payload.get("semantic", {}).get("provenance", {})
+    provenance = semantic.get("provenance") or {}
     tx.run(
         """
         MATCH (p:Patient {id: $patient_id})

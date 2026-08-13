@@ -435,6 +435,12 @@ wait_for_schema_registry()
 register_schema()
 avro_serializer = build_avro_serializer()
 
+
+def _on_delivery(err, msg):
+    if err is not None:
+        print(f"Delivery failed for {msg.topic() if msg else '?'}: {err}")
+
+
 while True:
     if random.random() < 0.2:
         topic, event = random.choice(REFERENCE_GENERATORS)()
@@ -442,7 +448,7 @@ while True:
         topic, event = random.choice(GENERATORS)()
     key = event["patient_id"] or event["event_id"]
     avro_payload = avro_serializer(event, SerializationContext(topic, MessageField.VALUE))
-    producer.produce(topic, key=key.encode("utf-8"), value=avro_payload)
+    producer.produce(topic, key=key.encode("utf-8"), value=avro_payload, on_delivery=_on_delivery)
     producer.flush()
     print(f"Produced {event['event_type']} to {topic}: {event['event_id']}")
     time.sleep(INTERVAL)

@@ -280,14 +280,24 @@ services:
       dockerfile: flink-app/Dockerfile
     container_name: healthcare-flink-app
     depends_on:
-      - flink-jobmanager
-      - flink-taskmanager
-      - kafka
-      - kafka2
-      - kafka3
-      - qdrant
-      - neo4j
-      - neo4j-init
+      flink-jobmanager:
+        condition: service_started
+      flink-taskmanager:
+        condition: service_started
+      kafka:
+        condition: service_started
+      kafka2:
+        condition: service_started
+      kafka3:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      neo4j:
+        condition: service_started
+      neo4j-init:
+        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
     env_file:
       - path: ./.env
         required: false
