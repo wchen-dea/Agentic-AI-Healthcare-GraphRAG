@@ -391,7 +391,7 @@ curl -s -X POST "http://localhost:8000/query" \
 ## Project Layout
 
 ```text
-platform/       Shared library (embedding, storage, runner, rules engine, ontology loader)
+shared_lib/       Shared library (embedding, storage, runner, rules engine, ontology loader)
 domains/        Domain implementations
   healthcare/   Healthcare Provider domain
     config/     Ontology YAML, rules, vocabulary mappings

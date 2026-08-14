@@ -24,7 +24,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
 try:
-    from platform.embedding import stable_embedding, VECTOR_SIZE
+    from shared_lib.embedding import stable_embedding, VECTOR_SIZE
 except ImportError:
     from app.pipeline_service import _md5_embedding as stable_embedding
     VECTOR_SIZE = 384

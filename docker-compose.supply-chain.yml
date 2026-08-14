@@ -45,16 +45,18 @@ services:
       - kafka3
     entrypoint: ["/bin/sh", "-c"]
     command: |
-      echo "Creating supply-chain topics..." &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.purchase.orders --partitions 3 --replication-factor 3 &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.shipment.updates --partitions 3 --replication-factor 3 &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.quality.results --partitions 3 --replication-factor 3 &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.disruption.alerts --partitions 3 --replication-factor 3 &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.inventory.levels --partitions 3 --replication-factor 3 &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.suppliers --partitions 1 --replication-factor 3 &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.parts --partitions 1 --replication-factor 3 &&
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.facilities --partitions 1 --replication-factor 3 &&
-      echo "Supply-chain topics created."
+      "
+      sleep 15
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.purchase.orders --partitions 3 --replication-factor 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.shipment.updates --partitions 3 --replication-factor 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.quality.results --partitions 3 --replication-factor 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.disruption.alerts --partitions 3 --replication-factor 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.inventory.levels --partitions 3 --replication-factor 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.suppliers --partitions 1 --replication-factor 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.parts --partitions 1 --replication-factor 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.facilities --partitions 1 --replication-factor 3
+      echo 'Supply-chain Kafka topics created.'
+      "
 
   sc-producer:
     build:

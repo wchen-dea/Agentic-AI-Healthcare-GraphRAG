@@ -9,7 +9,7 @@ on:
       - deploy/production/k8s/**
       - domains/healthcare/rag-api/**
       - domains/healthcare/webapp/**
-      - platform/**
+      - shared_lib/**
   workflow_dispatch:
 
 permissions:

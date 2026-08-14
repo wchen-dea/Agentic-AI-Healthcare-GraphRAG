@@ -7,5 +7,5 @@ COPY domains/healthcare/rag-api/llm_provider.py .
 COPY domains/healthcare/rag-api/skills_layer.py .
 COPY domains/healthcare/rag-api/domain ./domain
 COPY domains/healthcare/rag-api/config ./config
-COPY platform ./platform
+COPY shared_lib ./shared_lib
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

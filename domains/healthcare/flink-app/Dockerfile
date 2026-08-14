@@ -16,5 +16,5 @@ COPY domains/healthcare/flink-app/app /app/app
 COPY domains/healthcare/flink-app/healthcare_graph_rag_job.py /app/healthcare_graph_rag_job.py
 COPY domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py /app/healthcare_graph_rag_pyflink_job.py
 COPY domains/healthcare/config/ontology /app/config/ontology
-COPY platform /app/platform
+COPY shared_lib /app/shared_lib
 USER flink

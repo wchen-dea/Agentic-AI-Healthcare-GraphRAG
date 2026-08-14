@@ -6,5 +6,5 @@ COPY domains/supply-chain/rag-api/app.py .
 COPY domains/supply-chain/rag-api/skills_layer.py .
 COPY domains/supply-chain/rag-api/domain ./domain
 COPY domains/supply-chain/rag-api/config ./config
-COPY platform ./platform
+COPY shared_lib ./shared_lib
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
