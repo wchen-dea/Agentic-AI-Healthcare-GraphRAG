@@ -5,19 +5,11 @@ services:
   kafka-init:
     image: confluentinc/cp-kafka:7.9.0
     container_name: healthcare-kafka-init
-    depends_on:
-      kafka:
-        condition: service_started
-      kafka2:
-        condition: service_started
-      kafka3:
-        condition: service_started
-      schema-registry:
-        condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
       "
-      sleep 15
+      echo 'Waiting for Kafka cluster...'
+      sleep 30
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic healthcare.ehr.events --partitions 3 --replication-factor 3
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic healthcare.lab.results --partitions 3 --replication-factor 3
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic healthcare.device.telemetry --partitions 3 --replication-factor 3
@@ -125,8 +117,6 @@ services:
     depends_on:
       kafka-init:
         condition: service_completed_successfully
-      schema-registry:
-        condition: service_healthy
     env_file:
       - path: ./.env
         required: false
@@ -144,8 +134,6 @@ services:
       flink-jobmanager:
         condition: service_started
       flink-taskmanager:
-        condition: service_started
-      kafka:
         condition: service_started
       qdrant:
         condition: service_started
@@ -179,7 +167,6 @@ services:
     depends_on:
       - qdrant
       - neo4j
-      - ollama
     ports:
       - "8000:8000"
     env_file:
@@ -208,3 +195,8 @@ services:
 volumes:
   qdrant_storage:
   neo4j_data:
+
+networks:
+  default:
+    name: graphrag-net
+    external: true

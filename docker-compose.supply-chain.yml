@@ -39,14 +39,11 @@ services:
   sc-kafka-init:
     image: confluentinc/cp-kafka:7.9.0
     container_name: supplychain-kafka-init
-    depends_on:
-      - kafka
-      - kafka2
-      - kafka3
     entrypoint: ["/bin/sh", "-c"]
     command: |
       "
-      sleep 15
+      echo 'Waiting for Kafka cluster...'
+      sleep 30
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.purchase.orders --partitions 3 --replication-factor 3
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.shipment.updates --partitions 3 --replication-factor 3
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.quality.results --partitions 3 --replication-factor 3
@@ -64,8 +61,6 @@ services:
       dockerfile: domains/supply-chain/producer/Dockerfile
     container_name: supplychain-producer
     depends_on:
-      schema-registry:
-        condition: service_healthy
       sc-kafka-init:
         condition: service_completed_successfully
     environment:
@@ -95,7 +90,6 @@ services:
     depends_on:
       - qdrant-sc
       - neo4j-sc
-      - ollama
     ports:
       - "8001:8000"
     environment:
@@ -116,8 +110,6 @@ services:
     depends_on:
       sc-kafka-init:
         condition: service_completed_successfully
-      schema-registry:
-        condition: service_healthy
       qdrant-sc:
         condition: service_started
       neo4j-sc:
@@ -155,3 +147,8 @@ services:
 volumes:
   neo4j_sc_data:
   qdrant_sc_data:
+
+networks:
+  default:
+    name: graphrag-net
+    external: true
