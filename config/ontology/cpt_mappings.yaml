@@ -1,0 +1,150 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Expanded local CPT procedure coding coverage for synthetic claim lifecycle generation.
+local_mappings:
+  cpt_procedures:
+  - local_code: '99213'
+    standard_system: CPT
+    standard_code: '99213'
+    display: Office visit, established patient, moderate
+  - local_code: '99214'
+    standard_system: CPT
+    standard_code: '99214'
+    display: Office visit, established patient, high complexity
+  - local_code: '99232'
+    standard_system: CPT
+    standard_code: '99232'
+    display: Subsequent hospital care
+  - local_code: '99285'
+    standard_system: CPT
+    standard_code: '99285'
+    display: Emergency dept visit, high complexity
+  - local_code: '80053'
+    standard_system: CPT
+    standard_code: '80053'
+    display: Comprehensive metabolic panel
+  - local_code: '80061'
+    standard_system: CPT
+    standard_code: '80061'
+    display: Lipid panel
+  - local_code: '85025'
+    standard_system: CPT
+    standard_code: '85025'
+    display: CBC with differential
+  - local_code: '83036'
+    standard_system: CPT
+    standard_code: '83036'
+    display: HbA1c
+  - local_code: '93000'
+    standard_system: CPT
+    standard_code: '93000'
+    display: ECG with interpretation
+  - local_code: '93306'
+    standard_system: CPT
+    standard_code: '93306'
+    display: Echocardiography
+  - local_code: '93458'
+    standard_system: CPT
+    standard_code: '93458'
+    display: Cardiac catheterization
+  - local_code: '71046'
+    standard_system: CPT
+    standard_code: '71046'
+    display: Chest X-ray, 2 views
+  - local_code: '74177'
+    standard_system: CPT
+    standard_code: '74177'
+    display: CT abdomen and pelvis with contrast
+  - local_code: '70553'
+    standard_system: CPT
+    standard_code: '70553'
+    display: MRI brain with contrast
+  - local_code: '36415'
+    standard_system: CPT
+    standard_code: '36415'
+    display: Venipuncture
+  - local_code: '43239'
+    standard_system: CPT
+    standard_code: '43239'
+    display: Upper GI endoscopy with biopsy
+  - local_code: '45378'
+    standard_system: CPT
+    standard_code: '45378'
+    display: Colonoscopy, diagnostic
+  - local_code: '27447'
+    standard_system: CPT
+    standard_code: '27447'
+    display: Total knee arthroplasty
+  - local_code: '99223'
+    standard_system: CPT
+    standard_code: '99223'
+    display: Initial hospital care, high complexity
+  - local_code: '99233'
+    standard_system: CPT
+    standard_code: '99233'
+    display: Subsequent hospital care, high complexity
+  - local_code: '99291'
+    standard_system: CPT
+    standard_code: '99291'
+    display: Critical care, first 30-74 minutes
+  - local_code: '99406'
+    standard_system: CPT
+    standard_code: '99406'
+    display: Smoking and tobacco cessation counseling
+  - local_code: '82962'
+    standard_system: CPT
+    standard_code: '82962'
+    display: Glucose, blood by glucose monitoring device
+  - local_code: '84443'
+    standard_system: CPT
+    standard_code: '84443'
+    display: Thyroid stimulating hormone
+  - local_code: '83880'
+    standard_system: CPT
+    standard_code: '83880'
+    display: Natriuretic peptide
+  - local_code: '85730'
+    standard_system: CPT
+    standard_code: '85730'
+    display: Partial thromboplastin time
+  - local_code: '92928'
+    standard_system: CPT
+    standard_code: '92928'
+    display: Percutaneous coronary intervention with stent
+  - local_code: '93970'
+    standard_system: CPT
+    standard_code: '93970'
+    display: Duplex scan of extremity veins, complete bilateral
+  - local_code: '71260'
+    standard_system: CPT
+    standard_code: '71260'
+    display: CT thorax with contrast
+  - local_code: '76700'
+    standard_system: CPT
+    standard_code: '76700'
+    display: Ultrasound, abdominal, complete
+  - local_code: '36556'
+    standard_system: CPT
+    standard_code: '36556'
+    display: Insertion of non-tunneled central venous catheter
+  - local_code: '31500'
+    standard_system: CPT
+    standard_code: '31500'
+    display: Emergency endotracheal intubation
+  - local_code: '92950'
+    standard_system: CPT
+    standard_code: '92950'
+    display: Cardiopulmonary resuscitation
+  - local_code: '11042'
+    standard_system: CPT
+    standard_code: '11042'
+    display: Debridement, subcutaneous tissue
+  - local_code: '20610'
+    standard_system: CPT
+    standard_code: '20610'
+    display: Arthrocentesis, major joint
+  - local_code: '11721'
+    standard_system: CPT
+    standard_code: '11721'
+    display: Debridement of nails

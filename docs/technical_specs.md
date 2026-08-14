@@ -376,22 +376,28 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 | Property | Value |
 |----------|-------|
 | Event interval | 1 s (default; `EVENT_INTERVAL_SECONDS`) |
-| Patient pool | 100 (`patient-0001` … `patient-0100`) |
-| Provider pool | 20 (`provider-001` … `provider-020`) |
-| Transactional event share | 80 % |
-| Reference event share | 20 % |
+| Transaction events per interval | 3 (default; `TRANSACTION_EVENTS_PER_INTERVAL`) |
+| Reference events per interval | 3 (default; `REFERENCE_EVENTS_PER_INTERVAL`) |
+| Patient pool | 1000 (default; `PATIENT_POOL_SIZE`) |
+| Provider pool | 200 (default; `PROVIDER_POOL_SIZE`) |
+| Device pool | 400 (default; `DEVICE_POOL_SIZE`) |
+| Hot-entity skew | `HOT_ENTITY_PROBABILITY=0.7` with configurable hot pools |
+| Temporal noise | late arrivals + correction events (`LATE_EVENT_PROBABILITY`, `CORRECTION_EVENT_PROBABILITY`) |
+| Bursty intervals | shift-handoff batch bursts (`BATCH_BURST_PROBABILITY`, `BATCH_BURST_MULTIPLIER`, `SHIFT_HANDOFF_HOURS`) |
+| Correlated follow-ups | critical abnormal labs may enqueue medication administration follow-ups |
+| Per-interval category behavior | Producer emits both transactional and reference batches each tick |
 | Schema registration | On startup, retries until Schema Registry is healthy |
 | Serialization | Confluent AvroSerializer (`to_dict` identity) |
 
 ### Event type volumes
 
-| Event type | Generator function | Medications/labs/etc. covered |
-|-----------|-------------------|-------------------------------|
-| `CLINICAL_NOTE` | `ehr_event` | 24 diagnoses, 20 symptoms, 6 EHR systems, 6 note templates, ICD-10 code |
-| `LAB_RESULT` | `lab_event` | 18 lab tests with per-test abnormality threshold, lab panel, specimen type |
-| `VITAL_SIGN` | `device_event` | 5 device sources, device types, temp, RR, glucose, alert |
-| `MEDICATION_ORDER` | `pharmacy_event` | 24 medications with drug class, 9 frequencies, 6 routes, order type, days supply |
-| `CLAIM_STATUS` | `claims_event` | 10 payers, 19 CPT codes with descriptions, ICD-10 diagnosis code, billed/allowed amounts |
+| Event type | Generator function(s) | Medications/labs/etc. covered |
+|-----------|------------------------|-------------------------------|
+| `CLINICAL_NOTE` | `ehr_event`, `adt_event`, `allergy_intolerance_event`, `problem_list_update_event` | Encounter lifecycle (admit/transfer/discharge), allergy/intolerance updates, problem-list updates, ICD-10-backed context |
+| `LAB_RESULT` | `lab_event` | 36 lab tests with per-test abnormality threshold, lab panel, specimen type, optional correlated follow-up trigger |
+| `VITAL_SIGN` | `device_event` | 10 device sources, expanded device pool/types, temp, RR, glucose, alert |
+| `MEDICATION_ORDER` | `pharmacy_event`, `medication_administration_event`, `medication_lifecycle_event` | 48 medications with drug class, administration and medication lifecycle states (ordered, verified, administered, hold, discontinued) |
+| `CLAIM_STATUS` | `claims_event`, `claim_lifecycle_event`, `prior_auth_decision_event`, `procedure_performed_event` | 20 payers, 36 CPT codes with descriptions, ICD-10 diagnosis code, prior-auth and claim lifecycle chain (submitted -> pending -> denied -> appealed -> approved -> paid) |
 
 ---
 
@@ -434,6 +440,9 @@ Both jobs run in parallel. Neither requires live external services (all dependen
 **File:** `.github/workflows/deploy-ai-prd.yml`  
 Separate production deployment workflow targeting the AI services bundle under `deploy/production/`.
 
+**File:** `.github/workflows/ontology-conformance.yml`  
+Includes ontology and pipeline checks plus `terminology-coverage-gate` that runs `python scripts/validate_terminology_coverage.py` and fails when LAB/CPT/ICD-10 mapping coverage drops below configured thresholds.
+
 ---
 
 ## 12. Key Environment Variables
@@ -452,6 +461,23 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092,...` | producer, flink-app | Broker list |
 | `SCHEMA_REGISTRY_URL` | `http://schema-registry:8081` | producer, flink-app | Schema Registry URL |
 | `EVENT_INTERVAL_SECONDS` | `1` | producer | Seconds between emitted events |
+| `TRANSACTION_EVENTS_PER_INTERVAL` | `3` | producer | Number of transactional events emitted per interval tick |
+| `REFERENCE_EVENTS_PER_INTERVAL` | `3` | producer | Number of reference events emitted per interval tick |
+| `PATIENT_POOL_SIZE` | `1000` | producer | Size of synthetic patient ID catalog |
+| `PROVIDER_POOL_SIZE` | `200` | producer | Size of synthetic provider ID catalog |
+| `DEVICE_POOL_SIZE` | `400` | producer | Size of synthetic device ID catalog |
+| `HOT_PATIENT_POOL_SIZE` | `120` | producer | Number of high-frequency patients for skewed distributions |
+| `HOT_PROVIDER_POOL_SIZE` | `40` | producer | Number of high-frequency providers for skewed distributions |
+| `HOT_ENTITY_PROBABILITY` | `0.7` | producer | Probability that generated event uses a hot entity |
+| `LATE_EVENT_PROBABILITY` | `0.12` | producer | Probability an event timestamp is backdated (late arrival simulation) |
+| `CORRECTION_EVENT_PROBABILITY` | `0.06` | producer | Probability payload is flagged as correction of a prior event |
+| `FOLLOWUP_CORRELATION_PROBABILITY` | `0.45` | producer | Probability abnormal critical labs trigger correlated follow-up events |
+| `BATCH_BURST_PROBABILITY` | `0.3` | producer | Probability shift handoff produces burstier event batches |
+| `BATCH_BURST_MULTIPLIER` | `3` | producer | Batch multiplier applied during burst intervals |
+| `SHIFT_HANDOFF_HOURS` | `7,15,23` | producer | UTC hours considered operational handoff windows |
+| `TERMINOLOGY_COVERAGE_THRESHOLD_LABS` | `0.95` | CI/scripts | Minimum lab mapping coverage threshold |
+| `TERMINOLOGY_COVERAGE_THRESHOLD_CPT` | `0.95` | CI/scripts | Minimum CPT mapping coverage threshold |
+| `TERMINOLOGY_COVERAGE_THRESHOLD_ICD10` | `0.95` | CI/scripts | Minimum ICD-10 mapping coverage threshold |
 | `CONDUKTOR_POSTGRES_PASSWORD` | `change_me` | conduktor-postgres | Postgres password |
 | `CONDUKTOR_ADMIN_PASSWORD` | `Admin@123!` | conduktor-console | Console admin password |
 | `GRAFANA_ADMIN_PASSWORD` | `admin123` | grafana | Grafana admin password |

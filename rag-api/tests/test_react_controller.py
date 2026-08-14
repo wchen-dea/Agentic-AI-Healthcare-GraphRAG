@@ -117,6 +117,40 @@ class ReactControllerTests(unittest.TestCase):
         self.assertEqual(len(result["vector_context"]), 1)
         self.assertEqual(len(result["graph_context"]), 1)
 
+    def test_lifecycle_events_merge_across_iterations(self) -> None:
+        call_count = {"n": 0}
+
+        def vector_context(_q: str, _patient_id: str | None, _limit: int):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return [{"event_id": "evt-adt-1", "patient_id": "patient-1", "event_type": "clinical_note", "score": 0.88}]
+            return [
+                {"event_id": "evt-adt-1", "patient_id": "patient-1", "event_type": "clinical_note", "score": 0.88},
+                {"event_id": "evt-medadmin-1", "patient_id": "patient-1", "event_type": "medication_order", "score": 0.91},
+            ]
+
+        def graph_context(_patient_ids: list[str]):
+            return [{"patient_id": "patient-1", "conditions": ["Sepsis"], "claims": [{"status": "submitted"}]}]
+
+        result = run_react_query_loop(
+            question="review admission and medication lifecycle",
+            patient_id="patient-1",
+            context_limit=5,
+            settings=ReactLoopSettings(max_iterations=3, min_confidence=0.75, max_no_progress_steps=2),
+            classify_request_type_fn=_classify,
+            select_retrieval_plan_fn=_select,
+            vector_context_fn=vector_context,
+            rank_vector_context_fn=_rank_vector,
+            graph_context_fn=graph_context,
+            rank_graph_context_fn=_rank_graph,
+            synthesize_answer_fn=_synthesize,
+        )
+
+        self.assertTrue(result["react"]["enabled"])
+        self.assertEqual(result["react"]["final_reason"], "confidence_reached")
+        self.assertGreaterEqual(len(result["vector_context"]), 1)
+        self.assertEqual(len(result["graph_context"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

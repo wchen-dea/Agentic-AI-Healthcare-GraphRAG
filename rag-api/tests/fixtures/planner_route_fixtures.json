@@ -86,5 +86,49 @@
     "expected_query_prefix": "Cohort triage focus (cohort):",
     "expected_top_k": 2,
     "expected_reason_contains": "cohort-level triage"
+  },
+  {
+    "id": "medication_administration_lifecycle",
+    "question": "Verify medication administration and hold status for current orders",
+    "patient_id": "patient-007",
+    "max_top_k": 5,
+    "expected_request_type": "medication_safety",
+    "expected_plan_name": "medication_safety",
+    "expected_query_prefix": "Medication safety focus:",
+    "expected_top_k": 5,
+    "expected_reason_contains": "medication safety semantics"
+  },
+  {
+    "id": "claim_lifecycle_denial_appeal",
+    "question": "Review claim denial and appeal status for recent imaging procedure",
+    "patient_id": "patient-008",
+    "max_top_k": 4,
+    "expected_request_type": "coding_review",
+    "expected_plan_name": "coding_review",
+    "expected_query_prefix": "Coding and claims focus:",
+    "expected_top_k": 4,
+    "expected_reason_contains": "coding or claims semantics"
+  },
+  {
+    "id": "prior_auth_cpt_review",
+    "question": "Check CPT prior authorization decision for cardiac catheterization",
+    "patient_id": "patient-009",
+    "max_top_k": 5,
+    "expected_request_type": "coding_review",
+    "expected_plan_name": "coding_review",
+    "expected_query_prefix": "Coding and claims focus:",
+    "expected_top_k": 5,
+    "expected_reason_contains": "coding or claims semantics"
+  },
+  {
+    "id": "adverse_drug_allergy_check",
+    "question": "Assess adverse drug reaction and allergy intolerance risk for Penicillin",
+    "patient_id": "patient-010",
+    "max_top_k": 6,
+    "expected_request_type": "medication_safety",
+    "expected_plan_name": "medication_safety",
+    "expected_query_prefix": "Medication safety focus:",
+    "expected_top_k": 6,
+    "expected_reason_contains": "medication safety semantics"
   }
 ]

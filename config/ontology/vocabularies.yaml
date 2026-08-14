@@ -9,6 +9,9 @@ standard_systems:
 - id: LOINC
   canonical_uri: https://loinc.org
   scope: laboratory_and_observation_codes
+- id: CPT
+  canonical_uri: https://www.ama-assn.org/practice-management/cpt
+  scope: procedure_and_billing_codes
 - id: RxNorm
   canonical_uri: https://www.nlm.nih.gov/research/umls/rxnorm/
   scope: medication_normalization

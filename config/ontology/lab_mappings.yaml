@@ -1,0 +1,150 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+purpose: Expanded local lab name to LOINC terminology coverage for synthetic source generation.
+local_mappings:
+  labs:
+  - local_code: Potassium
+    standard_system: LOINC
+    standard_code: TBD
+    display: Potassium
+  - local_code: Sodium
+    standard_system: LOINC
+    standard_code: TBD
+    display: Sodium
+  - local_code: Glucose
+    standard_system: LOINC
+    standard_code: TBD
+    display: Glucose
+  - local_code: Creatinine
+    standard_system: LOINC
+    standard_code: TBD
+    display: Creatinine
+  - local_code: BUN
+    standard_system: LOINC
+    standard_code: TBD
+    display: Blood urea nitrogen
+  - local_code: HbA1c
+    standard_system: LOINC
+    standard_code: TBD
+    display: Hemoglobin A1c
+  - local_code: WBC
+    standard_system: LOINC
+    standard_code: TBD
+    display: White blood cell count
+  - local_code: Hemoglobin
+    standard_system: LOINC
+    standard_code: TBD
+    display: Hemoglobin
+  - local_code: Platelets
+    standard_system: LOINC
+    standard_code: TBD
+    display: Platelet count
+  - local_code: TSH
+    standard_system: LOINC
+    standard_code: TBD
+    display: Thyroid stimulating hormone
+  - local_code: eGFR
+    standard_system: LOINC
+    standard_code: TBD
+    display: Estimated glomerular filtration rate
+  - local_code: LDL
+    standard_system: LOINC
+    standard_code: TBD
+    display: LDL cholesterol
+  - local_code: HDL
+    standard_system: LOINC
+    standard_code: TBD
+    display: HDL cholesterol
+  - local_code: ALT
+    standard_system: LOINC
+    standard_code: TBD
+    display: Alanine aminotransferase
+  - local_code: AST
+    standard_system: LOINC
+    standard_code: TBD
+    display: Aspartate aminotransferase
+  - local_code: Troponin I
+    standard_system: LOINC
+    standard_code: TBD
+    display: Cardiac troponin I
+  - local_code: INR
+    standard_system: LOINC
+    standard_code: TBD
+    display: International normalized ratio
+  - local_code: Procalcitonin
+    standard_system: LOINC
+    standard_code: TBD
+    display: Procalcitonin
+  - local_code: Calcium
+    standard_system: LOINC
+    standard_code: TBD
+    display: Calcium
+  - local_code: Magnesium
+    standard_system: LOINC
+    standard_code: TBD
+    display: Magnesium
+  - local_code: Phosphate
+    standard_system: LOINC
+    standard_code: TBD
+    display: Phosphate
+  - local_code: C-Reactive Protein
+    standard_system: LOINC
+    standard_code: TBD
+    display: C-reactive protein
+  - local_code: ESR
+    standard_system: LOINC
+    standard_code: TBD
+    display: Erythrocyte sedimentation rate
+  - local_code: Lactate
+    standard_system: LOINC
+    standard_code: TBD
+    display: Lactate
+  - local_code: BNP
+    standard_system: LOINC
+    standard_code: TBD
+    display: B-type natriuretic peptide
+  - local_code: Total Bilirubin
+    standard_system: LOINC
+    standard_code: TBD
+    display: Total bilirubin
+  - local_code: Albumin
+    standard_system: LOINC
+    standard_code: TBD
+    display: Albumin
+  - local_code: Alkaline Phosphatase
+    standard_system: LOINC
+    standard_code: TBD
+    display: Alkaline phosphatase
+  - local_code: D-Dimer
+    standard_system: LOINC
+    standard_code: TBD
+    display: D-dimer
+  - local_code: Ferritin
+    standard_system: LOINC
+    standard_code: TBD
+    display: Ferritin
+  - local_code: Uric Acid
+    standard_system: LOINC
+    standard_code: TBD
+    display: Uric acid
+  - local_code: Creatine Kinase
+    standard_system: LOINC
+    standard_code: TBD
+    display: Creatine kinase
+  - local_code: Arterial pH
+    standard_system: LOINC
+    standard_code: TBD
+    display: Arterial blood pH
+  - local_code: PaCO2
+    standard_system: LOINC
+    standard_code: TBD
+    display: Arterial carbon dioxide partial pressure
+  - local_code: PaO2
+    standard_system: LOINC
+    standard_code: TBD
+    display: Arterial oxygen partial pressure
+  - local_code: Serum Osmolality
+    standard_system: LOINC
+    standard_code: TBD
+    display: Serum osmolality

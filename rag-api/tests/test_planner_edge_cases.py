@@ -59,6 +59,47 @@ class PlannerEdgeCaseTests(unittest.TestCase):
         ordered = [item["patient_id"] for item in ranked]
         self.assertEqual(ordered, ["patient-a", "patient-b", "patient-c"])
 
+    def test_adt_discharge_query_routes_to_patient_summary(self) -> None:
+        request_type = classify_request_type(
+            "Summarize discharge status and follow-up plan", "patient-50"
+        )
+        self.assertEqual(request_type, "patient_summary")
+
+    def test_allergy_intolerance_query_routes_to_medication_safety(self) -> None:
+        request_type = classify_request_type(
+            "Check adverse drug reaction and allergy intolerance for Penicillin", "patient-51"
+        )
+        self.assertEqual(request_type, "medication_safety")
+
+    def test_claim_lifecycle_query_routes_to_coding_review(self) -> None:
+        request_type = classify_request_type(
+            "Review claim denial and appeal lifecycle for recent procedure", "patient-52"
+        )
+        self.assertEqual(request_type, "coding_review")
+
+    def test_medication_administration_query_routes_to_medication_safety(self) -> None:
+        request_type = classify_request_type(
+            "Verify medication administration hold status", "patient-53"
+        )
+        self.assertEqual(request_type, "medication_safety")
+
+    def test_prior_auth_decision_query_routes_to_coding_review(self) -> None:
+        request_type = classify_request_type(
+            "Check CPT prior authorization denial for imaging procedure", "patient-54"
+        )
+        self.assertEqual(request_type, "coding_review")
+
+    def test_lifecycle_event_vector_ranking_preserves_priority(self) -> None:
+        items = [
+            {"event_type": "clinical_note", "score": 0.8, "event_id": "evt-adt-1"},
+            {"event_type": "medication_order", "score": 0.95, "event_id": "evt-medadmin-1"},
+            {"event_type": "claim_status", "score": 0.92, "event_id": "evt-claim-lc-1"},
+        ]
+        ranked = rank_vector_context(items, "medication_safety")
+        ordered_types = [item["event_type"] for item in ranked]
+        self.assertEqual(ordered_types[0], "medication_order")
+        self.assertEqual(ordered_types[1], "clinical_note")
+
 
 if __name__ == "__main__":
     unittest.main()

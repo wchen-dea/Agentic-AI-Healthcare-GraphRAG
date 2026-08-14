@@ -473,6 +473,134 @@ class RagApiContractTests(unittest.TestCase):
         self.assertIn("claims", coding)
         self.assertEqual(cohort["guardrails"]["evidence_access_level"], "none")
 
+    def test_query_handles_lifecycle_event_family_payloads(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "lifecycle-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+        client = TestClient(rag_app.app)
+
+        lifecycle_vector = [
+            {
+                "score": 0.92,
+                "event_id": "evt-adt-1",
+                "patient_id": "patient-10",
+                "event_type": "clinical_note",
+                "text": "ADT update: patient admit at ICU.",
+            },
+            {
+                "score": 0.87,
+                "event_id": "evt-medadmin-1",
+                "patient_id": "patient-10",
+                "event_type": "medication_order",
+                "text": "Medication administration: Heparin administered inpatient.",
+            },
+        ]
+        lifecycle_graph = [
+            {
+                "patient_id": "patient-10",
+                "conditions": ["Sepsis"],
+                "symptoms": ["fever"],
+                "observations": [],
+                "medications": [{"name": "Heparin", "status": "administered"}],
+                "interactions": [],
+                "vitals": [],
+                "claims": [{"status": "submitted", "lifecycle_status": "submitted"}],
+                "lab_signals": [],
+                "icd10_codes": [{"condition": "Sepsis", "icd10": "A41.9"}],
+                "adverse_events": [],
+                "contraindications": [],
+            }
+        ]
+
+        with patch.object(rag_app, "vector_context", return_value=lifecycle_vector), \
+             patch.object(rag_app, "graph_context", return_value=lifecycle_graph), \
+             patch.object(rag_app, "ask_ollama", return_value="ADT lifecycle answer"):
+            response = client.post(
+                "/query",
+                json={"question": "Summarize admit and medication status", "patient_id": "patient-10"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["answer"], "ADT lifecycle answer")
+        self.assertEqual(len(payload["vector_context"]), 2)
+        self.assertEqual(payload["graph_context"][0]["claims"][0]["status"], "submitted")
+
+    def test_query_handles_temporal_noise_fields_in_evidence(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "noise-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+        client = TestClient(rag_app.app)
+
+        noisy_vector = [
+            {
+                "score": 0.85,
+                "event_id": "evt-late-1",
+                "patient_id": "patient-20",
+                "event_type": "lab_result",
+                "text": "Potassium 6.1 mmol/L. Late arrival correction event.",
+            },
+        ]
+
+        with patch.object(rag_app, "vector_context", return_value=noisy_vector), \
+             patch.object(rag_app, "graph_context", return_value=[]), \
+             patch.object(rag_app, "ask_ollama", return_value="Temporal noise handled"):
+            response = client.post(
+                "/query",
+                json={"question": "Review lab potassium results", "patient_id": "patient-20"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["answer"], "Temporal noise handled")
+        self.assertNotIn("text", payload["vector_context"][0])
+        self.assertTrue(payload["vector_context"][0]["text_redacted"])
+
+    def test_expanded_mcp_tools_with_claim_lifecycle_context(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "claim-lc-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+
+        fake_result = {
+            "question": "claim lifecycle demo",
+            "request_type": "coding_review",
+            "retrieval_plan": {"name": "coding_review", "top_k": 5, "reason": "lifecycle"},
+            "patients": ["patient-30"],
+            "vector_context": [
+                {
+                    "score": 0.91,
+                    "event_id": "evt-claim-lc-1",
+                    "patient_id": "patient-30",
+                    "event_type": "claim_status",
+                    "text": "Claim submitted then denied then appealed.",
+                }
+            ],
+            "graph_context": [
+                {
+                    "patient_id": "patient-30",
+                    "claims": [
+                        {"status": "submitted", "lifecycle_status": "submitted"},
+                        {"status": "denied", "lifecycle_status": "denied"},
+                        {"status": "appealed", "lifecycle_status": "appealed"},
+                    ],
+                    "icd10_codes": [{"condition": "COPD", "icd10": "J44.1"}],
+                    "contraindications": [],
+                    "adverse_events": [],
+                }
+            ],
+            "answer": "claim lifecycle summary",
+        }
+
+        with patch.object(rag_app, "run_query", return_value=fake_result):
+            coding = rag_app.coding_gap_detect("patient-30")
+
+        self.assertIn("claims", coding)
+        self.assertEqual(len(coding["claims"]), 3)
+        self.assertIn("icd10_codes", coding)
+
 
 if __name__ == "__main__":
     unittest.main()

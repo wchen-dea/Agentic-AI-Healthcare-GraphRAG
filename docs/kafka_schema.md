@@ -81,11 +81,11 @@ Important limitation in current schema design:
 
 | Topic | Partitions | Typical Event Type | Producer Function |
 | --- | --- | --- | --- |
-| healthcare.ehr.events | 3 | CLINICAL_NOTE | ehr_event |
+| healthcare.ehr.events | 3 | CLINICAL_NOTE | ehr_event plus ADT, allergy/intolerance, and problem-list generators |
 | healthcare.lab.results | 3 | LAB_RESULT | lab_event |
 | healthcare.device.telemetry | 3 | VITAL_SIGN | device_event |
-| healthcare.pharmacy.orders | 3 | MEDICATION_ORDER | pharmacy_event |
-| healthcare.claims.events | 3 | CLAIM_STATUS | claims_event |
+| healthcare.pharmacy.orders | 3 | MEDICATION_ORDER | pharmacy_event plus medication admin/lifecycle generators |
+| healthcare.claims.events | 3 | CLAIM_STATUS | claims_event plus claim lifecycle, prior-auth, and procedure-performed generators |
 
 ### Reference Topics
 
@@ -111,12 +111,20 @@ This ensures deterministic local topology and avoids accidental topic drift.
 
 ## Event Generation Mix
 
-The producer loop emits:
+The producer loop now emits both categories every interval tick:
 
-- 80 percent transactional events
-- 20 percent reference events
+- transactional events per tick: `TRANSACTION_EVENTS_PER_INTERVAL` (default `3`)
+- reference events per tick: `REFERENCE_EVENTS_PER_INTERVAL` (default `3`)
 
-This ratio is controlled by random selection in producer/produce_events.py.
+Default behavior represents a 200% increase baseline for each category relative to the prior single-event-per-interval stream.
+
+Within each interval batch, the producer attempts to emit distinct `event_type` values.
+Shift-handoff windows can introduce burst traffic (`BATCH_BURST_PROBABILITY`, `BATCH_BURST_MULTIPLIER`, `SHIFT_HANDOFF_HOURS`) to better emulate operational load spikes.
+
+Temporal and operational realism features:
+- Late-arriving events via backdated `event_ts` (`late_arrival_minutes` in payload)
+- Correction events via `is_correction` and `correction_of_event_id`
+- Correlated follow-up events from critical abnormal labs to medication administration actions
 
 ## Payload Shape Examples
 
@@ -134,7 +142,7 @@ This ratio is controlled by random selection in producer/produce_events.py.
 
 ### Lab Result
 
-The producer selects from 18 lab tests. Each test carries a per-test abnormality threshold evaluated by the Flink processor to write `MAY_INDICATE` edges.
+The producer selects from 36 lab tests. Each test carries a per-test abnormality threshold evaluated by the Flink processor to write `MAY_INDICATE` edges.
 
 ```json
 {
@@ -187,7 +195,7 @@ Possible `device_type` values: `monitor`, `wearable`, `bedside`, `implant`, `pat
 
 ### Medication Order
 
-The producer selects from 24 medications. Each order carries `drug_class` (derived from the medication catalog), `order_type`, and `days_supply`.
+The producer selects from 48 medications. Each order carries `drug_class` (derived from the medication catalog), `order_type`, and `days_supply`.
 
 ```json
 {
@@ -201,12 +209,12 @@ The producer selects from 24 medications. Each order carries `drug_class` (deriv
 }
 ```
 
-Possible `order_type` values: `new`, `renewal`, `discontinue`, `dose_change`.
+Possible `order_type` values include baseline order actions (`renewal`, `dose_change`, `resume`, `taper`, `stat`) and lifecycle states (`ordered`, `verified`, `administered`, `hold`, `discontinued`).
 Possible `route` values: `oral`, `IV`, `subcutaneous`, `inhaled`, `topical`, `sublingual`.
 
 ### Claim Event
 
-Claims now carry a full financial record including procedure description (from 19 CPT codes), ICD-10 diagnosis code, financial amounts, claim type, and service date.
+Claims now carry a full financial record including procedure description (from 36 CPT codes), ICD-10 diagnosis code, financial amounts, claim type, and service date.
 
 ```json
 {
@@ -223,8 +231,9 @@ Claims now carry a full financial record including procedure description (from 1
 }
 ```
 
-Possible `status` values: `submitted`, `approved`, `denied`, `pending`, `appealed`, `partially_approved`.
+Possible `status` values include lifecycle and adjudication states: `submitted`, `pending`, `denied`, `appealed`, `adjudicated`, `approved`, `paid`.
 Possible `claim_type` values: `professional`, `institutional`, `dental`, `pharmacy`.
+Dedicated claim lifecycle emissions follow `submitted -> pending -> denied -> appealed -> approved -> paid` for longitudinal claim progression.
 Hospital-related CPT codes (99232, 99285, 99291, 99223) trigger a `(Claim)-[:RESULTED_IN]->(AdverseOutcome {code: "HO"})` edge in Neo4j.
 
 ### Reference (Patient)
