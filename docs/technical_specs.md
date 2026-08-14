@@ -88,11 +88,22 @@ Launched via `docker compose -f docker-compose.yml -f docker-compose.supply-chai
 
 | Component | Python version | Base image |
 |-----------|---------------|-----------|
-| rag-api | 3.11 | python:3.11-slim |
-| flink-app | 3.11 (via Flink image) | custom Flink Dockerfile |
-| producer | 3.11 | python:3.11-slim |
+| rag-api (healthcare) | 3.11 | python:3.11-slim |
+| rag-api (supply-chain) | 3.11 | python:3.11-slim |
+| flink-app (healthcare) | 3.11 (via Flink image) | custom Flink Dockerfile |
+| flink-processor (supply-chain) | 3.11 | python:3.11-slim |
+| producer (both domains) | 3.11 | python:3.11-slim |
 | mcp-server (standalone) | 3.11 | python:3.11-slim |
 | CI test runner | 3.11 | ubuntu-latest + setup-python@v5 |
+| Local dev (uv) | 3.11 | `.python-version` + `pyproject.toml` |
+
+### Local development tooling
+
+| Tool | File | Purpose |
+|------|------|---------|
+| [uv](https://docs.astral.sh/uv/) | `pyproject.toml` | Python project manager, dependency resolution, venv |
+| make | `Makefile` | Docker Compose shortcuts (`make up`, `make test-hc`, etc.) |
+| ruff | `pyproject.toml [tool.ruff]` | Linting and formatting |
 
 ---
 

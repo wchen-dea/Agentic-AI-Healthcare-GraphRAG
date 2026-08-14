@@ -50,9 +50,14 @@ Key relationships: `SUPPLIES`, `DEPENDS_ON` (BOM), `SHIPPED_FROM/TO`, `DISRUPTED
 From the repository root:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml \
-  -f domains/supply-chain/docker-compose.supply-chain.yml \
-  up -d --build
+make up-sc       # or make up for both domains
+```
+
+Or without the Makefile:
+
+```bash
+docker compose -f docker-compose.infra.yml -p infra up -d
+docker compose -f docker-compose.supply-chain.yml -p supplychain up -d
 ```
 
 Verify Neo4j:

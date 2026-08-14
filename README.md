@@ -181,7 +181,9 @@ This quick start is for local development only. It is not a production deploymen
 Prerequisites:
 
 - Docker Desktop or Docker Engine with Compose support
+- [uv](https://docs.astral.sh/uv/) (Python project manager)
 - jq (recommended for shell validations)
+- make (for Makefile shortcuts)
 - Enough disk for Ollama model download (roughly 5 GB+)
 
 Start the full stack:
@@ -189,7 +191,41 @@ Start the full stack:
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
 cp .env.example .env
+make up          # or: make up-hc (healthcare only) / make up-sc (supply-chain only)
+```
+
+Or without the Makefile:
+
+```bash
 docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+```
+
+### Local Python Environment
+
+The project uses [uv](https://docs.astral.sh/uv/) with Python 3.11 (same version as all Docker images).
+
+```bash
+uv sync              # Install all dependencies into .venv
+uv run python ...    # Run scripts with the project Python
+uv run pytest ...    # Run tests
+```
+
+### Makefile Shortcuts
+
+```bash
+make help        # Show all available targets
+make up          # Start infra + healthcare + supply-chain
+make up-hc       # Start infra + healthcare only
+make up-sc       # Start infra + supply-chain only
+make down-all    # Stop everything
+make ps          # Show running containers
+make neo4j-hc    # Open healthcare Neo4j shell
+make neo4j-sc    # Open supply-chain Neo4j shell
+make test-hc     # Run healthcare validation tests
+make test-sc     # Run supply-chain validation tests
+make topics      # List all Kafka topics
+make logs        # Tail healthcare logs
+make fresh       # Full clean restart with both domains
 ```
 
 The local stack follows the same externalized configuration pattern as the production bundle: copy `.env.example` to `.env` and keep local credentials and secret-like values in `.env`, not hardcoded in source-controlled Compose overrides.
@@ -391,7 +427,11 @@ curl -s -X POST "http://localhost:8000/query" \
 ## Project Layout
 
 ```text
-shared_lib/       Shared library (embedding, storage, runner, rules engine, ontology loader)
+pyproject.toml  Unified Python project config (uv, dependencies, ruff)
+Makefile        Local development shortcuts (make up, make test-hc, etc.)
+.python-version Python 3.11 pin (used by uv and Docker images)
+shared_lib/     Shared library (embedding, storage, runner, rules engine, ontology loader)
+  webapp/       Shared webapp assets (styles, query-helpers.js, nginx config)
 domains/        Domain implementations
   healthcare/   Healthcare Provider domain
     config/     Ontology YAML, rules, vocabulary mappings
@@ -406,11 +446,17 @@ domains/        Domain implementations
     mcp-server/ MCP adapter scaffold (reference implementation)
   supply-chain/ Supply Chain Resilience domain
     config/     Ontology YAML, risk signal rules
-    flink-app/  Graph writes and pipeline service
+    flink-app/  Stream processor and graph writes
     neo4j/      Constraints and seed data
     producer/   Synthetic event producer
-    rag-api/    Domain planner and models
+    rag-api/    FastAPI RAG API with skills layer
     schemas/    Avro envelope schema
+    skills/     Agent Skills packages
+    scripts/    Domain-specific validation and query scripts
+    webapp/     Supply-chain query UI
+docker-compose.infra.yml        Shared infrastructure (Kafka, ZK, monitoring, Ollama)
+docker-compose.healthcare.yml   Healthcare domain services
+docker-compose.supply-chain.yml Supply-chain domain services
 docs/           Architecture, Kafka contract, graph model, and runbook
 docs/adrs/      Architecture Decision Records (ADRs)
 scripts/        Cross-domain validation scripts
@@ -443,6 +489,8 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 | [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |
 | [deploy/production/k8s/README.md](deploy/production/k8s/README.md) | Kubernetes manifests |
 | [domains/supply-chain/README.md](domains/supply-chain/README.md) | Supply Chain domain: graph model, events, quick start |
+| [Makefile](Makefile) | Local development shortcuts (make up, make test-hc, etc.) |
+| [pyproject.toml](pyproject.toml) | Unified Python project config (uv, dependencies, ruff) |
 
 ## Safety Disclaimer
 

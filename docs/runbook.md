@@ -14,13 +14,30 @@ Scope note:
 ## Prerequisites
 
 - Docker Compose
+- [uv](https://docs.astral.sh/uv/) (Python project manager)
 - curl
 - jq
+- make (for Makefile shortcuts)
 
 Optional but useful:
 
 - cypher-shell access through the Neo4j container
 - Conduktor and Flink dashboards in browser
+
+## Makefile Quick Reference
+
+```bash
+make up          # Start infra + healthcare + supply-chain
+make up-hc       # Start infra + healthcare only
+make down-all    # Stop everything
+make ps          # Show running containers
+make neo4j-hc    # Healthcare cypher-shell
+make neo4j-sc    # Supply-chain cypher-shell
+make test-hc     # Run healthcare tests
+make topics      # List Kafka topics
+make clean       # Full cleanup with volume removal
+make help        # Show all targets
+```
 
 ## Core Commands
 

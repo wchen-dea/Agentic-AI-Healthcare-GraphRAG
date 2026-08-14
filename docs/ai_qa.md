@@ -81,6 +81,15 @@ Python 3.14+ causes a dependency conflict: `mcp==1.28.0` requires `pydantic>=2.1
 
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
+uv sync
+uv run python domains/healthcare/rag-api/tests/test_contracts.py
+uv run python domains/healthcare/rag-api/tests/test_planner_evaluation.py
+uv run python domains/healthcare/rag-api/tests/test_planner_edge_cases.py
+```
+
+Or with a manual venv (if uv is not available):
+
+```bash
 python3.11 -m venv .venv311
 .venv311/bin/pip install -r domains/healthcare/rag-api/requirements.txt
 .venv311/bin/python domains/healthcare/rag-api/tests/test_contracts.py
@@ -386,9 +395,8 @@ git push → dev branch
   │     └── optional skills-ref validate (best-effort install, non-blocking if unavailable)
   │
   ├── contract-tests job
-  │     ├── python 3.11 venv
-  │     ├── pip install domains/healthcare/rag-api/requirements.txt
-  │     ├── python domains/healthcare/rag-api/tests/test_contracts.py  ← 10 tests, ~2-4 s
+  │     ├── uv sync (or python 3.11 venv fallback)
+  │     ├── uv run python domains/healthcare/rag-api/tests/test_contracts.py  ← 10 tests, ~2-4 s
   │     ├── python domains/healthcare/rag-api/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
   │     └── python domains/healthcare/rag-api/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
   │
