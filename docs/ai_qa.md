@@ -25,9 +25,9 @@ Question
 
 ## 1. Contract Tests (CI-Automated)
 
-**File:** `rag-api/tests/test_contracts.py`  
-**Runner:** `python rag-api/tests/test_contracts.py` (stdlib `unittest`, no pytest)  
-**CI trigger:** push or PR to `dev` touching `rag-api/**` — `.github/workflows/rag-api-contracts.yml`
+**File:** `domains/healthcare/rag-api/tests/test_contracts.py`  
+**Runner:** `python domains/healthcare/rag-api/tests/test_contracts.py` (stdlib `unittest`, no pytest)  
+**CI trigger:** push or PR to `dev` touching `domains/healthcare/rag-api/**` — `.github/workflows/rag-api-contracts.yml`
 
 These tests run entirely in-process using `fastapi.testclient.TestClient`. All three
 external services (Qdrant, Neo4j, Ollama) are mocked with `unittest.mock.patch`, so no
@@ -50,8 +50,8 @@ live stack is required.
 
 ### Planner evaluation suite (Stage 2)
 
-**Files:** `rag-api/tests/test_planner_evaluation.py`, `rag-api/tests/fixtures/planner_route_fixtures.json`  
-**Runner:** `python rag-api/tests/test_planner_evaluation.py`
+**Files:** `domains/healthcare/rag-api/tests/test_planner_evaluation.py`, `domains/healthcare/rag-api/tests/fixtures/planner_route_fixtures.json`  
+**Runner:** `python domains/healthcare/rag-api/tests/test_planner_evaluation.py`
 
 This suite validates planner route selection and plan generation with fixture-driven assertions:
 
@@ -62,8 +62,8 @@ This suite validates planner route selection and plan generation with fixture-dr
 
 ### Planner edge-case suite (Stage 2)
 
-**File:** `rag-api/tests/test_planner_edge_cases.py`  
-**Runner:** `python rag-api/tests/test_planner_edge_cases.py`
+**File:** `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`  
+**Runner:** `python domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
 
 This suite focuses on negative and edge conditions that are easy to miss in happy-path fixtures:
 
@@ -82,10 +82,10 @@ Python 3.14+ causes a dependency conflict: `mcp==1.28.0` requires `pydantic>=2.1
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
 python3.11 -m venv .venv311
-.venv311/bin/pip install -r rag-api/requirements.txt
-.venv311/bin/python rag-api/tests/test_contracts.py
-.venv311/bin/python rag-api/tests/test_planner_evaluation.py
-.venv311/bin/python rag-api/tests/test_planner_edge_cases.py
+.venv311/bin/pip install -r domains/healthcare/rag-api/requirements.txt
+.venv311/bin/python domains/healthcare/rag-api/tests/test_contracts.py
+.venv311/bin/python domains/healthcare/rag-api/tests/test_planner_evaluation.py
+.venv311/bin/python domains/healthcare/rag-api/tests/test_planner_edge_cases.py
 ```
 
 Expected output:
@@ -387,13 +387,13 @@ git push → dev branch
   │
   ├── contract-tests job
   │     ├── python 3.11 venv
-  │     ├── pip install rag-api/requirements.txt
-  │     ├── python rag-api/tests/test_contracts.py  ← 10 tests, ~2-4 s
-  │     ├── python rag-api/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
-  │     └── python rag-api/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
+  │     ├── pip install domains/healthcare/rag-api/requirements.txt
+  │     ├── python domains/healthcare/rag-api/tests/test_contracts.py  ← 10 tests, ~2-4 s
+  │     ├── python domains/healthcare/rag-api/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
+  │     └── python domains/healthcare/rag-api/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
   │
   └── container-build job
-        └── docker build -f rag-api/Dockerfile      ← validates image builds
+        └── docker build -f domains/healthcare/rag-api/Dockerfile      ← validates image builds
 ```
 
 Neither job requires live external services. The contract tests mock all three
@@ -406,8 +406,8 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 
 | Gap | Recommended next step |
 |-----|-----------------------|
-| Ontology and rule-pack conformance | Validate `config/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
-| Graph integration tests after event injection | Add `rag-api/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
+| Ontology and rule-pack conformance | Validate `domains/healthcare/config/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
+| Graph integration tests after event injection | Add `domains/healthcare/rag-api/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
 | Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
 | Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |
 | Adverse event detection end-to-end | Inject known medication + symptom pair, assert `AdverseEvent` node via Cypher |

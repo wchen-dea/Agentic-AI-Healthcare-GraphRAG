@@ -1,0 +1,44 @@
+version: 0.1.0
+status: draft
+owner: supply-chain-team
+purpose: Graph seed facts for supply chain knowledge graph.
+risk_category_seeds:
+- Single Source Dependency
+- Geopolitical Exposure
+- Quality Failure Rate
+- Lead Time Volatility
+- Financial Instability
+- Natural Disaster Exposure
+- Capacity Constraint
+- Logistics Bottleneck
+- Regulatory Non-Compliance
+- Cyber Vulnerability
+disruption_type_seeds:
+- port_closure
+- factory_shutdown
+- raw_material_shortage
+- transport_delay
+- quality_hold
+- sanctions_compliance
+- natural_disaster
+- labor_strike
+- equipment_failure
+- cyber_incident
+facility_type_seeds:
+- factory
+- warehouse
+- distribution_center
+- port
+- cross_dock
+- cold_storage
+commodity_category_seeds:
+- Electronics
+- Automotive
+- Pharmaceuticals
+- Chemicals
+- Metals
+- Plastics
+- Textiles
+- Food & Beverage
+- Aerospace
+- Industrial Equipment

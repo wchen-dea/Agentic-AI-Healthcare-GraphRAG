@@ -1,0 +1,17 @@
+version: 0.1.0
+status: draft
+owner: supply-chain-team
+purpose: Standard terminology bindings for supply chain domain.
+standard_systems:
+- id: GS1
+  canonical_uri: https://www.gs1.org
+  scope: product_and_location_identification
+- id: UNSPSC
+  canonical_uri: https://www.unspsc.org
+  scope: commodity_classification
+- id: ISO_3166
+  canonical_uri: https://www.iso.org/iso-3166-country-codes.html
+  scope: country_and_region_codes
+- id: INCOTERMS
+  canonical_uri: https://iccwbo.org/business-solutions/incoterms-rules/
+  scope: trade_terms

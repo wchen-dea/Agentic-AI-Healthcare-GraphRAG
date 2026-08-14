@@ -39,6 +39,17 @@ Domain extension points:
 
 This keeps new sections additive and modular.
 
+## Multi-Domain Architecture
+
+The platform supports parallel domain deployments sharing infrastructure (Kafka cluster, Schema Registry, monitoring) while isolating domain-specific concerns (Neo4j instance, Qdrant collection, Kafka topics, ontology rules).
+
+| Domain | Directory | Neo4j Port | Qdrant Port | Topic Prefix |
+| --- | --- | --- | --- | --- |
+| Healthcare Provider | root (`domains/healthcare/producer/`, `domains/healthcare/flink-app/`, `domains/healthcare/rag-api/`) | 7474/7687 | 6333 | `healthcare.*` |
+| Supply Chain Resilience | `domains/supply-chain/` | 7475/7688 | 6335 | `supplychain.*` |
+
+Each domain brings its own: Avro envelope schema, ontology YAML (entities, seeds, rules), graph write functions, producer event generators, and RAG API planner/classifier. The streaming pipeline, embedding infrastructure, and observability stack are reused.
+
 ## Healthcare Extension Matrix
 
 | Section | Example Inputs | Graph/Vector Emphasis | Primary Users | Expected Outcome |
@@ -49,6 +60,17 @@ This keeps new sections additive and modular.
 | Payer Utilization Review | Authorization outcomes, utilization events | Coverage patterns and utilization trajectory | UM teams, payer analysts | Better high-cost-case triage and utilization governance |
 | Population Health | Longitudinal events, risk tiers, chronic indicators | Cohort similarity + graph risk factors | Population health teams | Prioritized outreach and proactive risk management |
 | Device and Remote Care | Telemetry, device inventory, alert streams | Device-patient-event lineage | Monitoring teams, biomedical ops | Faster anomaly triage and reduced alert fatigue |
+
+## Supply Chain Extension Matrix
+
+| Section | Example Inputs | Graph/Vector Emphasis | Primary Users | Expected Outcome |
+| --- | --- | --- | --- | --- |
+| Supplier Risk | Supplier profiles, geopolitical data, financial signals | SUPPLIES edges, HAS_RISK_SIGNAL, single-source DEPENDS_ON chains | Procurement, risk management | Earlier single-source and geopolitical exposure detection |
+| Procurement | Purchase orders, incoterms, pricing | ORDERED_FROM, ORDERS_PART, DELIVERS_TO | Category managers, buyers | PO lifecycle visibility, cost variance analysis |
+| Logistics | Shipment tracking, customs, transport modes | SHIPPED_FROM, SHIPPED_TO, CONTAINS_PART, lead-time deviation | Logistics coordinators | Delay detection, carrier performance, customs hold alerts |
+| Quality | Inspections, defect rates, corrective actions | INSPECTED_PART, SUPPLIED_BY, defect_rate signals | Quality engineers, supplier management | Quality trend detection, supplier scorecard, CAPA triggers |
+| Disruption | Facility alerts, natural disaster, cyber incidents | DISRUPTED_BY, AFFECTS_PART, cascade via DEPENDS_ON BOM | Supply chain command center | Impact propagation assessment, mitigation tracking |
+| Inventory | Warehouse levels, reorder points, days-of-supply | HOLDS_INVENTORY, below_reorder signals | Planners, warehouse ops | Stockout risk detection, reorder optimization |
 
 ## Extension Playbook
 
@@ -78,12 +100,12 @@ This architecture intentionally combines several patterns so streaming ingestion
 
 ### Pattern Mapping to Repository Components
 
-- Event-Driven Pipeline: [producer/produce_events.py](../producer/produce_events.py), [flink-app/healthcare_graph_rag_pyflink_job.py](../flink-app/healthcare_graph_rag_pyflink_job.py), [docker-compose.yml](../docker-compose.yml)
-- Dual Materialized Views: [flink-app/healthcare_graph_rag_job.py](../flink-app/healthcare_graph_rag_job.py), [docs/neo4j_model.md](neo4j_model.md)
-- Shared-Core, Multi-Interface: [rag-api/app.py](../rag-api/app.py) (`run_query`, REST `/query`, MCP tools)
-- Policy Enforcement Point: [rag-api/app.py](../rag-api/app.py) (`_authorize`, `_execute_with_audit`, guardrail shaping)
-- Contract-First Tooling: [rag-api/tests/test_contracts.py](../rag-api/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
-- Bounded Context Window: [rag-api/app.py](../rag-api/app.py) (`max_*` settings and truncation/budget helpers)
+- Event-Driven Pipeline: [domains/healthcare/producer/produce_events.py](../domains/healthcare/producer/produce_events.py), [domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [docker-compose.yml](../docker-compose.yml)
+- Dual Materialized Views: [domains/healthcare/flink-app/healthcare_graph_rag_job.py](../domains/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/neo4j_model.md](neo4j_model.md)
+- Shared-Core, Multi-Interface: [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`run_query`, REST `/query`, MCP tools)
+- Policy Enforcement Point: [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`_authorize`, `_execute_with_audit`, guardrail shaping)
+- Contract-First Tooling: [domains/healthcare/rag-api/tests/test_contracts.py](../domains/healthcare/rag-api/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
+- Bounded Context Window: [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`max_*` settings and truncation/budget helpers)
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
 - Adapter Pattern (roadmap): [docs/adrs/0006-local-first-llm-provider-routing.md](adrs/0006-local-first-llm-provider-routing.md)
 
@@ -331,7 +353,7 @@ flowchart TD
 
 ### Local Development
 
-Current implementation uses Ollama in rag-api/app.py.
+Current implementation uses Ollama in domains/healthcare/rag-api/app.py.
 
 - Local endpoint via OLLAMA_URL.
 - Local model choice via OLLAMA_MODEL.
@@ -348,7 +370,7 @@ MCP delivery in the current implementation:
 
 ### Roadmap Extension: Anthropic/OpenAI Routing
 
-The current repository runtime includes a provider adapter in `rag-api/llm_provider.py` and uses Ollama as the default configured provider.
+The current repository runtime includes a provider adapter in `domains/healthcare/rag-api/llm_provider.py` and uses Ollama as the default configured provider.
 
 For production extension, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
 
@@ -386,7 +408,7 @@ Use a secret manager for API keys. Do not store credentials in files or compose 
 
 ### Producer
 
-producer/produce_events.py emits two event families:
+domains/healthcare/producer/produce_events.py emits two event families:
 
 - Transactional events:
   - clinical notes
@@ -405,13 +427,13 @@ The producer registers a shared Avro envelope in Schema Registry and publishes C
 
 ### Kafka + Schema Registry
 
-Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in docker-compose.yml with fixed partitions per domain topic.
+Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in docker-compose.healthcare.yml with fixed partitions per domain topic.
 
 Schema Registry stores the MedicalEvent envelope under topic-value subjects for transactional and reference topics, and the schema ID is embedded in Kafka value payloads.
 
 ### Flink Runtime
 
-docker-compose.yml starts:
+docker-compose.healthcare.yml starts:
 
 - flink-jobmanager
 - flink-taskmanager
@@ -423,7 +445,7 @@ There is no demo auto-submit service in the current implementation.
 
 ### Native PyFlink Job
 
-flink-app/healthcare_graph_rag_pyflink_job.py is the active stream job:
+domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py is the active stream job:
 
 - Builds one KafkaSource per topic in ALL_TOPICS.
 - Tags each record with its topic and unions all streams.
@@ -439,7 +461,7 @@ Execution details:
 
 ### Processor Logic Reuse
 
-flink-app/healthcare_graph_rag_job.py provides:
+domains/healthcare/flink-app/healthcare_graph_rag_job.py provides:
 
 - stable_embedding for deterministic embeddings,
 - clinical_text rendering with optional reference-data expansion,
@@ -476,7 +498,7 @@ See [neo4j_model.md](neo4j_model.md) for the full model.
 
 ### RAG API
 
-rag-api/app.py exposes:
+domains/healthcare/rag-api/app.py exposes:
 
 - GET /health
 - GET /metrics
@@ -484,7 +506,7 @@ rag-api/app.py exposes:
 - POST /query
 - POST /mcp (MCP streamable HTTP protocol endpoint)
 
-Embedded MCP tools exposed from rag-api/app.py:
+Embedded MCP tools exposed from domains/healthcare/rag-api/app.py:
 
 - patient_context_get
 - vector_evidence_search
@@ -564,7 +586,7 @@ def llm_client_from_env() -> LLMClient:
   return OllamaClient(base_url=os.getenv("OLLAMA_URL", "http://ollama:11434"))
 ```
 
-Suggested integration point in [rag-api/app.py](rag-api/app.py):
+Suggested integration point in [domains/healthcare/rag-api/app.py](domains/healthcare/rag-api/app.py):
 
 - Keep query orchestration as is.
 - Replace direct generation call in ask_ollama(...) with ask_llm(...).

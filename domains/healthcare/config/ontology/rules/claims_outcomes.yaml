@@ -1,0 +1,67 @@
+version: 0.1.0
+status: draft
+owner: revenue-cycle-rules
+source_of_truth:
+- flink-app/healthcare_graph_rag_job.py
+- neo4j/init.cypher
+purpose: Declarative claims-to-adverse-outcome mapping rules.
+adverse_outcomes:
+- code: HO
+  description: Hospitalization - Initial or Prolonged
+- code: DE
+  description: Death
+- code: LT
+  description: Life-Threatening
+- code: DS
+  description: Disability
+- code: OT
+  description: Other Serious (Important Medical Events)
+rules:
+- id: institutional_claim_hospitalization
+  trigger:
+    event_type: CLAIM_STATUS
+    claim_type: institutional
+  output_edge:
+    type: RESULTED_IN
+    adverse_outcome: HO
+  severity: moderate
+- id: hospital_cpt_hospitalization
+  trigger:
+    event_type: CLAIM_STATUS
+    procedure_code_in: ["99232", "99285", "99291", "99223"]
+  output_edge:
+    type: RESULTED_IN
+    adverse_outcome: HO
+  severity: moderate
+- id: critical_care_life_threatening
+  trigger:
+    event_type: CLAIM_STATUS
+    procedure_code_in: ["99291", "92950", "31500"]
+  output_edge:
+    type: RESULTED_IN
+    adverse_outcome: LT
+  severity: high
+- id: cpr_death_signal
+  trigger:
+    event_type: CLAIM_STATUS
+    procedure_code_in: ["92950"]
+  output_edge:
+    type: RESULTED_IN
+    adverse_outcome: DE
+  severity: high
+- id: disability_procedure_signal
+  trigger:
+    event_type: CLAIM_STATUS
+    procedure_code_in: ["27447", "92928"]
+  output_edge:
+    type: RESULTED_IN
+    adverse_outcome: DS
+  severity: moderate
+- id: intubation_life_threatening
+  trigger:
+    event_type: CLAIM_STATUS
+    procedure_code_in: ["31500", "36556"]
+  output_edge:
+    type: RESULTED_IN
+    adverse_outcome: LT
+  severity: high

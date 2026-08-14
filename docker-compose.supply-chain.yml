@@ -1,0 +1,155 @@
+# Supply Chain domain overlay.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.supply-chain.yml up -d
+
+services:
+  neo4j-sc:
+    image: neo4j:5.26.2
+    container_name: supplychain-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/supplychain123
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    volumes:
+      - neo4j_sc_data:/data
+
+  neo4j-sc-init:
+    image: neo4j:5.26.2
+    container_name: supplychain-neo4j-init
+    depends_on:
+      - neo4j-sc
+    entrypoint: ["/bin/sh", "-c"]
+    command: /bin/sh /bootstrap.sh
+    volumes:
+      - ./domains/supply-chain/neo4j/init.cypher:/init.cypher
+      - ./domains/supply-chain/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
+      - ./domains/supply-chain/neo4j/bootstrap.sh:/bootstrap.sh
+
+  qdrant-sc:
+    image: qdrant/qdrant:latest
+    container_name: supplychain-qdrant
+    ports:
+      - "6335:6333"
+      - "6336:6334"
+    volumes:
+      - qdrant_sc_data:/qdrant/storage
+
+  sc-kafka-init:
+    image: confluentinc/cp-kafka:7.9.0
+    container_name: supplychain-kafka-init
+    depends_on:
+      - kafka
+      - kafka2
+      - kafka3
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      echo "Creating supply-chain topics..." &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.purchase.orders --partitions 3 --replication-factor 3 &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.shipment.updates --partitions 3 --replication-factor 3 &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.quality.results --partitions 3 --replication-factor 3 &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.disruption.alerts --partitions 3 --replication-factor 3 &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.inventory.levels --partitions 3 --replication-factor 3 &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.suppliers --partitions 1 --replication-factor 3 &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.parts --partitions 1 --replication-factor 3 &&
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic supplychain.master.facilities --partitions 1 --replication-factor 3 &&
+      echo "Supply-chain topics created."
+
+  sc-producer:
+    build:
+      context: .
+      dockerfile: domains/supply-chain/producer/Dockerfile
+    container_name: supplychain-producer
+    depends_on:
+      schema-registry:
+        condition: service_healthy
+      sc-kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29093,kafka3:29094
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      EVENT_INTERVAL_SECONDS: "1"
+      TRANSACTION_EVENTS_PER_INTERVAL: "3"
+      REFERENCE_EVENTS_PER_INTERVAL: "2"
+    volumes:
+      - ./domains/supply-chain/schemas:/app/schemas
+
+  sc-webapp:
+    build:
+      context: .
+      dockerfile: domains/supply-chain/webapp/Dockerfile
+    container_name: supplychain-webapp
+    depends_on:
+      - sc-rag-api
+    ports:
+      - "8089:80"
+
+  sc-rag-api:
+    build:
+      context: .
+      dockerfile: domains/supply-chain/rag-api/Dockerfile
+    container_name: supplychain-rag-api
+    depends_on:
+      - qdrant-sc
+      - neo4j-sc
+      - ollama
+    ports:
+      - "8001:8000"
+    environment:
+      QDRANT_URL: http://qdrant-sc:6333
+      QDRANT_COLLECTION: supplychain_events
+      NEO4J_URI: bolt://neo4j-sc:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: supplychain123
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
+      SC_SKILLS_LAYER_PATH: config/skills_layer.json
+
+  sc-flink-processor:
+    build:
+      context: .
+      dockerfile: domains/supply-chain/flink-app/Dockerfile
+    container_name: supplychain-flink-processor
+    depends_on:
+      sc-kafka-init:
+        condition: service_completed_successfully
+      schema-registry:
+        condition: service_healthy
+      qdrant-sc:
+        condition: service_started
+      neo4j-sc:
+        condition: service_started
+      neo4j-sc-init:
+        condition: service_started
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29093,kafka3:29094
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      QDRANT_URL: http://qdrant-sc:6333
+      QDRANT_COLLECTION: supplychain_events
+      NEO4J_URI: bolt://neo4j-sc:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: supplychain123
+
+  sc-neodash:
+    image: neo4jlabs/neodash:latest
+    container_name: supplychain-neodash
+    platform: linux/amd64
+    depends_on:
+      - neo4j-sc
+    ports:
+      - "5006:5005"
+    environment:
+      standalone: "true"
+      standaloneProtocol: neo4j
+      standaloneHost: localhost
+      standalonePort: "7688"
+      standaloneDatabase: neo4j
+      standaloneUsername: neo4j
+      standalonePassword: supplychain123
+      standalonePasswordWarningHidden: "true"
+      customHeader: Supply Chain Neo4j GUI
+
+volumes:
+  neo4j_sc_data:
+  qdrant_sc_data:

@@ -39,7 +39,7 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `rag-api/tests/`
+- `domains/healthcare/rag-api/tests/`
 - `docs/ai_qa.md`
 - `.github/workflows/rag-api-contracts.yml`
 - `.github/workflows/ontology-conformance.yml`
@@ -54,9 +54,9 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `rag-api/llm_provider.py`
-- `rag-api/app.py`
-- `rag-api/tests/test_contracts.py`
+- `domains/healthcare/rag-api/llm_provider.py`
+- `domains/healthcare/rag-api/app.py`
+- `domains/healthcare/rag-api/tests/test_contracts.py`
 
 ### 3. Finish terminology and ontology governance depth
 
@@ -68,10 +68,10 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `config/ontology/`
+- `domains/healthcare/config/ontology/`
 - `scripts/generate_ontology_seed_cypher.py`
 - `scripts/validate_ontology.py`
-- `neo4j/generated_ontology_seeds.cypher`
+- `domains/healthcare/neo4j/generated_ontology_seeds.cypher`
 
 ### 4. Production controls for non-demo readiness (Stage 5)
 
@@ -144,19 +144,19 @@ CI checks: New workflow job `grounding-scorecard`; uploads JSON/Markdown report 
 - [ ] 3. ReAct loop hardening (phase 2)
 Scope: Extend loop stop criteria, fallback behavior, and loop metadata tests.
 Acceptance criteria: ReAct tests cover confidence stop, max-iteration stop, no-progress stop, and fallback path; no regression in planner suites.
-CI checks: `python3 rag-api/tests/test_react_controller.py`; `python3 rag-api/tests/test_planner_evaluation.py`; `python3 rag-api/tests/test_planner_edge_cases.py`; aggregated via `scripts/test_react_planner.sh`.
+CI checks: `python3 domains/healthcare/rag-api/tests/test_react_controller.py`; `python3 domains/healthcare/rag-api/tests/test_planner_evaluation.py`; `python3 domains/healthcare/rag-api/tests/test_planner_edge_cases.py`; aggregated via `scripts/test_react_planner.sh`.
 
 - [ ] 4. Evidence fusion reranking
 Scope: Add deterministic cross-source reranking using relevance + recency + graph signal weight.
 Acceptance criteria: Ranking function documented and unit tested; top-k ordering deterministic across repeated runs; route quality improves on fixture set.
-CI checks: New unit suite in `rag-api/tests/` and benchmark delta assertion in `retrieval-benchmark` job.
+CI checks: New unit suite in `domains/healthcare/rag-api/tests/` and benchmark delta assertion in `retrieval-benchmark` job.
 
 ### Sprint 2: Runtime Resilience and Governance Promotion
 
 - [ ] 5. Multi-provider runtime + failover
 Scope: Add second provider adapter and deterministic failover policy.
 Acceptance criteria: Adapter switch by env works; timeout/5xx failover tested; retrieval orchestration unchanged.
-CI checks: Extend `rag-api/tests/test_contracts.py` with provider/failover cases; add matrix job in `.github/workflows/rag-api-contracts.yml`.
+CI checks: Extend `domains/healthcare/rag-api/tests/test_contracts.py` with provider/failover cases; add matrix job in `.github/workflows/rag-api-contracts.yml`.
 
 - [ ] 6. Ontology governance depth
 Scope: Increase vocabulary mapping coverage and drift checks.
@@ -166,7 +166,7 @@ CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python 
 - [ ] 7. Policy-as-code and PHI boundaries
 Scope: Encode policy classes, redaction rules, and retention constraints as testable rules.
 Acceptance criteria: Policy fixtures cover allowed/denied tool calls and redaction classes; export guardrails validated for all roles.
-CI checks: Add policy regression suite in `rag-api/tests/`; run as required check in `rag-api-contracts.yml`.
+CI checks: Add policy regression suite in `domains/healthcare/rag-api/tests/`; run as required check in `rag-api-contracts.yml`.
 
 - [ ] 8. Progressive delivery SLO gates
 Scope: Define promotion gates for latency, error rate, and grounding score.
@@ -180,3 +180,28 @@ CI checks: Add deployment pre-check job in `.github/workflows/deploy-ai-prd.yml`
 - [ ] At least two LLM providers are supported with tested failover.
 - [ ] Ontology and policy drift checks block merges when governance constraints fail.
 - [ ] Production promotion includes explicit SLO gates and rollback criteria.
+
+## Multi-Domain Extension Backlog
+
+### Supply Chain Domain
+
+The `domains/supply-chain/` scaffold is in place with producer, graph_writes, pipeline service, ontology seeds, and docker-compose overlay. Remaining work:
+
+- [ ] Full Flink consumer job for supply-chain topics (reuse healthcare runner pattern)
+- [ ] Supply-chain RAG API with graph_context Cypher for supplier/part/facility traversal
+- [ ] Supply-chain planner evaluation fixtures and contract tests
+- [ ] Risk signal rules engine integration (single-source, lead-time, quality threshold rules)
+- [ ] Supply-chain query examples script (`scripts/sc_query_examples.sh`)
+- [ ] BOM cascade impact analysis: given a disruption, traverse DEPENDS_ON to find all affected assemblies
+- [ ] Supplier scorecard aggregation from quality inspections, shipment lead times, and disruption history
+- [ ] Neural embedding deployment for supply-chain Qdrant collection (shared MiniLM model)
+
+### New Domain Template
+
+To add a third domain (e.g., Insurance Claims, Cybersecurity SOC):
+
+1. Create `domains/<name>/` with: `domains/healthcare/config/ontology/`, `domains/healthcare/producer/`, `domains/healthcare/flink-app/app/`, `domains/healthcare/rag-api/domain/`, `domains/healthcare/neo4j/`, `domains/healthcare/schemas/`
+2. Define Avro envelope schema with domain-specific ID fields
+3. Write docker-compose overlay with isolated Neo4j + Qdrant + topic init
+4. Implement graph_writes and pipeline_service for the domain's entity model
+5. Add planner classifier and retrieval plan for domain request types
