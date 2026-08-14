@@ -224,6 +224,34 @@ Optional one-shot validation:
 python3 ./scripts/mcp_smoke_test.py
 ```
 
+CI-safe ReAct/planner validation (without full contract suite):
+
+```bash
+./scripts/test_react_planner.sh
+```
+
+### Optional: Enable ReAct Query Loop (Local)
+
+The default query path is single-pass. To enable the iterative ReAct controller locally,
+set these `.env` values and recreate `rag-api`:
+
+```bash
+RAG_API_REACT_ENABLED=true
+RAG_API_REACT_MAX_ITERS=3
+RAG_API_REACT_MIN_CONFIDENCE=0.75
+RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
+```
+
+Then rebuild/recreate the API service:
+
+```bash
+docker compose build rag-api
+docker compose up -d --force-recreate rag-api
+```
+
+When enabled, `/query` responses include an optional `react` block with loop metadata
+(`iterations`, `final_reason`, `confidence`, and `actions`).
+
 ## LocalStack
 
 The local stack also includes `localstack` for development scenarios that need an AWS-compatible local endpoint surface.

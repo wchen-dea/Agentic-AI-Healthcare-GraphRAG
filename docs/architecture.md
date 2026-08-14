@@ -87,6 +87,80 @@ This architecture intentionally combines several patterns so streaming ingestion
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
 - Adapter Pattern (roadmap): [docs/adrs/0006-local-first-llm-provider-routing.md](adrs/0006-local-first-llm-provider-routing.md)
 
+## Modern AI Stack Frameworks and Design Patterns Summary
+
+This section maps the current implementation to a modern AI application stack model and highlights what is already implemented versus what remains on the roadmap.
+
+### Framework Layer Summary
+
+| Modern AI Stack Layer | Typical Frameworks / Technologies | This Repository Mapping | Status |
+| --- | --- | --- | --- |
+| Data ingestion and event backbone | Kafka, Schema Registry, stream processors | Kafka + Schema Registry + native PyFlink pipeline | Implemented |
+| Retrieval stores | Vector DB + Graph DB + optional OLAP | Qdrant + Neo4j dual persistence | Implemented |
+| API and tool protocol layer | FastAPI, MCP, tool contracts | FastAPI + embedded FastMCP + MCP tool contracts | Implemented |
+| Agent / orchestration layer | Planner, skill registry, multi-step controller | Deterministic planner + skills layer + role-aware tool policies | Implemented (baseline) |
+| ReAct-style iterative control | Reason-act-observe loop controller | Feature-flagged ReAct loop path in rag-api | Implemented (phase 1 skeleton) |
+| Model provider abstraction | Adapter for local and managed providers | Ollama runtime + provider adapter structure | Implemented (single provider runtime) |
+| Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites | Implemented (partial) |
+| Observability and operations | Metrics, dashboards, probes, runbooks | Prometheus + Grafana + blackbox probes + runbook | Implemented |
+| Production governance and safety | Privacy policy, rollout gates, SLO controls | Deployment bundle and policy foundations present | In progress |
+
+### Design Pattern Summary
+
+| Pattern | Modern AI Relevance | Repository Usage | Status |
+| --- | --- | --- | --- |
+| Event-driven architecture | Supports near-real-time AI context refresh and replay | Producer -> Kafka -> PyFlink -> dual sinks | Implemented |
+| Polyglot persistence | Combines semantic similarity with relationship reasoning | Qdrant for vectors + Neo4j for graph context | Implemented |
+| Shared-core multi-surface API | Prevents drift between REST and tool protocol behavior | Shared query core for REST and MCP tool endpoints | Implemented |
+| Planner-first retrieval orchestration | Improves determinism before LLM synthesis | Request classification + retrieval planning + ranking | Implemented |
+| ReAct iterative orchestration | Enables multi-step tool use with explicit stop criteria | ReAct controller feature flag path and response metadata | Implemented (phase 1 skeleton) |
+| Policy enforcement point | Centralizes authorization and output controls | Role/tool checks + evidence shaping + byte budgets | Implemented |
+| Adapter pattern for model providers | Decouples retrieval from generation vendor | Provider adapter abstraction with Ollama runtime | Implemented (partial breadth) |
+| Contract-first evolution | Keeps external API/tool behavior stable as internals evolve | Contract test suite and MCP schema discipline | Implemented |
+| Evaluation-driven promotion | Uses objective quality gates for release progression | Planner tests in place; retrieval/grounding scorecards pending | In progress |
+| Progressive delivery controls | Reduces risk in production AI changes | Documented production deployment patterns; staged gates pending | In progress |
+
+### Gap Summary for Full Modern-Stack Alignment
+
+- Multi-provider runtime breadth is not complete yet (adapter exists, runtime is primarily Ollama today).
+- Retrieval benchmark and grounded-answer scorecard automation are not fully enforced as release gates.
+- Policy and privacy controls are present at foundation level but not yet complete for non-demo production governance depth.
+
+### Promotion Direction
+
+To promote from baseline-modern to production-modern AI stack maturity:
+
+1. Expand provider adapters and add failover behavior tests.
+2. Add retrieval and grounding scorecards as CI release gates.
+3. Strengthen policy/privacy controls and rollout guardrails with explicit SLO criteria.
+
+### Maturity Scorecard (1-5)
+
+Scoring guide:
+
+- 1 = not started
+- 2 = foundational design in place
+- 3 = baseline implementation working
+- 4 = production hardening in progress
+- 5 = production-grade with automated gates
+
+| Layer | Current Score | Target Next Sprint | Evidence Anchor | Primary Lift To Increase Score |
+| --- | --- | --- | --- | --- |
+| Data ingestion and event backbone | 4 | 4 | Kafka + Schema Registry + PyFlink runtime | Add stronger replay/recovery regression checks |
+| Retrieval stores (vector + graph) | 4 | 4 | Qdrant + Neo4j dual persistence in active flow | Add retrieval quality benchmark baselines |
+| API and MCP tool protocol | 4 | 4 | FastAPI + embedded MCP + contract tests | Expand protocol-level regression coverage |
+| Planner and skills orchestration | 3 | 4 | Deterministic planner + skills layer | Add route quality scorecards in CI |
+| ReAct iterative control | 3 | 4 | Feature-flagged ReAct loop and metadata | Add broader loop tests and stop/fallback metrics |
+| Model provider abstraction | 3 | 4 | Adapter structure with Ollama runtime | Add second provider + failover test suite |
+| Evaluation and quality gates | 3 | 4 | Contract + planner evaluation suites | Add retrieval and grounding release gates |
+| Observability and operations | 4 | 4 | Prometheus, Grafana, probes, runbook | Add alert quality tuning and SLO dashboards |
+| Production governance and safety | 2 | 3 | Policy/deploy foundations under production bundle | Implement policy/privacy/SLO rollout controls |
+
+Sprint tracking note:
+
+- Update only `Current Score`, `Target Next Sprint`, and `Primary Lift To Increase Score` during planning/review.
+- Keep `Evidence Anchor` stable unless architecture implementation materially changes.
+
 ## Architecture At A Glance
 
 ```text

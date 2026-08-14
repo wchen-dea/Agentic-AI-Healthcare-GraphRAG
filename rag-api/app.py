@@ -16,6 +16,7 @@ from domain import (
     rank_vector_context,
     select_retrieval_plan,
 )
+from domain.react_controller import ReactLoopSettings, run_react_query_loop
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
@@ -64,6 +65,10 @@ class Settings:
     max_evidence_chars: int
     max_answer_chars: int
     max_response_bytes: int
+    react_enabled: bool
+    react_max_iters: int
+    react_min_confidence: float
+    react_max_no_progress_steps: int
 
 
 def get_settings() -> Settings:
@@ -108,6 +113,16 @@ def get_settings() -> Settings:
         max_evidence_chars=int(os.getenv("RAG_API_MAX_EVIDENCE_CHARS", "240")),
         max_answer_chars=int(os.getenv("RAG_API_MAX_ANSWER_CHARS", "2000")),
         max_response_bytes=int(os.getenv("RAG_API_MAX_RESPONSE_BYTES", "50000")),
+        react_enabled=_to_bool(os.getenv("RAG_API_REACT_ENABLED"), default=False),
+        react_max_iters=max(1, min(int(os.getenv("RAG_API_REACT_MAX_ITERS", "3")), 6)),
+        react_min_confidence=max(
+            0.0,
+            min(float(os.getenv("RAG_API_REACT_MIN_CONFIDENCE", "0.75")), 1.0),
+        ),
+        react_max_no_progress_steps=max(
+            0,
+            int(os.getenv("RAG_API_REACT_MAX_NO_PROGRESS_STEPS", "1")),
+        ),
     )
 
 
@@ -591,6 +606,35 @@ Answer with:
 
 def run_query(question: str, patient_id: str | None = None, top_k: int | None = None) -> dict[str, Any]:
     context_limit = min(top_k or settings.max_context_items, max(settings.max_context_items, 8))
+    if settings.react_enabled:
+        loop_settings = ReactLoopSettings(
+            max_iterations=settings.react_max_iters,
+            min_confidence=settings.react_min_confidence,
+            max_no_progress_steps=settings.react_max_no_progress_steps,
+        )
+        return run_react_query_loop(
+            question=question,
+            patient_id=patient_id,
+            context_limit=context_limit,
+            settings=loop_settings,
+            classify_request_type_fn=classify_request_type,
+            select_retrieval_plan_fn=select_retrieval_plan,
+            vector_context_fn=vector_context,
+            rank_vector_context_fn=rank_vector_context,
+            graph_context_fn=graph_context,
+            rank_graph_context_fn=rank_graph_context,
+            synthesize_answer_fn=ask_ollama,
+        )
+
+    return _run_query_single_pass(question=question, patient_id=patient_id, context_limit=context_limit)
+
+
+def _run_query_single_pass(
+    *,
+    question: str,
+    patient_id: str | None,
+    context_limit: int,
+) -> dict[str, Any]:
     request_type = classify_request_type(question, patient_id)
     plan = select_retrieval_plan(request_type, question, patient_id, context_limit)
 
@@ -774,6 +818,8 @@ def _build_query_response(
             "response_truncated": False,
         },
     }
+    if result.get("react"):
+        payload["react"] = result["react"]
     return _apply_response_budget(payload)
 
 

@@ -126,3 +126,57 @@ flowchart LR
 2. Stage 4 additional provider adapters and adapter-level tests.
 3. Stage 1 terminology/ontology mapping coverage deepening.
 4. Stage 5 production privacy and rollout controls.
+
+## Two-Sprint Implementation Plan
+
+### Sprint 1: Quality and Orchestration Hardening
+
+- [ ] 1. Retrieval benchmark gate
+Scope: Add stable retrieval fixtures and scoring script for precision@k and recall@k.
+Acceptance criteria: At least 20 labeled queries in fixtures; precision@5 >= 0.70; recall@5 >= 0.75; benchmark output published as CI artifact.
+CI checks: New workflow job `retrieval-benchmark` in `.github/workflows/rag-api-contracts.yml`; fails when thresholds are missed.
+
+- [ ] 2. Grounded-answer scorecard
+Scope: Add answer grounding evaluator with unsupported-claim and citation-coverage metrics.
+Acceptance criteria: Golden set committed; unsupported-claim rate <= 0.10; citation coverage >= 0.80; failure taxonomy emitted per run.
+CI checks: New workflow job `grounding-scorecard`; uploads JSON/Markdown report artifact and enforces thresholds.
+
+- [ ] 3. ReAct loop hardening (phase 2)
+Scope: Extend loop stop criteria, fallback behavior, and loop metadata tests.
+Acceptance criteria: ReAct tests cover confidence stop, max-iteration stop, no-progress stop, and fallback path; no regression in planner suites.
+CI checks: `python3 rag-api/tests/test_react_controller.py`; `python3 rag-api/tests/test_planner_evaluation.py`; `python3 rag-api/tests/test_planner_edge_cases.py`; aggregated via `scripts/test_react_planner.sh`.
+
+- [ ] 4. Evidence fusion reranking
+Scope: Add deterministic cross-source reranking using relevance + recency + graph signal weight.
+Acceptance criteria: Ranking function documented and unit tested; top-k ordering deterministic across repeated runs; route quality improves on fixture set.
+CI checks: New unit suite in `rag-api/tests/` and benchmark delta assertion in `retrieval-benchmark` job.
+
+### Sprint 2: Runtime Resilience and Governance Promotion
+
+- [ ] 5. Multi-provider runtime + failover
+Scope: Add second provider adapter and deterministic failover policy.
+Acceptance criteria: Adapter switch by env works; timeout/5xx failover tested; retrieval orchestration unchanged.
+CI checks: Extend `rag-api/tests/test_contracts.py` with provider/failover cases; add matrix job in `.github/workflows/rag-api-contracts.yml`.
+
+- [ ] 6. Ontology governance depth
+Scope: Increase vocabulary mapping coverage and drift checks.
+Acceptance criteria: Mapping coverage report generated; generator output parity enforced; ontology drift fails CI.
+CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python scripts/validate_ontology.py` and fail on parity/drift mismatch.
+
+- [ ] 7. Policy-as-code and PHI boundaries
+Scope: Encode policy classes, redaction rules, and retention constraints as testable rules.
+Acceptance criteria: Policy fixtures cover allowed/denied tool calls and redaction classes; export guardrails validated for all roles.
+CI checks: Add policy regression suite in `rag-api/tests/`; run as required check in `rag-api-contracts.yml`.
+
+- [ ] 8. Progressive delivery SLO gates
+Scope: Define promotion gates for latency, error rate, and grounding score.
+Acceptance criteria: Documented SLO thresholds in runbook; canary promotion checklist added; rollback trigger criteria explicit.
+CI checks: Add deployment pre-check job in `.github/workflows/deploy-ai-prd.yml` validating SLO config and required artifacts.
+
+### Exit Criteria After Sprint 2
+
+- [ ] Retrieval and grounding quality gates are required checks on pull requests.
+- [ ] ReAct and planner validation runs via a single stable command and CI job.
+- [ ] At least two LLM providers are supported with tested failover.
+- [ ] Ontology and policy drift checks block merges when governance constraints fail.
+- [ ] Production promotion includes explicit SLO gates and rollback criteria.

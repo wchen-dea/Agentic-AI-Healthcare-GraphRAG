@@ -43,6 +43,40 @@ docker compose build rag-api
 docker compose up -d --force-recreate rag-api
 ```
 
+### Optional: Enable ReAct Loop In Local `rag-api`
+
+Add or update these variables in `.env`:
+
+```bash
+RAG_API_REACT_ENABLED=true
+RAG_API_REACT_MAX_ITERS=3
+RAG_API_REACT_MIN_CONFIDENCE=0.75
+RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
+```
+
+Rebuild and recreate `rag-api`:
+
+```bash
+docker compose build rag-api
+docker compose up -d --force-recreate rag-api
+```
+
+Verify with a smoke query and ensure a `react` object is present in the response:
+
+```bash
+curl -s -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Summarize hyperkalemia risk","patient_id":"patient-0001"}' | jq '.react'
+```
+
+Expected: non-null object with `enabled`, `iterations`, and `final_reason`.
+
+Run only ReAct and planner test suites (CI-safe shortcut):
+
+```bash
+./scripts/test_react_planner.sh
+```
+
 Stop all services:
 
 ```bash

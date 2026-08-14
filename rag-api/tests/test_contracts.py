@@ -27,6 +27,10 @@ class RagApiContractTests(unittest.TestCase):
         "RAG_API_MAX_ANSWER_CHARS",
         "RAG_API_MAX_CONTEXT_ITEMS",
         "RAG_API_TOOL_POLICY_PATH",
+        "RAG_API_REACT_ENABLED",
+        "RAG_API_REACT_MAX_ITERS",
+        "RAG_API_REACT_MIN_CONFIDENCE",
+        "RAG_API_REACT_MAX_NO_PROGRESS_STEPS",
         "LLM_MAX_TOKENS",
         "LLM_TIMEOUT_SECONDS",
     }
@@ -362,6 +366,66 @@ class RagApiContractTests(unittest.TestCase):
         self.assertEqual(payload["request_type"], "medication_safety")
         self.assertEqual(payload["retrieval_plan"]["name"], "medication_safety")
         self.assertIn("reason", payload["retrieval_plan"])
+        self.assertNotIn("react", payload)
+
+    def test_query_react_block_present_when_enabled(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "react-on-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            RAG_API_REACT_ENABLED="true",
+            RAG_API_REACT_MAX_ITERS="2",
+            RAG_API_REACT_MIN_CONFIDENCE="1.0",
+        )
+        client = TestClient(rag_app.app)
+
+        with patch.object(
+            rag_app,
+            "vector_context",
+            return_value=[
+                {
+                    "score": 0.9,
+                    "event_id": "evt-1",
+                    "patient_id": "patient-55",
+                    "event_type": "lab_result",
+                    "text": "evidence",
+                }
+            ],
+        ), patch.object(
+            rag_app,
+            "graph_context",
+            return_value=[{"patient_id": "patient-55", "conditions": ["CKD"]}],
+        ), patch.object(rag_app, "ask_ollama", return_value="ReAct answer"):
+            response = client.post(
+                "/query",
+                json={"question": "Summarize risk", "patient_id": "patient-55"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("react", payload)
+        self.assertTrue(payload["react"]["enabled"])
+        self.assertIn(payload["react"]["final_reason"], {"confidence_reached", "max_iterations_reached", "no_progress_limit"})
+        self.assertGreaterEqual(payload["react"]["iterations"], 1)
+
+    def test_query_react_block_absent_when_disabled(self) -> None:
+        rag_app = self.load_module(
+            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "react-off-audit.log"),
+            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            RAG_API_REACT_ENABLED="false",
+        )
+        client = TestClient(rag_app.app)
+
+        with patch.object(rag_app, "vector_context", return_value=[]), patch.object(
+            rag_app, "graph_context", return_value=[]
+        ), patch.object(rag_app, "ask_ollama", return_value="Single pass"):
+            response = client.post(
+                "/query",
+                json={"question": "Patient summary", "patient_id": "patient-2"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertNotIn("react", payload)
 
     def test_expanded_mcp_tools_return_expected_shapes(self) -> None:
         rag_app = self.load_module(
