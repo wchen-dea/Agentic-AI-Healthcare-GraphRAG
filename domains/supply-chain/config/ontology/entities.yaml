@@ -1,0 +1,67 @@
+version: 0.1.0
+status: draft
+owner: supply-chain-team
+purpose: Entity and relationship definitions for supply chain knowledge graph.
+entities:
+- label: Supplier
+  key: id
+  description: Organization that provides parts, materials, or services
+- label: Part
+  key: id
+  description: Component, raw material, or finished good
+- label: Facility
+  key: id
+  description: Warehouse, factory, distribution center, or port
+- label: Shipment
+  key: id
+  description: A tracked movement of goods between facilities
+- label: PurchaseOrder
+  key: id
+  description: Contractual order for parts from a supplier
+- label: QualityInspection
+  key: id
+  description: Inbound or in-process quality check result
+- label: DisruptionEvent
+  key: id
+  description: Event indicating a supply chain disruption
+- label: RiskSignal
+  key: id
+  description: Computed risk indicator from rules engine
+- label: SourceSystem
+  key: name
+  description: Originating system (ERP, WMS, TMS, IoT)
+relationships:
+- type: SUPPLIES
+  from: Supplier
+  to: Part
+- type: LOCATED_AT
+  from: Supplier
+  to: Facility
+- type: SHIPPED_FROM
+  from: Shipment
+  to: Facility
+- type: SHIPPED_TO
+  from: Shipment
+  to: Facility
+- type: CONTAINS_PART
+  from: Shipment
+  to: Part
+- type: ORDERED_FROM
+  from: PurchaseOrder
+  to: Supplier
+- type: ORDERS_PART
+  from: PurchaseOrder
+  to: Part
+- type: INSPECTED_PART
+  from: QualityInspection
+  to: Part
+- type: DEPENDS_ON
+  from: Part
+  to: Part
+  description: Bill-of-materials dependency
+- type: HAS_RISK_SIGNAL
+  from: Supplier
+  to: RiskSignal
+- type: DISRUPTED_BY
+  from: Facility
+  to: DisruptionEvent

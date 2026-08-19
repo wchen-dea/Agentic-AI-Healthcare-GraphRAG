@@ -2,39 +2,52 @@
 
 ## 1. Container Inventory
 
-All services are defined in `docker-compose.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
+All services are defined in `docker-compose.infra.yml` and `docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
 
 | Container | Image | Version | Host Ports | Role |
 |-----------|-------|---------|-----------|------|
-| `healthcare-zookeeper` | confluentinc/cp-zookeeper | 7.9.0 | 2181 | Kafka coordination |
-| `healthcare-kafka` | confluentinc/cp-kafka | 7.9.0 | 9092, 29092 | Kafka broker 1 |
-| `healthcare-kafka-2` | confluentinc/cp-kafka | 7.9.0 | 9093, 29093 | Kafka broker 2 |
-| `healthcare-kafka-3` | confluentinc/cp-kafka | 7.9.0 | 9094, 29094 | Kafka broker 3 |
-| `healthcare-schema-registry` | confluentinc/cp-schema-registry | 7.9.0 | 8081 | Avro schema registry |
+| `infra-zookeeper` | confluentinc/cp-zookeeper | 7.9.0 | 2181 | Kafka coordination |
+| `infra-kafka` | confluentinc/cp-kafka | 7.9.0 | 9092, 29092 | Kafka broker 1 |
+| `infra-kafka-2` | confluentinc/cp-kafka | 7.9.0 | 9093, 29093 | Kafka broker 2 |
+| `infra-kafka-3` | confluentinc/cp-kafka | 7.9.0 | 9094, 29094 | Kafka broker 3 |
+| `infra-schema-registry` | confluentinc/cp-schema-registry | 7.9.0 | 8081 | Avro schema registry |
 | `healthcare-kafka-init` | confluentinc/cp-kafka | 7.9.0 | — | One-shot topic provisioning |
-| `healthcare-conduktor-postgres` | postgres | 14 | — | Conduktor metadata store |
-| `healthcare-conduktor-console` | conduktor/conduktor-console | latest | 8085 | Kafka management UI |
+| `infra-conduktor-postgres` | postgres | 14 | — | Conduktor metadata store |
+| `infra-conduktor-console` | conduktor/conduktor-console | latest | 8085 | Kafka management UI |
 | `healthcare-qdrant` | qdrant/qdrant | latest | 6333 (HTTP), 6334 (gRPC) | Vector store |
 | `healthcare-neo4j` | neo4j | 5.26.2 | 7474 (HTTP), 7687 (Bolt) | Graph database |
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
 | `healthcare-neodash` | neo4jlabs/neodash | latest | 5005 | Neo4j dashboard UI |
-| `healthcare-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
-| `healthcare-flink-jobmanager` | custom (flink-app/Dockerfile) | — | 8082 | Flink JobManager |
-| `healthcare-flink-taskmanager` | custom (flink-app/Dockerfile) | — | — | Flink TaskManager |
-| `healthcare-flink-app` | custom (flink-app/Dockerfile) | — | — | PyFlink job submitter |
-| `healthcare-event-producer` | custom (producer/Dockerfile) | — | — | Synthetic event generator |
-| `healthcare-rag-api` | custom (rag-api/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
-| `healthcare-provider-web` | custom (webapp/Dockerfile) | — | 8088 | Provider web UI (Nginx) |
-| `healthcare-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
-| `healthcare-blackbox-exporter` | prom/blackbox-exporter | latest | 9115 | HTTP probe exporter |
-| `healthcare-grafana` | grafana/grafana | latest | 3000 | Metrics dashboards |
+| `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
+| `healthcare-flink-jobmanager` | custom (domains/healthcare/flink-app/Dockerfile) | — | 8082 | Flink JobManager |
+| `healthcare-flink-taskmanager` | custom (domains/healthcare/flink-app/Dockerfile) | — | — | Flink TaskManager |
+| `healthcare-flink-app` | custom (domains/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
+| `healthcare-producer` | custom (domains/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
+| `healthcare-rag-api` | custom (domains/healthcare/rag-api/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
+| `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (Nginx) |
+| `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
+| `infra-blackbox-exporter` | prom/blackbox-exporter | latest | 9115 | HTTP probe exporter |
+| `infra-grafana` | grafana/grafana | latest | 3000 | Metrics dashboards |
+| `localstack` | localstack/localstack | 3.8.0 | 4566, 4510–4559 | Local AWS-compatible services |
+
+### Supply Chain Domain Containers (optional overlay)
+
+Launched via `docker compose -f docker-compose.yml -f docker-compose.supply-chain.yml up -d`.
+
+| Container | Image | Version | Host Ports | Role |
+|-----------|-------|---------|-----------|------|
+| `supplychain-neo4j` | neo4j | 5.26.2 | 7475 (HTTP), 7688 (Bolt) | Supply chain graph database |
+| `supplychain-neo4j-init` | neo4j | 5.26.2 | — | One-shot supply chain Cypher seed |
+| `supplychain-qdrant` | qdrant/qdrant | latest | 6335 (HTTP), 6336 (gRPC) | Supply chain vector store |
+| `supplychain-kafka-init` | confluentinc/cp-kafka | 7.9.0 | — | One-shot supply chain topic creation |
+| `supplychain-producer` | custom (domains/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
 | `localstack` | localstack/localstack | 3.8.0 | 4566, 4510–4559 | Local AWS-compatible services |
 
 ---
 
 ## 2. Library Versions
 
-### rag-api (`rag-api/requirements.txt`)
+### rag-api (`domains/healthcare/rag-api/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -51,7 +64,7 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 
 > **Note:** `pydantic` is pinned with a range (`>=2.11.7,<3.0.0`) rather than an exact version because `mcp==1.28.0` requires `pydantic>=2.12.0` on Python 3.14. The range allows pip to resolve on Python 3.11 (CI/Docker target) and 3.14+ without conflict.
 
-### flink-app (`flink-app/requirements.txt`)
+### flink-app (`domains/healthcare/flink-app/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -62,7 +75,7 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 | qdrant-client | 1.11.3 | Qdrant upsert client |
 | requests | 2.32.3 | HTTP utilities |
 
-### producer (`producer/requirements.txt`)
+### producer (`domains/healthcare/producer/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -75,11 +88,22 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 
 | Component | Python version | Base image |
 |-----------|---------------|-----------|
-| rag-api | 3.11 | python:3.11-slim |
-| flink-app | 3.11 (via Flink image) | custom Flink Dockerfile |
-| producer | 3.11 | python:3.11-slim |
+| rag-api (healthcare) | 3.11 | python:3.11-slim |
+| rag-api (supply-chain) | 3.11 | python:3.11-slim |
+| flink-app (healthcare) | 3.11 (via Flink image) | custom Flink Dockerfile |
+| flink-processor (supply-chain) | 3.11 | python:3.11-slim |
+| producer (both domains) | 3.11 | python:3.11-slim |
 | mcp-server (standalone) | 3.11 | python:3.11-slim |
 | CI test runner | 3.11 | ubuntu-latest + setup-python@v5 |
+| Local dev (uv) | 3.11 | `.python-version` + `pyproject.toml` |
+
+### Local development tooling
+
+| Tool | File | Purpose |
+|------|------|---------|
+| [uv](https://docs.astral.sh/uv/) | `pyproject.toml` | Python project manager, dependency resolution, venv |
+| make | `Makefile` | Docker Compose shortcuts (`make up`, `make test-hc`, etc.) |
+| ruff | `pyproject.toml [tool.ruff]` | Linting and formatting |
 
 ---
 
@@ -133,7 +157,7 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 
 ## 4. Avro Envelope Schema
 
-**File:** `schemas/medical_event.avsc`  
+**File:** `domains/healthcare/schemas/medical_event.avsc`  
 **Namespace:** `com.healthcare.graphrag`  
 **Record name:** `MedicalEvent`  
 **Schema version:** `1.0.0`
@@ -227,7 +251,7 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 | HTTP port | 7474 |
 | Bolt port | 7687 |
 | Auth | `neo4j / ${NEO4J_PASSWORD:-healthcare123}` |
-| Init script | `neo4j/init.cypher` (mounted at startup) |
+| Init script | `domains/healthcare/neo4j/init.cypher` (mounted at startup) |
 
 ### Node labels (19)
 
@@ -278,7 +302,7 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 | `MANAGED_BY` | Patient → Provider | — |
 | `COVERED_BY` | Patient → Payer | — |
 
-### Seed data (from `neo4j/init.cypher`)
+### Seed data (from `domains/healthcare/neo4j/init.cypher`)
 
 | Category | Count |
 |----------|-------|
@@ -320,7 +344,7 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 | `risk_summary_generate` | `generation` | run_query() + prompt template |
 | `evidence_bundle_export` | `export` | run_query() + bounded text |
 
-### Role-based access policy (`rag-api/config/tool_policies.json`)
+### Role-based access policy (`domains/healthcare/rag-api/config/tool_policies.json`)
 
 | Role | Permitted tools |
 |------|----------------|
@@ -427,13 +451,13 @@ All services are defined in `docker-compose.yml`. The local stack runs entirely 
 ## 11. CI / CD Pipeline
 
 **File:** `.github/workflows/rag-api-contracts.yml`  
-**Trigger:** push or PR to `dev` branch touching `rag-api/**`, `skills/**`, skill-generation scripts, or the workflow file itself
+**Trigger:** push or PR to `dev` branch touching `domains/healthcare/rag-api/**`, `domains/healthcare/skills/**`, skill-generation scripts, or the workflow file itself
 
 | Job | Runner | Steps |
 |-----|--------|-------|
 | `skills-layer-validation` | ubuntu-latest | Checkout → Python 3.11 → `python scripts/generate_agent_skills.py --check` → `python scripts/validate_agent_skills.py` → optional `skills-ref validate` pass (best-effort install, skip on unavailable binary) |
-| `contract-tests` | ubuntu-latest | Checkout → Python 3.11 + pip cache → install `rag-api/requirements.txt` → `python rag-api/tests/test_contracts.py` (10 tests, ~1-3 s) → `python rag-api/tests/test_planner_evaluation.py` (fixture-driven route/plan assertions) |
-| `container-build` | ubuntu-latest | Checkout → `docker build -f rag-api/Dockerfile` |
+| `contract-tests` | ubuntu-latest | Checkout → Python 3.11 + pip cache → install `domains/healthcare/rag-api/requirements.txt` → `python domains/healthcare/rag-api/tests/test_contracts.py` (10 tests, ~1-3 s) → `python domains/healthcare/rag-api/tests/test_planner_evaluation.py` (fixture-driven route/plan assertions) |
+| `container-build` | ubuntu-latest | Checkout → `docker build -f domains/healthcare/rag-api/Dockerfile` |
 
 Both jobs run in parallel. Neither requires live external services (all dependencies mocked in contract tests).
 

@@ -1,0 +1,209 @@
+# Shared infrastructure — Kafka cluster, Schema Registry, monitoring, Ollama, LocalStack.
+# Domain services are in domain-specific overlay files.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.healthcare.yml up -d
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.9.0
+    container_name: infra-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.9.0
+    container_name: infra-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.9.0
+    container_name: infra-kafka-2
+    depends_on:
+      - zookeeper
+    ports:
+      - "9093:9093"
+      - "29093:29093"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://kafka2:29093,PLAINTEXT_HOST://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:29093,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+  kafka3:
+    image: confluentinc/cp-kafka:7.9.0
+    container_name: infra-kafka-3
+    depends_on:
+      - zookeeper
+    ports:
+      - "9094:9094"
+      - "29094:29094"
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://kafka3:29094,PLAINTEXT_HOST://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:29094,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.9.0
+    container_name: infra-schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka1:29092,PLAINTEXT://kafka2:29093,PLAINTEXT://kafka3:29094
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: ["CMD-SHELL", "cub sr-ready schema-registry 8081 30"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  conduktor-postgres:
+    image: postgres:14
+    container_name: infra-conduktor-postgres
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      POSTGRES_DB: conduktor
+      POSTGRES_USER: conduktor
+      POSTGRES_PASSWORD: ${CONDUKTOR_POSTGRES_PASSWORD:-change_me}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - conduktor_pg_data:/var/lib/postgresql/data
+
+  conduktor-console:
+    image: conduktor/conduktor-console:latest
+    container_name: infra-conduktor-console
+    depends_on:
+      - kafka
+      - schema-registry
+      - conduktor-postgres
+    ports:
+      - "8085:8080"
+    volumes:
+      - conduktor_data:/var/conduktor
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      CDK_DATABASE_URL: postgresql://conduktor:${CONDUKTOR_POSTGRES_PASSWORD:-change_me}@conduktor-postgres:5432/conduktor
+      CDK_ORGANIZATION_NAME: healthcare-demo
+      CDK_ADMIN_EMAIL: admin@healthcare.local
+      CDK_ADMIN_PASSWORD: ${CONDUKTOR_ADMIN_PASSWORD:-Admin@123!}
+      CDK_CLUSTERS_0_ID: healthcare-kafka
+      CDK_CLUSTERS_0_NAME: healthcare-kafka
+      CDK_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092,kafka2:29093,kafka3:29094
+      CDK_CLUSTERS_0_SCHEMAREGISTRY_URL: http://schema-registry:8081
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: infra-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: infra-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus-alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: infra-blackbox-exporter
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: infra-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+
+  localstack:
+    container_name: infra-localstack
+    image: localstack/localstack:3.8.0
+    ports:
+      - "0.0.0.0:4566:4566"
+      - "0.0.0.0:4510-4559:4510-4559"
+    environment:
+      - DEBUG=${DEBUG:-0}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4566/_localstack/health | grep -q '\"initialized\": true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+volumes:
+  ollama_models:
+  conduktor_pg_data:
+  conduktor_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: graphrag-net
+    external: true

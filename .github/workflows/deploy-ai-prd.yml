@@ -7,8 +7,9 @@ on:
     paths:
       - .github/workflows/deploy-ai-prd.yml
       - deploy/production/k8s/**
-      - rag-api/**
-      - webapp/**
+      - domains/healthcare/rag-api/**
+      - domains/healthcare/webapp/**
+      - shared_lib/**
   workflow_dispatch:
 
 permissions:

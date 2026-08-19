@@ -6,8 +6,8 @@ on:
       - dev
     paths:
       - .github/workflows/rag-api-contracts.yml
-      - rag-api/**
-      - skills/**
+      - domains/healthcare/rag-api/**
+      - domains/healthcare/skills/**
       - scripts/generate_agent_skills.py
       - scripts/validate_agent_skills.py
   pull_request:
@@ -15,8 +15,8 @@ on:
       - dev
     paths:
       - .github/workflows/rag-api-contracts.yml
-      - rag-api/**
-      - skills/**
+      - domains/healthcare/rag-api/**
+      - domains/healthcare/skills/**
       - scripts/generate_agent_skills.py
       - scripts/validate_agent_skills.py
 
@@ -43,7 +43,7 @@ jobs:
         run: |
           run_validation() {
             echo "skills-ref detected; running upstream validation for each skill package"
-            for skill_dir in skills/*; do
+            for skill_dir in domains/healthcare/skills/*; do
               if [[ -d "$skill_dir" ]]; then
                 skills-ref validate "$skill_dir"
               fi
@@ -78,22 +78,22 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: rag-api/requirements.txt
+          cache-dependency-path: domains/healthcare/rag-api/requirements.txt
 
       - name: Create isolated venv
         run: python -m venv .venv311
 
       - name: Install rag-api dependencies
-        run: .venv311/bin/python -m pip install -r rag-api/requirements.txt
+        run: .venv311/bin/python -m pip install -r domains/healthcare/rag-api/requirements.txt
 
       - name: Run rag-api contract tests
-        run: .venv311/bin/python rag-api/tests/test_contracts.py
+        run: .venv311/bin/python domains/healthcare/rag-api/tests/test_contracts.py
 
       - name: Run planner evaluation suite
-        run: .venv311/bin/python rag-api/tests/test_planner_evaluation.py
+        run: .venv311/bin/python domains/healthcare/rag-api/tests/test_planner_evaluation.py
 
       - name: Run planner edge-case suite
-        run: .venv311/bin/python rag-api/tests/test_planner_edge_cases.py
+        run: .venv311/bin/python domains/healthcare/rag-api/tests/test_planner_edge_cases.py
 
   container-build:
     runs-on: ubuntu-latest
@@ -102,4 +102,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build rag-api container
-        run: docker build -f rag-api/Dockerfile -t rag-api-contracts:ci .
+        run: docker build -f domains/healthcare/rag-api/Dockerfile -t rag-api-contracts:ci .

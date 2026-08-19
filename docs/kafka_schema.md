@@ -8,7 +8,7 @@ The stack uses one shared envelope schema and topic-based routing semantics.
 
 ## Envelope Schema
 
-Source file: schemas/medical_event.avsc
+Source file: domains/healthcare/schemas/medical_event.avsc
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Source file: schemas/medical_event.avsc
 
 ## Schema Registry Behavior
 
-Producer behavior in producer/produce_events.py:
+Producer behavior in domains/healthcare/producer/produce_events.py:
 
 - Registers the Avro envelope under topic-value subjects for transactional and reference topics.
 - Uses POST /subjects/{subject}/versions.
@@ -71,7 +71,7 @@ Fix:
 
 Important limitation in current schema design:
 
-- `payload_json` is defined as a `string` field in `schemas/medical_event.avsc`.
+- `payload_json` is defined as a `string` field in `domains/healthcare/schemas/medical_event.avsc`.
 - Field-level masking can apply to top-level envelope fields.
 - Field-level masking cannot target nested JSON attributes inside `payload_json` unless that payload is migrated to structured Avro fields.
 
@@ -103,9 +103,35 @@ Important limitation in current schema design:
 | --- | --- | --- |
 | healthcare.dlq.events | 1 | Created by kafka-init; not currently written by processor |
 
+## Supply Chain Topics (parallel domain)
+
+Created by `supplychain-kafka-init` when the supply-chain overlay is active.
+
+### Supply Chain Transactional Topics
+
+| Topic | Partitions | Typical Event Type | Producer Function |
+| --- | --- | --- | --- |
+| supplychain.purchase.orders | 3 | PURCHASE_ORDER | purchase_order_event |
+| supplychain.shipment.updates | 3 | SHIPMENT_UPDATE | shipment_update_event |
+| supplychain.quality.results | 3 | QUALITY_RESULT | quality_result_event |
+| supplychain.disruption.alerts | 3 | DISRUPTION_ALERT | disruption_alert_event |
+| supplychain.inventory.levels | 3 | INVENTORY_LEVEL | inventory_level_event |
+
+### Supply Chain Reference Topics
+
+| Topic | Partitions | Typical Event Type | Producer Function |
+| --- | --- | --- | --- |
+| supplychain.master.suppliers | 1 | SUPPLIER_MASTER_UPSERT | supplier_reference_event |
+| supplychain.master.parts | 1 | PART_MASTER_UPSERT | part_reference_event |
+| supplychain.master.facilities | 1 | FACILITY_MASTER_UPSERT | facility_reference_event |
+
+### Supply Chain Envelope Schema
+
+Source file: `domains/supply-chain/schemas/supply_chain_event.avsc`. Uses entity_id/facility_id/supplier_id instead of patient_id/encounter_id/provider_id.
+
 ## Topic Creation And Lifecycle
 
-Topics are explicitly created by kafka-init in docker-compose.yml with auto-create disabled on the broker.
+Topics are explicitly created by kafka-init in docker-compose.healthcare.yml with auto-create disabled on the broker.
 
 This ensures deterministic local topology and avoids accidental topic drift.
 

@@ -8,7 +8,8 @@ MARKDOWN_TARGETS=(
   "README.md"
   "docs/**/*.md"
   "deploy/**/*.md"
-  "mcp-server/**/*.md"
+  "domains/**/*.md"
+  "platform/**/*.md"
 )
 
 if command -v markdownlint >/dev/null 2>&1; then
@@ -30,4 +31,4 @@ docker run --rm \
   -v "$ROOT_DIR:/workdir" \
   -w /workdir \
   node:20-alpine \
-  sh -lc 'npx --yes markdownlint-cli2 README.md docs/**/*.md deploy/**/*.md mcp-server/**/*.md'
+  sh -lc 'npx --yes markdownlint-cli2 README.md "docs/**/*.md" "deploy/**/*.md" "domains/**/*.md"'

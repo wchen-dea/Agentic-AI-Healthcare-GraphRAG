@@ -17,7 +17,7 @@ Adopt local-first generation with provider abstraction:
 
 Implementation status in this repository today:
 
-- Implemented: local Ollama-first runtime in `rag-api/app.py`.
+- Implemented: local Ollama-first runtime in `domains/healthcare/rag-api/app.py`.
 - Roadmap extension: provider adapter and environment-based routing for Anthropic/OpenAI.
 
 ## Consequences

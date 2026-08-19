@@ -10,7 +10,7 @@ services:
 
   provider-web:
     image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest
-    container_name: healthcare-provider-web
+    container_name: healthcare-webapp
     depends_on:
       - rag-api
     ports:

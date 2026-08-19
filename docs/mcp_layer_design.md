@@ -29,7 +29,7 @@ AI Client (Copilot, Claude Desktop, custom agent)
 ```
 
 Default runtime mode is embedded MCP inside rag-api.
-The `mcp-server/` folder remains a standalone reference scaffold for optional split-service deployments.
+The `domains/healthcare/mcp-server/` folder remains a standalone reference scaffold for optional split-service deployments.
 
 ## 1) Minimal Tool List
 
@@ -421,4 +421,4 @@ Exit criteria:
 
 ## Current Implementation Note
 
-The embedded MCP layer in `rag-api/app.py` already ships all five tools and shares the same retrieval + guardrail core used by `POST /query`.
+The embedded MCP layer in `domains/healthcare/rag-api/app.py` already ships all five tools and shares the same retrieval + guardrail core used by `POST /query`.

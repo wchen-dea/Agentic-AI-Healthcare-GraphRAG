@@ -38,7 +38,7 @@ The model prioritizes traceability, simple traversal patterns, and deterministic
 
 ## Constraints And Seed Data
 
-Initialization in neo4j/init.cypher creates uniqueness constraints for:
+Initialization in domains/healthcare/neo4j/init.cypher creates uniqueness constraints for:
 
 - Patient.id
 - Encounter.id
@@ -235,7 +235,7 @@ Property enrichment examples:
 
 ## How Graph Context Is Queried
 
-rag-api/app.py `graph_context()` retrieves for selected patient IDs:
+domains/healthcare/rag-api/app.py `graph_context()` retrieves for selected patient IDs:
 
 - conditions (with onset timestamps)
 - symptoms
@@ -343,3 +343,41 @@ LIMIT 25;
 - Reference enrichment is eventual with respect to transactional ordering.
 - Replays can improve property completeness as more reference records arrive.
 - This model is optimized for local explainability over full clinical normalization.
+
+## Supply Chain Graph Model (parallel domain)
+
+The supply-chain domain uses a separate Neo4j instance (`supplychain-neo4j` on port 7475/7688) with its own label set.
+
+### Supply Chain Core Labels
+
+| Label | Meaning |
+| --- | --- |
+| Supplier | Organization that provides parts or materials |
+| Part | Component, raw material, or finished good |
+| Facility | Factory, warehouse, distribution center, or port |
+| Shipment | Tracked movement of goods between facilities |
+| PurchaseOrder | Contractual order for parts from a supplier |
+| QualityInspection | Inbound or in-process quality check result |
+| DisruptionEvent | Supply chain disruption incident |
+| RiskSignal | Computed risk indicator (single-source, geopolitical, quality) |
+| SupplyChainEvent | Event lineage record |
+| SourceSystem | Originating system (ERP, WMS, TMS, IoT) |
+
+### Supply Chain Key Relationships
+
+| Relationship | From | To | Properties |
+| --- | --- | --- | --- |
+| SUPPLIES | Supplier | Part | exclusive |
+| DEPENDS_ON | Part | Part | bom_level |
+| ORDERED_FROM | PurchaseOrder | Supplier | — |
+| ORDERS_PART | PurchaseOrder | Part | — |
+| SHIPPED_FROM | Shipment | Facility | — |
+| SHIPPED_TO | Shipment | Facility | — |
+| CONTAINS_PART | Shipment | Part | — |
+| INSPECTED_PART | QualityInspection | Part | — |
+| DISRUPTED_BY | Facility | DisruptionEvent | — |
+| AFFECTS_PART | DisruptionEvent | Part | — |
+| HAS_RISK_SIGNAL | Supplier/Part | RiskSignal | detected_ts |
+| HOLDS_INVENTORY | Facility | Part | on_hand_qty, below_reorder, days_of_supply |
+
+Constraints and seeds: `domains/supply-chain/neo4j/init.cypher` and `domains/supply-chain/neo4j/generated_ontology_seeds.cypher`.

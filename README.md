@@ -1,13 +1,14 @@
 # Agentic AI Healthcare GraphRAG
 
-A healthcare-focused hybrid GraphRAG system built on Kafka, PyFlink, Qdrant, Neo4j, FastAPI, and Ollama.
+A multi-domain hybrid GraphRAG system built on Kafka, PyFlink, Qdrant, Neo4j, FastAPI, and Ollama.
+The first domain is **Healthcare Provider**; a parallel **Supply Chain Resilience** domain ships alongside it under `domains/supply-chain/`.
 
 ## Summary
 
-This project provides a healthcare AI platform blueprint across three dimensions:
+This project provides a domain-agnostic AI platform blueprint across three dimensions:
 
 - Technical leadership: streaming-first ingestion, dual evidence stores (vector plus graph), and agent-ready APIs (REST + MCP) on shared reasoning logic.
-- Industry innovation: one reusable architecture for clinical, operational, and financial healthcare AI workflows.
+- Industry innovation: one reusable architecture for clinical, operational, financial, and supply chain AI workflows.
 - Implementation maturity: complete local development stack plus production-ready deployment configuration variants for AI deliverables.
 
 Repository intent:
@@ -54,6 +55,36 @@ The platform is reusable by design: core platform layers stay stable while domai
 | Medication Safety | Orders, interaction knowledge base, FAERS adverse event reporting | Real-time adverse event detection, contraindication alerts, drug-drug interaction mechanism tracing, pharmacovigilance signal ranking |
 | Device and Remote Monitoring | Device telemetry, alerts, maintenance events | Faster anomaly response, operational efficiency |
 
+## Supply Chain Domain
+
+The supply-chain domain runs in parallel using its own Neo4j instance, Qdrant collection, and Kafka topics while sharing the existing Kafka cluster, Schema Registry, and monitoring stack.
+
+| Supply Chain Section | Example Data Sources | Typical Outcomes |
+| --- | --- | --- |
+| Supplier Risk | Supplier profiles, geopolitical data, financial signals | Single-source detection, geopolitical exposure alerts |
+| Procurement | Purchase orders, incoterms, lead time baselines | PO lifecycle tracking, cost variance analysis |
+| Logistics | Shipment tracking, customs, transport mode | Delay detection, carrier performance, customs hold alerts |
+| Quality | Inbound inspections, defect rates, CAPA records | Supplier quality scoring, rejection trend analysis |
+| Disruption | Facility alerts, natural disaster, cyber incidents | Cascade impact assessment, mitigation status tracking |
+| Inventory | Warehouse levels, reorder points, days-of-supply | Stockout risk detection, reorder optimization |
+
+Launch supply-chain alongside healthcare:
+
+```bash
+docker compose -f docker-compose.infra.yml \
+  -f docker-compose.healthcare.yml \
+  -f docker-compose.supply-chain.yml \
+  up -d
+```
+
+Supply-chain service endpoints:
+
+| Service | URL |
+| --- | --- |
+| Neo4j Browser (SC) | http://localhost:7475 |
+| Neo4j Bolt (SC) | bolt://localhost:7688 |
+| Qdrant (SC) | http://localhost:6335 |
+
 ## Innovation Highlights
 
 - Real-time healthcare intelligence stack: Kafka + Flink processing with Avro schema-governed event contracts.
@@ -88,7 +119,7 @@ Ops/UI
 ## LLM Strategy
 
 - Local default: Ollama using OLLAMA_URL and OLLAMA_MODEL.
-- Current implementation in `rag-api/app.py` uses Ollama `/api/generate` directly.
+- Current implementation in `domains/healthcare/rag-api/app.py` uses Ollama `/api/generate` directly.
 - Active latency and output controls: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
 - Temperature is currently fixed in code (`0.2`) and is not yet env-configurable.
 - Anthropic/OpenAI provider routing remains a documented extension path, not the active local runtime.
@@ -106,7 +137,7 @@ Ops/UI
 - Reference-data enrichment for patients, providers, devices, medications, and payers before sink writes.
 - 14-rule lab signal engine: each lab result is evaluated against clinical thresholds at ingest time and `MAY_INDICATE` edges are written atomically to Neo4j (Hyperkalemia, AMI, CKD, Anemia, Hyperlipidemia, Hypothyroidism, and more).
 - FAERS-aligned pharmacovigilance: adverse event detection fires after every `CLINICAL_NOTE` event by matching the documented symptom against `HAS_KNOWN_REACTION` graph edges for the patient's currently ordered medications.
-- Drug safety knowledge graph: `INTERACTS_WITH` edges carry mechanism annotations; `HAS_KNOWN_REACTION` edges carry MedDRA terms and severity; `CONTRAINDICATED_FOR` edges encode clinical contraindication reasoning — all seeded at stack startup from `neo4j/init.cypher`.
+- Drug safety knowledge graph: `INTERACTS_WITH` edges carry mechanism annotations; `HAS_KNOWN_REACTION` edges carry MedDRA terms and severity; `CONTRAINDICATED_FOR` edges encode clinical contraindication reasoning — all seeded at stack startup from `domains/healthcare/neo4j/init.cypher`.
 - ICD-10 coding: clinical note events carry an `icd10_code` field written as `(Condition)-[:CODED_AS]->(ICD10Code)` edges, enabling coding-gap queries across the graph.
 - Expanded synthetic event scope: 24-medication catalog with active ingredients, 18-lab-test panels with per-test abnormality thresholds, device alerts (tachycardia, hypoxia, hypertension), CPT procedure descriptions, and claims financial fields (billed/allowed amounts, service dates).
 - graph_context response includes `lab_signals`, `adverse_events`, `contraindications`, `icd10_codes`, and enriched `medications` / `vitals` / `claims` payloads visible in every API and MCP tool response.
@@ -122,11 +153,11 @@ Ops/UI
 
 This repository includes a runtime Skills layer plus generated Agent Skills packages.
 
-- Runtime planner config: `rag-api/config/skills_layer.json`
-- Runtime resolver: `rag-api/skills_layer.py`
+- Runtime planner config: `domains/healthcare/rag-api/config/skills_layer.json`
+- Runtime resolver: `domains/healthcare/rag-api/skills_layer.py`
 - REST endpoint: `POST /skills/plan`
 - MCP tool: `skills_plan_get`
-- Generated Agent Skills packages: `skills/`
+- Generated Agent Skills packages: `domains/healthcare/skills/`
 
 Generate and validate skill packages:
 
@@ -150,7 +181,9 @@ This quick start is for local development only. It is not a production deploymen
 Prerequisites:
 
 - Docker Desktop or Docker Engine with Compose support
+- [uv](https://docs.astral.sh/uv/) (Python project manager)
 - jq (recommended for shell validations)
+- make (for Makefile shortcuts)
 - Enough disk for Ollama model download (roughly 5 GB+)
 
 Start the full stack:
@@ -158,7 +191,41 @@ Start the full stack:
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
 cp .env.example .env
-docker compose up -d --build
+make up          # or: make up-hc (healthcare only) / make up-sc (supply-chain only)
+```
+
+Or without the Makefile:
+
+```bash
+docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+```
+
+### Local Python Environment
+
+The project uses [uv](https://docs.astral.sh/uv/) with Python 3.11 (same version as all Docker images).
+
+```bash
+uv sync              # Install all dependencies into .venv
+uv run python ...    # Run scripts with the project Python
+uv run pytest ...    # Run tests
+```
+
+### Makefile Shortcuts
+
+```bash
+make help        # Show all available targets
+make up          # Start infra + healthcare + supply-chain
+make up-hc       # Start infra + healthcare only
+make up-sc       # Start infra + supply-chain only
+make down-all    # Stop everything
+make ps          # Show running containers
+make neo4j-hc    # Open healthcare Neo4j shell
+make neo4j-sc    # Open supply-chain Neo4j shell
+make test-hc     # Run healthcare validation tests
+make test-sc     # Run supply-chain validation tests
+make topics      # List all Kafka topics
+make logs        # Tail healthcare logs
+make fresh       # Full clean restart with both domains
 ```
 
 The local stack follows the same externalized configuration pattern as the production bundle: copy `.env.example` to `.env` and keep local credentials and secret-like values in `.env`, not hardcoded in source-controlled Compose overrides.
@@ -191,7 +258,7 @@ cp .env.example .env
 4. Recreate or restart affected services after changing secret-bearing values:
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
 ```
 
 The values in `.env.example` are development placeholders. Replace them in `.env` if you want non-default local credentials.
@@ -205,14 +272,14 @@ Local Kafka topology after startup:
 If your local stack was created before the move to three brokers, existing Kafka topics may still have replication factor `1` because topic creation is idempotent. To fully reprovision the local Kafka cluster with replication factor `3`, recreate the local Kafka state when it is safe to do so:
 
 ```bash
-docker compose down -v
-docker compose up -d --build
+docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml down -v
+docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
 ```
 
 Pull the LLM model used by the API:
 
 ```bash
-docker exec -it healthcare-ollama ollama pull llama3.1
+docker exec -it infra-ollama ollama pull llama3.1
 ```
 
 Optional one-shot validation:
@@ -245,8 +312,8 @@ RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
 Then rebuild/recreate the API service:
 
 ```bash
-docker compose build rag-api
-docker compose up -d --force-recreate rag-api
+docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml build rag-api
+docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 When enabled, `/query` responses include an optional `react` block with loop metadata
@@ -360,20 +427,41 @@ curl -s -X POST "http://localhost:8000/query" \
 ## Project Layout
 
 ```text
+pyproject.toml  Unified Python project config (uv, dependencies, ruff)
+Makefile        Local development shortcuts (make up, make test-hc, etc.)
+.python-version Python 3.11 pin (used by uv and Docker images)
+shared_lib/     Shared library (embedding, storage, runner, rules engine, ontology loader)
+  webapp/       Shared webapp assets (styles, query-helpers.js, nginx config)
+domains/        Domain implementations
+  healthcare/   Healthcare Provider domain
+    config/     Ontology YAML, rules, vocabulary mappings
+    flink-app/  PyFlink job, processor logic, graph writes
+    neo4j/      Constraints and seed graph relationships
+    producer/   Synthetic event producer
+    rag-api/    FastAPI GraphRAG API
+    schemas/    Avro envelope schema
+    skills/     Generated Agent Skills packages
+    scripts/    Domain-specific validation and query scripts
+    webapp/     Provider-facing static UI
+    mcp-server/ MCP adapter scaffold (reference implementation)
+  supply-chain/ Supply Chain Resilience domain
+    config/     Ontology YAML, risk signal rules
+    flink-app/  Stream processor and graph writes
+    neo4j/      Constraints and seed data
+    producer/   Synthetic event producer
+    rag-api/    FastAPI RAG API with skills layer
+    schemas/    Avro envelope schema
+    skills/     Agent Skills packages
+    scripts/    Domain-specific validation and query scripts
+    webapp/     Supply-chain query UI
+docker-compose.infra.yml        Shared infrastructure (Kafka, ZK, monitoring, Ollama)
+docker-compose.healthcare.yml   Healthcare domain services
+docker-compose.supply-chain.yml Supply-chain domain services
 docs/           Architecture, Kafka contract, graph model, and runbook
 docs/adrs/      Architecture Decision Records (ADRs)
-flink-app/      PyFlink job, processor logic, and Flink runtime image
-mcp-server/     MCP adapter scaffold (reference implementation)
+scripts/        Cross-domain validation scripts
 monitoring/     Prometheus, Grafana, alerting, and blackbox config
-neo4j/          Constraints and seed graph relationships
-producer/       Synthetic event producer
-rag-api/        FastAPI GraphRAG API
-skills/         Generated Agent Skills packages (`SKILL.md` + references)
-schemas/        Avro envelope schema
-scripts/        Validation and query helper scripts
-webapp/         Provider-facing static UI
 deploy/         Deployment bundles (production AI runtime and monitoring)
-deploy/production/k8s/ Kubernetes-ready AI component manifests
 ```
 
 ## Implementation Notes
@@ -400,6 +488,9 @@ deploy/production/k8s/ Kubernetes-ready AI component manifests
 | [docs/ai_qa.md](docs/ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
 | [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |
 | [deploy/production/k8s/README.md](deploy/production/k8s/README.md) | Kubernetes manifests |
+| [domains/supply-chain/README.md](domains/supply-chain/README.md) | Supply Chain domain: graph model, events, quick start |
+| [Makefile](Makefile) | Local development shortcuts (make up, make test-hc, etc.) |
+| [pyproject.toml](pyproject.toml) | Unified Python project config (uv, dependencies, ruff) |
 
 ## Safety Disclaimer
 

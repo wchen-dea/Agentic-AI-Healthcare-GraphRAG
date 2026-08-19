@@ -1,0 +1,45 @@
+version: 0.1.0
+status: draft
+owner: supply-chain-rules
+purpose: Declarative supply chain risk signal detection rules.
+rules:
+- id: single_source_critical_part
+  trigger:
+    event_type: PURCHASE_ORDER
+    condition: supplier_count_for_part == 1
+  output_edge:
+    type: HAS_RISK_SIGNAL
+    risk_category: Single Source Dependency
+  severity: high
+- id: lead_time_exceeded
+  trigger:
+    event_type: SHIPMENT_UPDATE
+    condition: actual_lead_days > expected_lead_days * 1.5
+  output_edge:
+    type: HAS_RISK_SIGNAL
+    risk_category: Lead Time Volatility
+  severity: moderate
+- id: quality_rejection_rate
+  trigger:
+    event_type: QUALITY_RESULT
+    condition: defect_rate > 0.05
+  output_edge:
+    type: HAS_RISK_SIGNAL
+    risk_category: Quality Failure Rate
+  severity: high
+- id: geopolitical_risk_region
+  trigger:
+    event_type: SUPPLIER_UPDATE
+    condition: country in high_risk_regions
+  output_edge:
+    type: HAS_RISK_SIGNAL
+    risk_category: Geopolitical Exposure
+  severity: moderate
+- id: disruption_cascade
+  trigger:
+    event_type: DISRUPTION_ALERT
+    condition: affected_facility_is_sole_source
+  output_edge:
+    type: HAS_RISK_SIGNAL
+    risk_category: Capacity Constraint
+  severity: high

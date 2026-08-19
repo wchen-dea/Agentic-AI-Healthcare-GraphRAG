@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "SupplyChainEvent",
+  "namespace": "com.supplychain.graphrag",
+  "fields": [
+    {"name": "event_id", "type": "string"},
+    {"name": "event_ts", "type": "string"},
+    {"name": "source_system", "type": "string"},
+    {"name": "source_type", "type": "string"},
+    {"name": "event_type", "type": "string"},
+    {"name": "entity_id", "type": ["null", "string"], "default": null},
+    {"name": "facility_id", "type": ["null", "string"], "default": null},
+    {"name": "supplier_id", "type": ["null", "string"], "default": null},
+    {"name": "payload_json", "type": "string"},
+    {"name": "schema_version", "type": "string", "default": "1.0.0"}
+  ]
+}

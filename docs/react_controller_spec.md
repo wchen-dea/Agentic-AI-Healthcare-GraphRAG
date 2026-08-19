@@ -30,39 +30,39 @@ Out of scope (initial version):
 
 Primary implementation and integration touchpoints:
 
-- `rag-api/app.py`
+- `domains/healthcare/rag-api/app.py`
   - request handling and `POST /query`
   - core retrieval path (`run_query`, `vector_context`, `graph_context`)
   - answer synthesis (`ask_ollama`)
   - policy shaping and response budget enforcement
   - audit logging and tool metrics
-- `rag-api/domain/planner.py`
+- `domains/healthcare/rag-api/domain/planner.py`
   - request classification and retrieval plan selection
-- `rag-api/domain/evidence.py`
+- `domains/healthcare/rag-api/domain/evidence.py`
   - deterministic ranking for vector and graph contexts
-- `rag-api/skills_layer.py`
+- `domains/healthcare/rag-api/skills_layer.py`
   - business goal to skill/tool resolution
-- `rag-api/config/tool_policies.json`
+- `domains/healthcare/rag-api/config/tool_policies.json`
   - role to tool authorization policy
-- `rag-api/tests/test_contracts.py`
+- `domains/healthcare/rag-api/tests/test_contracts.py`
   - API and tool contract, guardrail, and policy tests
-- `rag-api/tests/test_planner_evaluation.py`
+- `domains/healthcare/rag-api/tests/test_planner_evaluation.py`
   - planner fixture-driven route/plan assertions
-- `rag-api/tests/test_planner_edge_cases.py`
+- `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
   - deterministic planner/ranking edge assertions
 
 Recommended new files:
 
-- `rag-api/domain/react_controller.py`
+- `domains/healthcare/rag-api/domain/react_controller.py`
   - ReAct loop state, policy checks, and execution logic
-- `rag-api/tests/test_react_controller.py`
+- `domains/healthcare/rag-api/tests/test_react_controller.py`
   - deterministic loop tests
-- `rag-api/tests/fixtures/react_cases.json`
+- `domains/healthcare/rag-api/tests/fixtures/react_cases.json`
   - loop scenario fixtures
 
 ## Runtime Configuration
 
-Add optional environment settings in `rag-api/app.py` `Settings`:
+Add optional environment settings in `domains/healthcare/rag-api/app.py` `Settings`:
 
 - `RAG_API_REACT_ENABLED` (default: `false`)
 - `RAG_API_REACT_MAX_ITERS` (default: `3`, min: `1`, max: `6`)
@@ -154,7 +154,7 @@ Initial action set should reuse existing runtime call paths:
 - `graphrag_answer_generate` -> calls synthesis over accumulated evidence
 - `skills_plan_get` (optional for business-goal routed flows)
 
-Role policy source of truth remains `rag-api/config/tool_policies.json`.
+Role policy source of truth remains `domains/healthcare/rag-api/config/tool_policies.json`.
 
 If an action is not allowed for role:
 
@@ -282,7 +282,7 @@ Privacy rule: do not return internal `thought` text by default.
 
 ## Metrics and Audit Additions
 
-Add optional metrics labels/counters in `rag-api/app.py`:
+Add optional metrics labels/counters in `domains/healthcare/rag-api/app.py`:
 
 - `rag_api_react_iterations` (histogram)
 - `rag_api_react_stop_total{reason=...}` (counter)
@@ -297,7 +297,7 @@ Audit event additions:
 
 ## Test Plan Mapped to Current Suite
 
-### 1. Unit tests: new `rag-api/tests/test_react_controller.py`
+### 1. Unit tests: new `domains/healthcare/rag-api/tests/test_react_controller.py`
 
 Core deterministic tests:
 
@@ -319,7 +319,7 @@ Core deterministic tests:
 6. `test_response_remains_within_budget_after_loop`
 - Verifies byte budget and truncation metadata.
 
-### 2. Contract tests: extend `rag-api/tests/test_contracts.py`
+### 2. Contract tests: extend `domains/healthcare/rag-api/tests/test_contracts.py`
 
 Add focused tests:
 
@@ -328,14 +328,14 @@ Add focused tests:
 3. `test_query_react_respects_role_policy`
 4. `test_query_react_guardrails_match_existing_defaults`
 
-### 3. Planner tests: optional extension in `rag-api/tests/test_planner_edge_cases.py`
+### 3. Planner tests: optional extension in `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
 
 Add action-selection edge assertions:
 
 1. `test_react_choose_action_prefers_missing_channel`
 2. `test_react_choose_action_for_medication_safety_prefers_graph_when_interactions_missing`
 
-### 4. Fixtures: new `rag-api/tests/fixtures/react_cases.json`
+### 4. Fixtures: new `domains/healthcare/rag-api/tests/fixtures/react_cases.json`
 
 Fixture fields:
 

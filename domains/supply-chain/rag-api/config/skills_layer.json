@@ -1,0 +1,91 @@
+{
+  "version": "1.0.0",
+  "flow": [
+    "Business Goals",
+    "Agent",
+    "Skills",
+    "Context",
+    "Ontology",
+    "MCP",
+    "Tools"
+  ],
+  "business_goals": {
+    "supplier_risk_assessment": {
+      "description": "Assess supplier concentration, geopolitical exposure, and quality risk across the supply base.",
+      "default_agent": "supplier_risk_agent",
+      "skills": [
+        "supplier_risk_review",
+        "grounded_answer"
+      ]
+    },
+    "disruption_impact_analysis": {
+      "description": "Analyze active disruptions, trace cascade impact through BOM dependencies, and assess mitigation status.",
+      "default_agent": "disruption_agent",
+      "skills": [
+        "disruption_impact_assessment",
+        "inventory_exposure_check",
+        "grounded_answer"
+      ]
+    },
+    "quality_trend_review": {
+      "description": "Review quality inspection trends, defect rates, and corrective action requirements by supplier and part.",
+      "default_agent": "quality_agent",
+      "skills": [
+        "quality_supplier_scorecard",
+        "evidence_bundle_export"
+      ]
+    },
+    "inventory_reorder_planning": {
+      "description": "Identify parts below reorder points, low days-of-supply positions, and reorder priority recommendations.",
+      "default_agent": "inventory_agent",
+      "skills": [
+        "inventory_exposure_check",
+        "grounded_answer"
+      ]
+    }
+  },
+  "skills": {
+    "supplier_risk_review": {
+      "description": "Evaluate supplier risk signals including single-source dependency, geopolitical exposure, and financial instability.",
+      "context_requirements": ["entity_id"],
+      "ontology_dependencies": ["entities", "risk_signals"],
+      "mcp_tools": ["supplier_context_get", "risk_summary_generate"],
+      "runtime_tools": ["neo4j"]
+    },
+    "disruption_impact_assessment": {
+      "description": "Trace disruption events through facility and BOM dependency chains to identify affected parts and assemblies.",
+      "context_requirements": ["question"],
+      "ontology_dependencies": ["entities", "risk_signals"],
+      "mcp_tools": ["disruption_impact_analyze", "vector_evidence_search"],
+      "runtime_tools": ["neo4j", "qdrant"]
+    },
+    "quality_supplier_scorecard": {
+      "description": "Aggregate quality inspection results by supplier with defect rate trends and corrective action history.",
+      "context_requirements": ["entity_id"],
+      "ontology_dependencies": ["entities"],
+      "mcp_tools": ["supplier_context_get", "quality_trend_summarize"],
+      "runtime_tools": ["neo4j"]
+    },
+    "inventory_exposure_check": {
+      "description": "Identify parts below reorder points, low days-of-supply, and at-risk facility-part positions.",
+      "context_requirements": ["question"],
+      "ontology_dependencies": ["entities"],
+      "mcp_tools": ["inventory_status_get", "vector_evidence_search"],
+      "runtime_tools": ["neo4j", "qdrant"]
+    },
+    "grounded_answer": {
+      "description": "Generate a grounded answer with bounded guardrails from vector and graph evidence.",
+      "context_requirements": ["question"],
+      "ontology_dependencies": ["provenance"],
+      "mcp_tools": ["graphrag_answer_generate"],
+      "runtime_tools": ["rag_api", "ollama"]
+    },
+    "evidence_bundle_export": {
+      "description": "Export evidence bundle for traceability, review, and audit workflows.",
+      "context_requirements": ["question"],
+      "ontology_dependencies": ["provenance"],
+      "mcp_tools": ["evidence_bundle_export"],
+      "runtime_tools": ["rag_api"]
+    }
+  }
+}
