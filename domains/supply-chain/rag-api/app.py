@@ -10,9 +10,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 app = FastAPI(title="Supply Chain GraphRAG API", version="0.2.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6335")
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "supplychain_events")
@@ -23,6 +30,8 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
 VECTOR_SIZE = 384
 SKILLS_LAYER_PATH = os.getenv("SC_SKILLS_LAYER_PATH", "config/skills_layer.json")
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "300"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1200"))
 
 # ── Lazy clients ──────────────────────────────────────────────────────────────
 
@@ -83,6 +92,13 @@ def stable_embedding(text: str, dim: int = VECTOR_SIZE) -> list[float]:
         vec[h % dim] += 1.0
     norm = sum(x * x for x in vec) ** 0.5
     return [x / norm if norm else 0.0 for x in vec]
+
+
+# ── LLM provider ──────────────────────────────────────────────────────────────
+
+from llm_provider import create_provider
+
+llm_provider = create_provider("ollama", base_url=OLLAMA_URL, configured_model=OLLAMA_MODEL)
 
 
 # ── Domain planner ────────────────────────────────────────────────────────────
@@ -158,12 +174,44 @@ def _ts():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _compact_context(items: list[dict]) -> str:
+    return json.dumps(items, default=str)[:4000] if items else "(none)"
+
+
+def ask_llm(question: str, vec_ctx: list[dict], graph_ctx: list[dict]) -> str:
+    prompt = f"""You are a supply-chain analytics RAG assistant for synthetic demo data only.
+Summarize the evidence and answer the question.
+
+Question:
+{question}
+
+Vector context from Qdrant:
+{_compact_context(vec_ctx)}
+
+Graph context from Neo4j:
+{_compact_context(graph_ctx)}
+
+Answer with:
+1. Key findings
+2. Relationship-based reasoning
+3. Evidence snippets
+4. Caveats
+"""
+    return llm_provider.generate(
+        prompt=prompt,
+        timeout_seconds=LLM_TIMEOUT_SECONDS,
+        max_tokens=LLM_MAX_TOKENS,
+        temperature=0.2,
+    )
+
+
 def run_query(question: str, entity_id: str | None) -> dict:
     request_type = classify_request_type(question, entity_id)
     plan = select_retrieval_plan(request_type, question, entity_id, max_top_k=5)
     vec_ctx = vector_context(plan.query_text, entity_id, plan.top_k)
     entity_ids = list({v.get("entity_id") for v in vec_ctx if v.get("entity_id")} | ({entity_id} if entity_id else set()))
     graph_ctx = graph_context(entity_ids) if entity_ids else []
+    answer = ask_llm(question, vec_ctx, graph_ctx)
     return {
         "question": question,
         "request_type": request_type,
@@ -171,7 +219,7 @@ def run_query(question: str, entity_id: str | None) -> dict:
         "entities": entity_ids,
         "vector_context": vec_ctx,
         "graph_context": graph_ctx,
-        "answer": f"Supply chain analysis for: {question}",
+        "answer": answer,
         "retrieved_at": _ts(),
         "trace_id": str(uuid.uuid4()),
     }

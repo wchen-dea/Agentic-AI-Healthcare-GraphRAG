@@ -3,6 +3,7 @@ WORKDIR /app
 COPY domains/supply-chain/rag-api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY domains/supply-chain/rag-api/app.py .
+COPY domains/supply-chain/rag-api/llm_provider.py .
 COPY domains/supply-chain/rag-api/skills_layer.py .
 COPY domains/supply-chain/rag-api/domain ./domain
 COPY domains/supply-chain/rag-api/config ./config
