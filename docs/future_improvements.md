@@ -97,7 +97,7 @@ flowchart LR
 	S1[Stage 1\nOntology normalization]
 	S2[Stage 2\nPlanner and ranking]
 	S3[Stage 3\nMCP expansion]
-	S4[Stage 4\nEvaluation and provider breadth]
+	S4[Stage 4\nMulti-domain and provider breadth]
 	S5[Stage 5\nProduction controls]
 
 	S0 --> S1 --> S2 --> S3 --> S4 --> S5
@@ -117,7 +117,7 @@ flowchart LR
 | Stage 1 | Ontology externalization and normalization | Largely completed | Loader/normalization/rules modules exist; continue mapping depth work. |
 | Stage 2 | Query planner and evidence ranking | Completed (baseline) | Planner and ranking shipped with fixture and edge-case suites. |
 | Stage 3 | Skill-composed MCP expansion | Completed (current scope) | Expanded tools and policy updates shipped; continue iterative refinement as needed. |
-| Stage 4 | Evaluation hardening and provider abstraction | In progress | Planner tests and provider abstraction started; benchmark/scorecard/provider breadth still open. |
+| Stage 4 | Multi-domain support and provider abstraction | In progress | Supply-chain domain added; planner tests and provider abstraction started; benchmark/scorecard/provider breadth still open. |
 | Stage 5 | Production controls for real data readiness | Pending | Requires policy/privacy/SLO rollout controls for non-demo operation. |
 
 ## Near-Term Execution Order

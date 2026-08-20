@@ -100,7 +100,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 
 ### Pattern Mapping to Repository Components
 
-- Event-Driven Pipeline: [domains/healthcare/producer/produce_events.py](../domains/healthcare/producer/produce_events.py), [domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [docker-compose.yml](../docker-compose.yml)
+- Event-Driven Pipeline: [domains/healthcare/producer/produce_events.py](../domains/healthcare/producer/produce_events.py), [domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [container/docker-compose.infra.yml](../container/docker-compose.infra.yml)
 - Dual Materialized Views: [domains/healthcare/flink-app/healthcare_graph_rag_job.py](../domains/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/neo4j_model.md](neo4j_model.md)
 - Shared-Core, Multi-Interface: [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`run_query`, REST `/query`, MCP tools)
 - Policy Enforcement Point: [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`_authorize`, `_execute_with_audit`, guardrail shaping)
@@ -211,53 +211,55 @@ Operational Plane
 
 ```mermaid
 flowchart LR
-  subgraph Ingestion[Streaming Ingestion]
-    P[Producer] --> K[Kafka]
+  subgraph Infra[Shared Infrastructure]
+    K[Kafka]
     SR[Schema Registry] --> K
-    K --> F[PyFlink]
-    F --> OL[Ontology loader]
-    OL --> NM[Normalization and rules]
+    L[LLM runtime]
+    PR[Prometheus]
+    GF[Grafana]
+    CDK[Conduktor]
   end
 
-  subgraph Persistence[Dual Persistence]
-    NM --> Q[Qdrant]
-    NM --> N[Neo4j]
+  subgraph HC[Healthcare Domain]
+    HP[HC Producer] --> K
+    K --> HF[HC PyFlink]
+    HF --> HOL[Ontology loader]
+    HOL --> HNM[Normalization and rules]
+    HNM --> HQ[HC Qdrant]
+    HNM --> HN[HC Neo4j]
+    HRAG[HC rag-api] --> HQ
+    HRAG --> HN
   end
 
-  subgraph APIProc[rag-api Process]
-    RAG[RAG REST API]
-    MCP[FastMCP API]
+  subgraph SC[Supply-Chain Domain]
+    SP[SC Producer] --> K
+    K --> SF[SC PyFlink]
+    SF --> SOL[Ontology loader]
+    SOL --> SNM[Normalization and rules]
+    SNM --> SQ[SC Qdrant]
+    SNM --> SN[SC Neo4j]
+    SRAG[SC rag-api] --> SQ
+    SRAG --> SN
+  end
+
+  subgraph APIProc[rag-api Process per domain]
     CORE[Shared planner and retrieval core]
     PLAN[Request classifier and planner]
     RANK[Evidence ranker and policy shaper]
     ADAPT[LLM provider adapter]
-    RAG --> CORE
-    MCP --> CORE
-    CORE --> PLAN
-    PLAN --> RANK
-    RANK --> ADAPT
+    CORE --> PLAN --> RANK --> ADAPT
   end
 
   subgraph AI[AI Application Layer]
-    UI[Provider Web] --> RAG
-    MCPClient[MCP Client] --> MCP
-    CORE --> Q
-    CORE --> N
-    ADAPT --> L[LLM runtime]
-  end
-
-  subgraph Ops[Operations]
-    FL[Flink UI]
-    CDK[Conduktor]
-    PR[Prometheus]
-    GF[Grafana]
+    UI[Provider Web] --> HRAG
+    UI2[SC Web] --> SRAG
+    MCPClient[MCP Client] --> HRAG
+    MCPClient --> SRAG
+    ADAPT --> L
   end
 
   K -. inspect .-> CDK
-  F -. monitor .-> FL
   CORE -. probe .-> PR
-  Q -. metrics .-> PR
-  N -. probe .-> PR
   PR --> GF
 ```
 
@@ -427,13 +429,13 @@ The producer registers a shared Avro envelope in Schema Registry and publishes C
 
 ### Kafka + Schema Registry
 
-Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in docker-compose.healthcare.yml with fixed partitions per domain topic.
+Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in container/docker-compose.healthcare.yml with fixed partitions per domain topic.
 
 Schema Registry stores the MedicalEvent envelope under topic-value subjects for transactional and reference topics, and the schema ID is embedded in Kafka value payloads.
 
 ### Flink Runtime
 
-docker-compose.healthcare.yml starts:
+container/docker-compose.healthcare.yml starts:
 
 - flink-jobmanager
 - flink-taskmanager

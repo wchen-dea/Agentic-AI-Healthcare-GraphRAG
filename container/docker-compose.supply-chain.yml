@@ -1,5 +1,5 @@
 # Supply Chain domain overlay.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.supply-chain.yml up -d
+# Usage: docker compose -f container/docker-compose.infra.yml -f container/docker-compose.supply-chain.yml up -d
 
 services:
   neo4j-sc:

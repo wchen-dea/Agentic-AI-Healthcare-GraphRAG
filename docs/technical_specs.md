@@ -2,7 +2,7 @@
 
 ## 1. Container Inventory
 
-All services are defined in `docker-compose.infra.yml` and `docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
+All services are defined in `container/docker-compose.infra.yml` and `container/docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
 
 | Container | Image | Version | Host Ports | Role |
 |-----------|-------|---------|-----------|------|
@@ -32,7 +32,7 @@ All services are defined in `docker-compose.infra.yml` and `docker-compose.healt
 
 ### Supply Chain Domain Containers (optional overlay)
 
-Launched via `docker compose -f docker-compose.yml -f docker-compose.supply-chain.yml up -d`.
+Launched via `docker compose -f container/docker-compose.infra.yml -f container/docker-compose.supply-chain.yml up -d`.
 
 | Container | Image | Version | Host Ports | Role |
 |-----------|-------|---------|-----------|------|

@@ -97,17 +97,20 @@ Source Systems / Producers
 
 ```mermaid
 flowchart LR
-  subgraph Ingestion[Ingestion and Semantics]
-    P[Producers] --> K[Kafka]
-    K --> F[Flink]
+  subgraph Infra[Shared Infrastructure]
+    K[Kafka]
+    K --> F[Flink per domain]
+  end
+
+  subgraph Ingestion[Ingestion and Semantics per domain]
     F --> NORM[Semantic normalization]
     NORM --> TERM[Terminology mapping]
     NORM --> ER[Entity resolution]
-    NORM --> RULES[Clinical rules]
+    NORM --> RULES[Domain rules]
     NORM --> PROV[Provenance tagging]
   end
 
-  subgraph Stores[Dual Evidence Stores]
+  subgraph Stores[Dual Evidence Stores per domain]
     TERM --> Q[Qdrant]
     ER --> G[Neo4j]
     RULES --> G
@@ -129,7 +132,7 @@ flowchart LR
     LLM --> RESP[Response shaping]
     RESP --> REST[REST]
     RESP --> MCP[MCP tools]
-    RESP --> UI[Provider web]
+    RESP --> UI[Domain web apps]
   end
 
   subgraph Ops[Quality and Ops]

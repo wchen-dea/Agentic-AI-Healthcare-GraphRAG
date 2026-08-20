@@ -71,9 +71,9 @@ The supply-chain domain runs in parallel using its own Neo4j instance, Qdrant co
 Launch supply-chain alongside healthcare:
 
 ```bash
-docker compose -f docker-compose.infra.yml \
-  -f docker-compose.healthcare.yml \
-  -f docker-compose.supply-chain.yml \
+docker compose -f container/docker-compose.infra.yml \
+  -f container/docker-compose.healthcare.yml \
+  -f container/docker-compose.supply-chain.yml \
   up -d
 ```
 
@@ -197,7 +197,7 @@ make up          # or: make up-hc (healthcare only) / make up-sc (supply-chain o
 Or without the Makefile:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 ### Local Python Environment
@@ -258,7 +258,7 @@ cp .env.example .env
 4. Recreate or restart affected services after changing secret-bearing values:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 The values in `.env.example` are development placeholders. Replace them in `.env` if you want non-default local credentials.
@@ -272,8 +272,8 @@ Local Kafka topology after startup:
 If your local stack was created before the move to three brokers, existing Kafka topics may still have replication factor `1` because topic creation is idempotent. To fully reprovision the local Kafka cluster with replication factor `3`, recreate the local Kafka state when it is safe to do so:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml down -v
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 Pull the LLM model used by the API:
@@ -312,8 +312,8 @@ RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
 Then rebuild/recreate the API service:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml build rag-api
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 When enabled, `/query` responses include an optional `react` block with loop metadata
@@ -454,9 +454,9 @@ domains/        Domain implementations
     skills/     Agent Skills packages
     scripts/    Domain-specific validation and query scripts
     webapp/     Supply-chain query UI
-docker-compose.infra.yml        Shared infrastructure (Kafka, ZK, monitoring, Ollama)
-docker-compose.healthcare.yml   Healthcare domain services
-docker-compose.supply-chain.yml Supply-chain domain services
+container/docker-compose.infra.yml        Shared infrastructure (Kafka, ZK, monitoring, Ollama)
+container/docker-compose.healthcare.yml   Healthcare domain services
+container/docker-compose.supply-chain.yml Supply-chain domain services
 docs/           Architecture, Kafka contract, graph model, and runbook
 docs/adrs/      Architecture Decision Records (ADRs)
 scripts/        Cross-domain validation scripts

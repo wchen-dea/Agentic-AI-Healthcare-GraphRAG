@@ -1,6 +1,6 @@
 # Shared infrastructure — Kafka cluster, Schema Registry, monitoring, Ollama, LocalStack.
 # Domain services are in domain-specific overlay files.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.healthcare.yml up -d
+# Usage: docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d
 
 services:
   zookeeper:

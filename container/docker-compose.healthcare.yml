@@ -1,5 +1,5 @@
 # Healthcare domain overlay.
-# Usage: docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d
+# Usage: docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d
 
 services:
   kafka-init:

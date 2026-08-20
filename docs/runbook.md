@@ -44,29 +44,29 @@ make help        # Show all targets
 Start or refresh services:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 Start supply-chain domain alongside healthcare:
 
 ```bash
-docker compose -f docker-compose.infra.yml \
-  -f docker-compose.healthcare.yml \
-  -f docker-compose.supply-chain.yml \
+docker compose -f container/docker-compose.infra.yml \
+  -f container/docker-compose.healthcare.yml \
+  -f container/docker-compose.supply-chain.yml \
   up -d --build
 ```
 
 Apply compose changes and remove deleted services:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 If you change `rag-api` source code, rebuild the image before recreating the service:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml build rag-api
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 ### Optional: Enable ReAct Loop In Local `rag-api`
@@ -83,8 +83,8 @@ RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
 Rebuild and recreate `rag-api`:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml build rag-api
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 Verify with a smoke query and ensure a `react` object is present in the response:
@@ -106,13 +106,13 @@ Run only ReAct and planner test suites (CI-safe shortcut):
 Stop all services:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml down
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down
 ```
 
 Stop and delete volumes (destructive):
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml down -v
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
 ```
 
 ## Service Health Checklist
@@ -384,7 +384,7 @@ Symptom:
 Fix:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 ### 2) Unexpected Non-Healthcare Flink Job Running
@@ -410,7 +410,7 @@ docker compose ps
 3. Re-run with orphan cleanup:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 ### 3) PyFlink Python Worker Not Found
@@ -434,7 +434,7 @@ Expected:
 Recovery:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build --force-recreate flink-jobmanager flink-taskmanager flink-app
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build --force-recreate flink-jobmanager flink-taskmanager flink-app
 ```
 
 ### 4) Kafka Connector Class Errors In Flink
@@ -452,8 +452,8 @@ docker exec healthcare-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-co
 Recovery:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml build --no-cache flink-jobmanager flink-taskmanager flink-app
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --force-recreate flink-jobmanager flink-taskmanager flink-app
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build --no-cache flink-jobmanager flink-taskmanager flink-app
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate flink-jobmanager flink-taskmanager flink-app
 ```
 
 ### 5) Ollama Model Not Available
@@ -496,8 +496,8 @@ Note:
 ### Soft Restart (keep volumes)
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml down
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 ### Hard Reset (delete all local data)
@@ -505,8 +505,8 @@ docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -
 Warning: this removes Kafka, Qdrant, Neo4j, and Grafana/Prometheus local state.
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml down -v
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 ## Post-Change Validation

@@ -56,8 +56,8 @@ make up-sc       # or make up for both domains
 Or without the Makefile:
 
 ```bash
-docker compose -f docker-compose.infra.yml -p infra up -d
-docker compose -f docker-compose.supply-chain.yml -p supplychain up -d
+docker compose -f container/docker-compose.infra.yml -p infra up -d
+docker compose -f container/docker-compose.supply-chain.yml -p supplychain up -d
 ```
 
 Verify Neo4j:
@@ -83,7 +83,7 @@ domains/supply-chain/
 └── webapp/                   # index.html, domain.js, Dockerfile
 ```
 
-Note: `docker-compose.supply-chain.yml` lives at the repository root.
+Note: `container/docker-compose.supply-chain.yml` lives in the `container/` directory.
 
 ## RAG Query Request Types
 
