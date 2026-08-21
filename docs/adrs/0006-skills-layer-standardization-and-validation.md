@@ -74,7 +74,7 @@ Trade-offs:
 ## Related
 
 - [ADR-0005: Embed FastMCP in rag-api](./0005-embed-fastmcp-in-rag-api.md)
-- [Skills Layer](../skills_layer.md)
-- [MCP Layer Design](../mcp_layer_design.md)
-- [Technical Specs](../technical_specs.md)
-- [AI QA](../ai_qa.md)
+- [Skills Layer](../08_skills_layer.md)
+- [MCP Layer Design](../07_mcp_layer_design.md)
+- [Technical Specs](../06_technical_specs.md)
+- [AI QA](../12_ai_qa.md)

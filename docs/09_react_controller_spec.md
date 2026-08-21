@@ -4,7 +4,7 @@
 
 This specification defines a concrete ReAct-style controller for the current GraphRAG runtime.
 
-Note: The ReAct controller is one of three query orchestration modes. See [langgraph_comparison.md](langgraph_comparison.md) for the comparison between single-pass, ReAct, and LangGraph multi-agent modes. The LangGraph multi-agent mode provides a more capable alternative with specialist agents and MLflow tracing.
+Note: The ReAct controller is one of three query orchestration modes. See [10_langgraph_comparison.md](10_langgraph_comparison.md) for the comparison between single-pass, ReAct, and LangGraph multi-agent modes. The LangGraph multi-agent mode provides a more capable alternative with specialist agents and MLflow tracing.
 
 Design intent:
 
@@ -70,7 +70,7 @@ Not yet implemented from this spec:
 - Detailed observation objects and plan history in state
 - ReAct-specific Prometheus metrics and audit fields
 
-The LangGraph multi-agent mode (ADR-0007) provides the richer specialist routing that the Phase 2 ReAct design proposed. See [langgraph_comparison.md](langgraph_comparison.md) for details.
+The LangGraph multi-agent mode (ADR-0007) provides the richer specialist routing that the Phase 2 ReAct design proposed. See [10_langgraph_comparison.md](10_langgraph_comparison.md) for details.
 
 ## Runtime Configuration
 

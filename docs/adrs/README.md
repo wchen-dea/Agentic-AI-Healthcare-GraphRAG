@@ -28,14 +28,14 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 
 | Document | Description |
 | --- | --- |
-| [architecture.md](../architecture.md) | System architecture, design patterns, component diagrams |
-| [target_architecture.md](../target_architecture.md) | Reference architecture, target outcomes, and capability map |
-| [future_improvements.md](../future_improvements.md) | Actionable backlog, staged delivery plan, and execution sequence |
-| [technical_specs.md](../technical_specs.md) | Container inventory, library versions, API specification |
-| [business_specs.md](../business_specs.md) | Use cases, business rules, stakeholders |
-| [neo4j_model.md](../neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
-| [kafka_schema.md](../kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
-| [mcp_layer_design.md](../mcp_layer_design.md) | MCP tool contracts and rollout stages |
-| [skills_layer.md](../skills_layer.md) | Skills layer flow, generated package model, and validation |
-| [runbook.md](../runbook.md) | Operations runbook, health checks, failure modes |
-| [ai_qa.md](../ai_qa.md) | QA strategy, contract tests, accuracy validation |
+| [02_architecture.md](../02_architecture.md) | System architecture, design patterns, component diagrams |
+| [target_02_architecture.md](../target_02_architecture.md) | Reference architecture, target outcomes, and capability map |
+| [14_future_improvements.md](../14_future_improvements.md) | Actionable backlog, staged delivery plan, and execution sequence |
+| [06_technical_specs.md](../06_technical_specs.md) | Container inventory, library versions, API specification |
+| [01_business_specs.md](../01_business_specs.md) | Use cases, business rules, stakeholders |
+| [05_neo4j_model.md](../05_neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
+| [04_kafka_schema.md](../04_kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
+| [07_mcp_layer_design.md](../07_mcp_layer_design.md) | MCP tool contracts and rollout stages |
+| [08_skills_layer.md](../08_skills_layer.md) | Skills layer flow, generated package model, and validation |
+| [13_runbook.md](../13_runbook.md) | Operations runbook, health checks, failure modes |
+| [12_ai_qa.md](../12_ai_qa.md) | QA strategy, contract tests, accuracy validation |

@@ -34,9 +34,9 @@ Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
 - [ADR-0008: MLflow tracing and evaluation](adrs/0008-mlflow-tracing-and-evaluation.md)
 - [ADR-0009: Domain module extraction](adrs/0009-domain-module-extraction.md)
 
-Roadmap design strategy is documented in [docs/target_architecture.md](target_architecture.md), and execution backlog details are maintained in [docs/future_improvements.md](future_improvements.md).
+Roadmap design strategy is documented in [docs/target_02_architecture.md](target_02_architecture.md), and execution backlog details are maintained in [docs/14_future_improvements.md](14_future_improvements.md).
 
-Runtime skill orchestration flow and contracts are documented in [docs/skills_layer.md](skills_layer.md).
+Runtime skill orchestration flow and contracts are documented in [docs/08_skills_layer.md](08_skills_layer.md).
 
 ## Why This Architecture Scales Across Healthcare Sections
 
@@ -122,12 +122,12 @@ This architecture intentionally combines several patterns so streaming ingestion
 ### Pattern Mapping to Repository Components
 
 - Event-Driven Pipeline: [data-platform/healthcare/producer/produce_events.py](../data-platform/healthcare/producer/produce_events.py), [data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [container/docker-compose.infra.yml](../container/docker-compose.infra.yml)
-- Dual Materialized Views: [data-platform/healthcare/flink-app/healthcare_graph_rag_job.py](../data-platform/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/neo4j_model.md](neo4j_model.md)
+- Dual Materialized Views: [data-platform/healthcare/flink-app/healthcare_graph_rag_job.py](../data-platform/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/05_neo4j_model.md](05_neo4j_model.md)
 - Shared-Core, Multi-Interface: [domains/healthcare/agents/app.py](../domains/healthcare/agents/app.py) (`run_query`, REST `/query`, MCP tools)
 - Policy Enforcement Point: [domains/healthcare/agents/domain/response_policy.py](../domains/healthcare/agents/domain/response_policy.py) (sanitization, truncation, budget), [domains/healthcare/agents/app.py](../domains/healthcare/agents/app.py) (`_authorize`, `_execute_with_audit`)
-- Contract-First Tooling: [domains/healthcare/agents/tests/test_contracts.py](../domains/healthcare/agents/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
+- Contract-First Tooling: [domains/healthcare/agents/tests/test_contracts.py](../domains/healthcare/agents/tests/test_contracts.py), [docs/07_mcp_layer_design.md](07_mcp_layer_design.md)
 - Bounded Context Window: [domains/healthcare/agents/domain/response_policy.py](../domains/healthcare/agents/domain/response_policy.py) (`apply_response_budget`, `truncate_text`)
-- Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
+- Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/13_runbook.md](13_runbook.md)
 - Adapter Pattern (roadmap): [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md)
 - Multi-Agent Orchestration: [domains/healthcare/agents/langgraph_agents/](../domains/healthcare/agents/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
 - MLflow Tracing: [domains/healthcare/agents/langgraph_agents/mlflow_tracing.py](../domains/healthcare/agents/langgraph_agents/mlflow_tracing.py), [domains/healthcare/agents/langgraph_agents/mlflow_eval.py](../domains/healthcare/agents/langgraph_agents/mlflow_eval.py)
@@ -547,7 +547,7 @@ Neo4j stores patient-centric graph entities and lineage, including:
 - medication/device/claim entities,
 - reference-context links (Provider, Device, Medication, Payer).
 
-See [neo4j_model.md](neo4j_model.md) for the full model.
+See [05_neo4j_model.md](05_neo4j_model.md) for the full model.
 
 ### RAG API
 
