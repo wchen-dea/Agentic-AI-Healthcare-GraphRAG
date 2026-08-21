@@ -71,11 +71,11 @@ Trade-offs:
 - Verify MLflow is reachable: `curl -s http://localhost:5000/health`
 - Run a query and check the MLflow Tracing UI at `http://localhost:5000` for new spans.
 - Run evaluation: `python -c "from langgraph_agents.mlflow_eval import compare_modes; print('ok')"`
-- Run tests: `python -m pytest domains/healthcare/rag-api/tests/test_mlflow_integration.py`
+- Run tests: `python -m pytest domains/healthcare/agents/tests/test_mlflow_integration.py`
 
 ## Related
 
 - [ADR-0007: LangGraph multi-agent query orchestration](./0007-langgraph-multi-agent-orchestration.md)
-- [domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py](../../domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py)
-- [domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py](../../domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py)
+- [domains/healthcare/agents/langgraph_agents/mlflow_tracing.py](../../domains/healthcare/agents/langgraph_agents/mlflow_tracing.py)
+- [domains/healthcare/agents/langgraph_agents/mlflow_eval.py](../../domains/healthcare/agents/langgraph_agents/mlflow_eval.py)
 - [container/docker-compose.infra.yml](../../container/docker-compose.infra.yml) (MLflow service)

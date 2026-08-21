@@ -2,17 +2,15 @@
 
 ## Purpose
 
-This document translates the current Healthcare GraphRAG demo architecture into a concrete reference architecture for a governed, ontology-aware, agentic healthcare intelligence platform.
+This document defines the strategic target for the healthcare intelligence platform — bridging the gap between the current implementation and a fully governed, production-grade agentic system.
 
-It focuses on three improvements:
+**For executives:** This is the capability roadmap showing where investment closes the gap to enterprise-grade healthcare AI.
 
-- explicit healthcare ontology and terminology control,
-- skill-based retrieval and reasoning orchestration,
-- staged implementation that fits the current repository structure.
+**For architects:** This is the reference architecture with implementation status, capability map, and measurable gaps.
 
-Initial ontology files now live under `domains/healthcare/config/ontology/`, and current implementation status is documented in [technical_specs.md](technical_specs.md), [runbook.md](runbook.md), [skills_layer.md](skills_layer.md), and [future_improvements.md](future_improvements.md).
+**For engineers:** This is the delivery backlog with acceptance criteria, file touchpoints, and staged execution order.
 
-This document separates implemented capabilities from the staged roadmap for the repository.
+Current ontology files live under `data-platform/healthcare/config/ontology/`. Implementation status details are in [technical_specs.md](technical_specs.md), [runbook.md](runbook.md), [skills_layer.md](skills_layer.md), and [future_improvements.md](future_improvements.md).
 
 ## Target Outcome
 
@@ -30,7 +28,7 @@ Desired characteristics:
 
 Implemented in the current repository:
 
-- ontology-driven ingestion modules exist in `domains/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
+- ontology-driven ingestion modules exist in `data-platform/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
 - dual persistence remains active across Qdrant and Neo4j,
 - `rag-api` query flow now includes request classification, retrieval planning, and deterministic evidence ranking,
 - LLM calls are routed through a provider adapter abstraction (`llm_provider.py`, default `ollama`),
@@ -60,6 +58,18 @@ Current gaps to close:
 - quality validation now covers planner behavior and contracts, but retrieval benchmarks and grounded-answer scorecards remain limited,
 - production controls (policy classes, privacy posture, staged rollout controls) remain incomplete for non-demo workloads.
 
+AI-trends-driven gaps (see [future_improvements.md](future_improvements.md) for detailed backlog):
+
+- no structured output generation (JSON-mode or schema-constrained extraction),
+- no dynamic model routing based on task complexity or cost targets,
+- no persistent agent memory for cross-session patient monitoring,
+- no input-side prompt injection detection or adversarial guardrails,
+- no streaming responses to client UIs,
+- no evaluation-gated CI/CD that blocks deployment below quality thresholds,
+- no per-user identity propagation or fine-grained data access governance,
+- no neural reranking between retrieval and synthesis,
+- no multimodal clinical image or document understanding.
+
 ## Target Architecture Principles
 
 1. Canonical semantics before retrieval.
@@ -67,6 +77,11 @@ Current gaps to close:
 3. Separation of domain knowledge, orchestration logic, and generation provider.
 4. Deterministic evidence assembly before probabilistic synthesis.
 5. Policy and provenance attached to every evidence path.
+6. Structured outputs with schema-constrained extraction for downstream system integration.
+7. Confidence-aware responses — abstain or escalate when evidence is insufficient.
+8. Evaluation-gated promotion — quality thresholds block releases, not just tests.
+9. Identity-aware governance — per-user access control propagated through the agent pipeline.
+10. Model-agnostic generation — route to local, managed, or specialized models based on task requirements.
 
 ## Target Architecture
 
@@ -156,104 +171,106 @@ flowchart LR
    class AUDIT pending;
 ```
 
-## Ontology Model Needed
+## Ontology Model
 
-The target architecture needs a machine-readable ontology layer that is small enough for this repo and structured enough to grow.
+The ontology layer is implemented under `data-platform/healthcare/config/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
 
-### Core ontology packages
+### Implemented ontology packages
 
-1. Clinical entity ontology
-   Defines canonical concepts such as Patient, Encounter, ClinicalEvent, Observation, Condition, Medication, MedicationOrder, DeviceReading, Claim, Procedure, Provider, Payer, AdverseEvent, and AdverseOutcome.
+| Package | File(s) | Status |
+| --- | --- | --- |
+| Clinical entity ontology | `entities.yaml` | Implemented — defines canonical concepts (Patient, Encounter, ClinicalEvent, Observation, Condition, Medication, etc.) |
+| Relationship ontology | `relationships.yaml` | Implemented — defines allowed edges (HAS_CONDITION, INTERACTS_WITH, MAY_INDICATE, CONTRAINDICATED_FOR, etc.) |
+| Terminology mappings | `vocabularies.yaml`, `icd10_mappings.yaml`, `cpt_mappings.yaml`, `lab_mappings.yaml`, `medication_mappings.yaml`, `patient_mappings.yaml`, `provider_mappings.yaml`, `device_mappings.yaml`, `payer_mappings.yaml` | Implemented — partial vocabulary coverage; broader mapping governance is a backlog item |
+| Provenance and policy | `provenance.yaml` | Implemented — defines source trust, PHI class, and retention class |
+| Graph seeds | `graph_seeds.yaml` | Implemented — drug safety relationships generated into `generated_ontology_seeds.cypher` |
+| Domain rules | `rules/lab_signals.yaml`, `rules/drug_safety.yaml`, `rules/claims_outcomes.yaml` | Implemented — 14 lab rules, drug interaction/reaction/contraindication rules, 6 claims outcome rules |
 
-2. Relationship ontology
-   Defines allowed edges such as HAS_CONDITION, HAS_OBSERVATION, ORDERS_MEDICATION, INTERACTS_WITH, MAY_INDICATE, CONTRAINDICATED_FOR, RESULTED_IN, and CODED_AS.
-
-3. Terminology ontology
-   Defines mappings to external clinical vocabularies such as ICD-10, LOINC, RxNorm, SNOMED CT, and MedDRA.
-
-4. Provenance and policy ontology
-   Defines source trust, sensitivity level, evidence class, retention rule, and consumer access constraints.
-
-### Recommended repository shape
+### Repository shape
 
 ```text
-config/
-  ontology/
-    entities.yaml
-    relationships.yaml
-    vocabularies.yaml
-    provenance.yaml
-    rules/
-      lab_signals.yaml
-      drug_safety.yaml
-      claims_outcomes.yaml
+data-platform/healthcare/config/ontology/
+  entities.yaml
+  relationships.yaml
+  vocabularies.yaml
+  provenance.yaml
+  graph_seeds.yaml
+  patient_mappings.yaml
+  medication_mappings.yaml
+  provider_mappings.yaml
+  device_mappings.yaml
+  payer_mappings.yaml
+  icd10_mappings.yaml
+  cpt_mappings.yaml
+  lab_mappings.yaml
+  rules/
+    lab_signals.yaml
+    drug_safety.yaml
+    claims_outcomes.yaml
 ```
 
-### Minimum ontology fields
+### Remaining ontology work
 
-| Package | Required fields | Why it matters |
+- Widen standard-code mapping coverage (LOINC, RxNorm, SNOMED CT depth).
+- Add formal ontology conformance tests that block CI on schema drift.
+- Add entity resolution policies beyond source-ID-based matching.
+- Validate that runtime graph merges conform to declared relationship cardinality constraints.
+
+## Skill Architecture
+
+The skills layer maps business goals to agents, skills, and MCP tools. The runtime planner (`skills_layer.py`) resolves skill plans; MCP tools are implemented in `app.py`; LangGraph specialist agents provide domain-specific reasoning.
+
+### Internal skills (mapped to implementation)
+
+| Skill | Responsibility | Implementation |
 | --- | --- | --- |
-| entities | `id`, `canonical_name`, `aliases`, `source_types`, `required_properties` | keeps ingestion and graph merges consistent |
-| relationships | `type`, `from`, `to`, `cardinality`, `required_properties` | prevents ad hoc graph drift |
-| vocabularies | `local_code`, `standard_system`, `standard_code`, `display` | supports interoperability and retrieval precision |
-| provenance | `source_system`, `trust_level`, `phi_class`, `retention_class` | supports policy-aware evidence handling |
-| rules | `trigger`, `condition`, `output_edge`, `severity`, `explanation` | moves domain rules out of code |
+| `semantic_normalize` | Convert payloads to canonical concepts | `flink-app/app/normalization.py` |
+| `terminology_map` | Map local codes to standard vocabularies | `flink-app/app/ontology_loader.py` + ontology YAML |
+| `graph_reason` | Deterministic patient/cohort traversals | `domain/retrieval.py` (`graph_search`) |
+| `vector_retrieve` | Semantic similarity retrieval | `domain/retrieval.py` (`vector_search`) |
+| `timeline_explain` | Order events and explain progression | MCP tool `timeline_explain` |
+| `safety_assess` | Interactions, contraindications, labs, adverse reactions | LangGraph `medication_safety_agent` + MCP `medication_risk_assess` |
+| `evidence_rank` | Rank by priority, score, and request type | `domain/evidence.py` |
+| `policy_shape` | Redact, bound, and authorize outputs | `domain/response_policy.py` |
+| `audit_export` | Traceable evidence bundles | MCP tool `evidence_bundle_export` |
 
-## Skill Architecture Needed
+### User-facing MCP tools (10 implemented)
 
-The target system should expose internal skills as reusable orchestration units, then compose user-facing MCP tools from them.
-
-### Core internal skills
-
-| Skill | Responsibility | Primary runtime |
+| MCP tool | Composed from | Status |
 | --- | --- | --- |
-| `semantic_normalize` | convert payloads to canonical concepts and fields | Flink |
-| `terminology_map` | map local codes and strings to standard vocabularies | Flink / rag-api |
-| `entity_resolve` | unify identities across source systems | Flink |
-| `graph_reason` | perform deterministic patient or cohort traversals | rag-api |
-| `vector_retrieve` | retrieve semantically similar evidence | rag-api |
-| `timeline_explain` | order events and explain temporal progression | rag-api |
-| `safety_assess` | combine interactions, contraindications, labs, and adverse reactions | rag-api |
-| `evidence_rank` | rank evidence by recency, relevance, severity, and source trust | rag-api |
-| `policy_shape` | redact, bound, and authorize outputs | rag-api |
-| `audit_export` | emit traceable evidence bundles and execution metadata | rag-api |
+| `patient_context_get` | `graph_reason` + `policy_shape` | Implemented |
+| `vector_evidence_search` | `vector_retrieve` + `policy_shape` | Implemented |
+| `graphrag_answer_generate` | `vector_retrieve` + `graph_reason` + `evidence_rank` + LLM synthesis | Implemented |
+| `risk_summary_generate` | `vector_retrieve` + `graph_reason` + LLM synthesis | Implemented |
+| `timeline_explain` | `graph_reason` + `timeline_explain` + `policy_shape` | Implemented |
+| `medication_risk_assess` | `graph_reason` + `safety_assess` + `evidence_rank` | Implemented |
+| `coding_gap_detect` | `graph_reason` + ICD-10 gap analysis | Implemented |
+| `cohort_risk_summary` | `vector_retrieve` + `graph_reason` + `evidence_rank` | Implemented |
+| `evidence_bundle_export` | `vector_retrieve` + `graph_reason` + `audit_export` + `policy_shape` | Implemented |
+| `skills_plan_get` | Skills layer planner resolution | Implemented |
 
-### User-facing MCP tools built from skills
+### Remaining skill architecture work
 
-| MCP tool | Composed skills | Purpose |
-| --- | --- | --- |
-| `patient_context_get` | `graph_reason`, `policy_shape` | current context retrieval |
-| `vector_evidence_search` | `vector_retrieve`, `policy_shape` | current vector evidence retrieval |
-| `graphrag_answer_generate` | `vector_retrieve`, `graph_reason`, `evidence_rank`, `policy_shape` | grounded answer generation |
-| `timeline_explain` | `graph_reason`, `timeline_explain`, `policy_shape` | patient progression summaries |
-| `medication_risk_assess` | `graph_reason`, `safety_assess`, `evidence_rank` | medication and contraindication review |
-| `coding_gap_detect` | `graph_reason`, `terminology_map`, `evidence_rank` | ICD and claims consistency checks |
-| `cohort_risk_summary` | `vector_retrieve`, `graph_reason`, `evidence_rank` | population-level triage |
-| `evidence_bundle_export` | `vector_retrieve`, `graph_reason`, `audit_export`, `policy_shape` | traceable export |
-
-### Why skills are needed
-
-- They make orchestration testable without invoking the LLM every time.
-- They separate deterministic reasoning from text generation.
-- They allow new healthcare workflows to be assembled without rewriting the core query path.
-- They support role-aware tool exposure through stable MCP contracts.
+- Implement a reusable skill runner that MCP tools and LangGraph agents compose through, replacing direct function calls.
+- Add `entity_resolve` skill for cross-source identity unification beyond source-ID matching.
+- Connect LangGraph specialist agents to the skills plan so `skills_plan_get` output drives agent execution.
 
 ## Capability Map
 
 | Capability area | Current state in repo | Target state | Primary repo touchpoints |
 | --- | --- | --- | --- |
-| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `domains/healthcare/schemas/medical_event.avsc`, `docs/kafka_schema.md`, `domains/healthcare/producer/produce_events.py` |
-| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `domains/healthcare/flink-app/healthcare_graph_rag_job.py`, `domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `domains/healthcare/flink-app/app/` |
-| Terminology mapping | partial ICD and MedDRA-style fields | governed mapping packs for ICD-10, LOINC, RxNorm, SNOMED CT, MedDRA | `domains/healthcare/neo4j/init.cypher`, new `domains/healthcare/config/ontology/vocabularies.yaml` |
+| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `data-platform/healthcare/schemas/medical_event.avsc`, `docs/kafka_schema.md`, `data-platform/healthcare/producer/produce_events.py` |
+| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `data-platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `data-platform/healthcare/flink-app/app/` |
+| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `data-platform/healthcare/config/ontology/vocabularies.yaml` and mapping files |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
-| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/neo4j_model.md`, `domains/healthcare/neo4j/init.cypher`, Flink graph writes |
-| Vector retrieval | deterministic stable embedding and top-k similarity | canonicalized evidence text, richer filters, reranking, optional neural embeddings | `domains/healthcare/flink-app/healthcare_graph_rag_job.py`, `domains/healthcare/rag-api/app.py` |
-| Query orchestration | request classification, retrieval plan selection, and evidence ranking are implemented with deterministic planner logic; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning and ranking | `domains/healthcare/rag-api/app.py`, `domains/healthcare/rag-api/domain/`, `domains/healthcare/rag-api/langgraph_agents/` |
-| Safety reasoning | seeded interactions, adverse events, contraindications | composable safety assessment skill with terminology-aware rules | `domains/healthcare/neo4j/init.cypher`, `docs/business_specs.md`, `domains/healthcare/rag-api/app.py` |
-| Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/rag-api/app.py` |
-| MCP surface | expanded tool set implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export) with role policy enforcement | richer internal skill composition and broader role-matrix governance | `docs/mcp_layer_design.md`, `domains/healthcare/rag-api/app.py`, `domains/healthcare/rag-api/config/tool_policies.json` |
-| Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/rag-api/app.py`, `domains/healthcare/rag-api/config/tool_policies.json` |
-| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, and MLflow evaluation harness are in place | retrieval benchmarks and grounded answer scorecards automated per release | `domains/healthcare/rag-api/tests/`, `scripts/validate_ontology.py`, `docs/ai_qa.md` |
+| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/neo4j_model.md`, `data-platform/healthcare/neo4j/init.cypher`, Flink graph writes |
+| Vector retrieval | stable embedding (MiniLM-L6-v2) with deterministic top-k similarity via `domain/retrieval.py` | neural reranking, richer filters, optional cross-encoder | `domains/healthcare/agents/domain/retrieval.py`, `data-platform/healthcare/flink-app/app/text_processing.py` |
+| Query orchestration | request classification, retrieval plan selection, and evidence ranking are implemented with deterministic planner logic; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning and ranking | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/domain/`, `domains/healthcare/agents/langgraph_agents/` |
+| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/agents/langgraph_agents/agents.py` |
+| Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agents/app.py` |
+| MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/mcp_layer_design.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
+| Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
+| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `scripts/validate_ontology.py`, `docs/ai_qa.md` |
 
 ## Execution Backlog
 

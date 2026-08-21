@@ -1,7 +1,7 @@
 [project]
-name = "agentic-ai-graphrag"
+name = "agentic-healthcare"
 version = "0.1.0"
-description = "Multi-domain Agentic AI GraphRAG platform"
+description = "Production-grade multi-agent healthcare intelligence platform with streaming GraphRAG, pharmacovigilance knowledge graph, and LangGraph orchestration"
 requires-python = ">=3.11"
 dependencies = [
     # Shared across domains for local development/testing

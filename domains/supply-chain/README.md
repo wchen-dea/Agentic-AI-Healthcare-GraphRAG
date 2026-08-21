@@ -76,7 +76,7 @@ domains/supply-chain/
 ├── flink-app/app/            # graph_writes.py, pipeline_service.py
 ├── neo4j/                    # init.cypher, seeds, bootstrap.sh
 ├── producer/                 # Dockerfile, produce_events.py, requirements.txt
-├── rag-api/                  # app.py, skills_layer.py, domain/, config/
+├── agents/                  # app.py, skills_layer.py, domain/, config/
 ├── schemas/                  # supply_chain_event.avsc
 ├── scripts/                  # query_examples.sh, validate_ontology.py, etc.
 ├── skills/                   # Agent Skills packages (SKILL.md)

@@ -38,7 +38,7 @@ The model prioritizes traceability, simple traversal patterns, and deterministic
 
 ## Constraints And Seed Data
 
-Initialization in domains/healthcare/neo4j/init.cypher creates uniqueness constraints for:
+Initialization in data-platform/healthcare/neo4j/init.cypher creates uniqueness constraints for:
 
 - Patient.id
 - Encounter.id
@@ -69,11 +69,12 @@ Seeded drug interaction relationships:
 - (Metformin)-[:INTERACTS_WITH {risk: nephrotoxicity_risk, severity: moderate}]->(Vancomycin)
 
 Seeded Condition nodes (aligned with lab signal rules): Hyperkalemia, Hyperglycemia, Diabetes Mellitus, Chronic Kidney Disease, Acute Myocardial Infarction, Anemia, Hyperlipidemia, Hypothyroidism, Hyperthyroidism, Hyponatremia, Hypernatremia, Infection, Anticoagulation Concern, Hypertension, Heart Failure.
-Drug safety seed data (FAERS-aligned):
+Drug safety seed data (FAERS-aligned, from `generated_ontology_seeds.cypher`):
 
 - 6 `AdverseOutcome` nodes: DE, LT, HO, DS, CA, OT
-- `HAS_KNOWN_REACTION` edges: 10 medications → matching symptom strings (e.g. Lisinopril→cough, Atorvastatin→leg cramps, Metoprolol→dizziness)
-- `CONTRAINDICATED_FOR` edges: 6 medication-condition pairs (e.g. Metformin→CKD, Lisinopril→Hyperkalemia, Vancomycin→CKD)
+- 41 `INTERACTS_WITH` edges with `risk`, `severity`, and `mechanism` annotations (e.g. Warfarin+Aspirin additive_anticoagulation, Morphine+Gabapentin additive_CNS_depression)
+- 46 `HAS_KNOWN_REACTION` edges with MedDRA terms (e.g. Lisinopril→Cough, Atorvastatin→Myalgia, Insulin Glargine→Hypoglycaemia/Confusion)
+- 23 `CONTRAINDICATED_FOR` edges with reason and severity (e.g. Metformin→CKD lactic_acidosis_risk, Lisinopril→Hyperkalemia worsens_hyperkalemia, Ibuprofen→Heart Failure NSAID_fluid_retention)
 ## Base Lineage Pattern
 
 Every transactional event writes the base lineage:
@@ -235,7 +236,7 @@ Property enrichment examples:
 
 ## How Graph Context Is Queried
 
-`domains/healthcare/rag-api/domain/retrieval.py` `graph_search()` retrieves for selected patient IDs:
+`domains/healthcare/agents/domain/retrieval.py` `graph_search()` retrieves for selected patient IDs:
 
 - conditions (with onset timestamps)
 - symptoms
@@ -380,4 +381,4 @@ The supply-chain domain uses a separate Neo4j instance (`supplychain-neo4j` on p
 | HAS_RISK_SIGNAL | Supplier/Part | RiskSignal | detected_ts |
 | HOLDS_INVENTORY | Facility | Part | on_hand_qty, below_reorder, days_of_supply |
 
-Constraints and seeds: `domains/supply-chain/neo4j/init.cypher` and `domains/supply-chain/neo4j/generated_ontology_seeds.cypher`.
+Constraints and seeds: `data-platform/supply-chain/neo4j/init.cypher` and `data-platform/supply-chain/neo4j/generated_ontology_seeds.cypher`.

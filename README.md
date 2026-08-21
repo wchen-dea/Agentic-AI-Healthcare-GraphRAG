@@ -28,13 +28,14 @@ Healthcare AI systems fail when they rely solely on LLM prompting without determ
 
 | Trend | How this platform implements it |
 | --- | --- |
-| Agentic AI | LangGraph StateGraph with 8 specialized agents, conditional routing, and confidence-gated re-retrieval loops |
-| GraphRAG | Hybrid vector + graph retrieval with deterministic evidence ranking before LLM synthesis |
-| Multi-modal retrieval | Qdrant semantic similarity + Neo4j relationship traversal combined in every query response |
-| Tool-use protocols | 10 MCP tools embedded in rag-api with role-based authorization and audit trails |
-| Evaluation-driven AI | MLflow tracing with 6 healthcare-specific scorers and cross-mode comparison |
-| Local-first AI | Ollama inference with zero API fees; provider abstraction ready for Anthropic/OpenAI routing |
-| Streaming AI pipelines | Kafka + PyFlink continuous enrichment with Avro schema governance |
+| Agentic AI | LangGraph StateGraph with 8 specialized agents, conditional routing, and confidence-gated re-retrieval loops — not a single-prompt wrapper |
+| GraphRAG | Hybrid vector + graph retrieval with deterministic evidence ranking before LLM synthesis — grounding answers in both semantic similarity and explicit clinical relationships |
+| Multi-modal retrieval | Qdrant semantic similarity + Neo4j relationship traversal combined in every query response — two complementary evidence channels, not one |
+| Tool-use protocols (MCP) | 10 MCP tools embedded in the agents service with role-based authorization, SHA-256 audit hashing, and response budget enforcement |
+| Evaluation-driven AI | MLflow tracing with 6 healthcare-specific scorers, cross-mode comparison, and evaluation harness ready for CI-gated release |
+| Agent harness engineering | Retry with backoff, input/output guardrails, prompt injection detection, prompt versioning, tool wrappers, and context budget accounting |
+| Local-first AI | Full stack runs on a laptop with zero API fees; Ollama provider abstraction ready for managed provider routing |
+| Streaming AI pipelines | Kafka + PyFlink continuous enrichment with Avro schema governance — events queryable in seconds, not overnight batch |
 
 ## Summary
 
@@ -42,7 +43,7 @@ This project provides a domain-agnostic AI platform blueprint across three dimen
 
 - **Technical depth**: streaming-first ingestion, dual evidence stores (vector + graph), multi-agent orchestration (LangGraph), and agent-ready APIs (REST + MCP) on shared domain modules.
 - **Industry applicability**: one reusable architecture for clinical, operational, financial, and supply chain AI workflows with domain-specific specialist agents.
-- **Implementation maturity**: complete local development stack with 97 tests, MLflow tracing, 48-medication safety knowledge graph, and production deployment configuration.
+- **Implementation maturity**: complete local development stack with 133 automated tests, MLflow tracing, 48-medication pharmacovigilance knowledge graph, and production deployment configuration.
 
 Repository intent:
 
@@ -51,7 +52,7 @@ Repository intent:
 
 Production boundary in this repository:
 
-- In scope: rag-api (embedded MCP), provider-web, optional standalone mcp-server, separate monitoring config.
+- In scope: agents (embedded MCP), provider-web, separate monitoring config.
 - Out of scope: source data systems, Confluent Kafka platform, and Apache Flink platform (independently managed).
 
 ## Tech Stack
@@ -170,8 +171,8 @@ Ops/UI
 ## LLM Strategy
 
 - Local default: Ollama using OLLAMA_URL and OLLAMA_MODEL.
-- LLM calls are routed through a provider abstraction in `domains/healthcare/rag-api/llm_provider.py`; the default provider is `OllamaProvider`.
-- Prompt construction and synthesis logic are in `domains/healthcare/rag-api/domain/synthesis.py`.
+- LLM calls are routed through a provider abstraction in `domains/healthcare/agents/llm_provider.py`; the default provider is `OllamaProvider`.
+- Prompt construction and synthesis logic are in `domains/healthcare/agents/domain/synthesis.py`.
 - Active latency and output controls: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
 - Temperature is currently fixed in code (`0.2`) and is not yet env-configurable.
 - Anthropic/OpenAI provider routing remains a documented extension path, not the active local runtime.
@@ -190,7 +191,7 @@ Ops/UI
 - **Hybrid retrieval**: semantic nearest-neighbor evidence from Qdrant combined with patient-centric relationship context from Neo4j — every answer is grounded in both similarity and explicit clinical relationships.
 - **14-rule lab signal engine**: each lab result is evaluated against clinical thresholds at ingest time (`MAY_INDICATE` edges written to Neo4j). Covers Hyperkalemia, AMI, CKD, Anemia, Hyperlipidemia, Hypothyroidism, and 8 more conditions.
 - **FAERS-aligned pharmacovigilance**: adverse event detection fires after every clinical note by matching symptoms against `HAS_KNOWN_REACTION` graph edges for the patient's active medications.
-- **Drug safety knowledge graph**: 41 `INTERACTS_WITH` edges with mechanism annotations, 46 `HAS_KNOWN_REACTION` edges with MedDRA terms, 23 `CONTRAINDICATED_FOR` edges — seeded at startup from `domains/healthcare/neo4j/generated_ontology_seeds.cypher`.
+- **Drug safety knowledge graph**: 41 `INTERACTS_WITH` edges with mechanism annotations, 46 `HAS_KNOWN_REACTION` edges with MedDRA terms, 23 `CONTRAINDICATED_FOR` edges — seeded at startup from `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`.
 
 ### Agentic AI
 
@@ -249,8 +250,8 @@ Additional multi-agent query examples are in `domains/healthcare/scripts/query_e
 
 This repository includes a runtime Skills layer plus generated Agent Skills packages.
 
-- Runtime planner config: `domains/healthcare/rag-api/config/skills_layer.json`
-- Runtime resolver: `domains/healthcare/rag-api/skills_layer.py`
+- Runtime planner config: `domains/healthcare/agents/config/skills_layer.json`
+- Runtime resolver: `domains/healthcare/agents/skills_layer.py`
 - REST endpoint: `POST /skills/plan`
 - MCP tool: `skills_plan_get`
 - Generated Agent Skills packages: `domains/healthcare/skills/`
@@ -560,29 +561,31 @@ curl -s -X POST "http://localhost:8000/query" \
 pyproject.toml  Unified Python project config (uv, dependencies, ruff)
 Makefile        Local development shortcuts (make up, make test-hc, etc.)
 .python-version Python 3.11 pin (used by uv and Docker images)
-shared_lib/     Shared library (embedding, storage, runner, rules engine, ontology loader)
-  webapp/       Shared webapp assets (styles, query-helpers.js, nginx config)
-domains/        Domain implementations
-  healthcare/   Healthcare Provider domain
+data-platform/  Data platform: shared libraries and per-domain streaming infrastructure
+  shared/       Shared modules (embedding, storage, runner, rules engine, ontology loader)
+    webapp/     Shared webapp assets (styles, query-helpers.js, nginx config)
+  healthcare/   Healthcare data sourcing
     config/     Ontology YAML, rules, vocabulary mappings
     flink-app/  PyFlink job, processor logic, graph writes
     neo4j/      Constraints and seed graph relationships
     producer/   Synthetic event producer
-    rag-api/    FastAPI GraphRAG API
-      domain/    Retrieval, synthesis, response policy, planner, evidence ranking
-      langgraph_agents/  LangGraph multi-agent orchestration and MLflow tracing
     schemas/    Avro envelope schema
-    skills/     Generated Agent Skills packages
-    scripts/    Domain-specific validation and query scripts
-    webapp/     Provider-facing static UI
-    mcp-server/ MCP adapter scaffold (reference implementation)
-  supply-chain/ Supply Chain Resilience domain
+  supply-chain/ Supply-chain data sourcing
     config/     Ontology YAML, risk signal rules
     flink-app/  Stream processor and graph writes
     neo4j/      Constraints and seed data
     producer/   Synthetic event producer
-    rag-api/    FastAPI RAG API with skills layer
     schemas/    Avro envelope schema
+domains/        Domain AI implementations
+  healthcare/   Healthcare Provider AI domain
+    agents/     Healthcare AI agents (FastAPI + MCP + LangGraph)
+      domain/    Retrieval, synthesis, response policy, planner, harness
+      langgraph_agents/  LangGraph multi-agent orchestration and MLflow tracing
+    skills/     Generated Agent Skills packages
+    scripts/    Domain-specific validation and query scripts
+    webapp/     Provider-facing static UI
+  supply-chain/ Supply Chain Resilience AI domain
+    agents/     Supply-chain AI agents (FastAPI + skills layer)
     skills/     Agent Skills packages
     scripts/    Domain-specific validation and query scripts
     webapp/     Supply-chain query UI
@@ -625,6 +628,7 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 | [docs/mcp_layer_design.md](docs/mcp_layer_design.md) | MCP tool contracts, schemas, rollout phases |
 | [docs/skills_layer.md](docs/skills_layer.md) | Skills layer flow, generated packages, and validation |
 | [docs/langgraph_comparison.md](docs/langgraph_comparison.md) | Multi-agent architecture comparison (single-pass vs ReAct vs LangGraph) |
+| [docs/healthcare_ai_agent_landscape.md](docs/healthcare_ai_agent_landscape.md) | Industry AI agent landscape analysis and platform alignment |
 | [docs/runbook.md](docs/runbook.md) | Operations runbook, health checks, failure modes |
 | [docs/ai_qa.md](docs/ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
 | [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |

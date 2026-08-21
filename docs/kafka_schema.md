@@ -8,7 +8,7 @@ The stack uses one shared envelope schema and topic-based routing semantics.
 
 ## Envelope Schema
 
-Source file: domains/healthcare/schemas/medical_event.avsc
+Source file: data-platform/healthcare/schemas/medical_event.avsc
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Source file: domains/healthcare/schemas/medical_event.avsc
 
 ## Schema Registry Behavior
 
-Producer behavior in domains/healthcare/producer/produce_events.py:
+Producer behavior in data-platform/healthcare/producer/produce_events.py:
 
 - Registers the Avro envelope under topic-value subjects for transactional and reference topics.
 - Uses POST /subjects/{subject}/versions.
@@ -71,7 +71,7 @@ Fix:
 
 Important limitation in current schema design:
 
-- `payload_json` is defined as a `string` field in `domains/healthcare/schemas/medical_event.avsc`.
+- `payload_json` is defined as a `string` field in `data-platform/healthcare/schemas/medical_event.avsc`.
 - Field-level masking can apply to top-level envelope fields.
 - Field-level masking cannot target nested JSON attributes inside `payload_json` unless that payload is migrated to structured Avro fields.
 
@@ -127,7 +127,7 @@ Created by `supplychain-kafka-init` when the supply-chain overlay is active.
 
 ### Supply Chain Envelope Schema
 
-Source file: `domains/supply-chain/schemas/supply_chain_event.avsc`. Uses entity_id/facility_id/supplier_id instead of patient_id/encounter_id/provider_id.
+Source file: `data-platform/supply-chain/schemas/supply_chain_event.avsc`. Uses entity_id/facility_id/supplier_id instead of patient_id/encounter_id/provider_id.
 
 ## Topic Creation And Lifecycle
 
