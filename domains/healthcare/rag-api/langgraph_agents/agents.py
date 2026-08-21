@@ -14,11 +14,7 @@ from .state import HealthcareAgentState
 # ── Supervisor / Triage Agent ───────────────────────────────────────────────
 
 def triage_agent(state: HealthcareAgentState) -> dict[str, Any]:
-    """Classify the question and produce an initial retrieval plan.
-
-    Sets ``request_type``, ``plan_query_text``, ``plan_top_k``, ``plan_reason``
-    and emits a reasoning message.
-    """
+    """Classify the question and produce an initial retrieval plan."""
     from domain import classify_request_type, select_retrieval_plan
 
     question = state["question"]
@@ -215,16 +211,12 @@ def coding_review_agent(state: HealthcareAgentState) -> dict[str, Any]:
 
 def confidence_evaluator(state: HealthcareAgentState) -> dict[str, Any]:
     """Estimate retrieval confidence and decide whether to iterate or finalize."""
+    from domain.response_policy import estimate_confidence
+
     vector_ctx = state.get("vector_context", [])
     graph_ctx = state.get("graph_context", [])
     iteration = state.get("iteration", 0)
-
-    if vector_ctx and graph_ctx:
-        confidence = 1.0
-    elif vector_ctx or graph_ctx:
-        confidence = 0.5
-    else:
-        confidence = 0.0
+    confidence = estimate_confidence(vector_ctx, graph_ctx)
 
     return {
         "confidence": confidence,

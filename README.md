@@ -470,6 +470,7 @@ domains/        Domain implementations
     neo4j/      Constraints and seed graph relationships
     producer/   Synthetic event producer
     rag-api/    FastAPI GraphRAG API
+      domain/    Retrieval, synthesis, response policy, planner, evidence ranking
       langgraph_agents/  LangGraph multi-agent orchestration and MLflow tracing
     schemas/    Avro envelope schema
     skills/     Generated Agent Skills packages

@@ -11,12 +11,19 @@ from pathlib import Path
 from typing import Any, Literal
 
 from domain import (
+    apply_response_budget,
     classify_request_type,
     rank_graph_context,
     rank_vector_context,
+    sanitize_graph_context_for_role,
+    sanitize_vector_context_for_role,
     select_retrieval_plan,
+    truncate_text,
+    vector_text_mode,
 )
 from domain.react_controller import ReactLoopSettings, run_react_query_loop
+from domain.retrieval import VECTOR_SIZE, graph_search, stable_embedding, vector_search
+from domain.synthesis import synthesize_answer
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
@@ -354,285 +361,22 @@ def _audit(
 
 
 _EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-_embedding_model = None
-
-
-def _get_embedding_model():
-    global _embedding_model
-    if _embedding_model is not None:
-        return _embedding_model
-    try:
-        from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer(_EMBEDDING_MODEL_NAME)
-    except Exception:
-        _embedding_model = False
-    return _embedding_model
-
-
-def stable_embedding(text: str, dim: int = VECTOR_SIZE) -> list[float]:
-    model = _get_embedding_model()
-    if model and model is not False:
-        vec = model.encode(text, normalize_embeddings=True).tolist()
-        return vec[:dim] if len(vec) >= dim else vec + [0.0] * (dim - len(vec))
-    vec = [0.0] * dim
-    for token in text.lower().split():
-        token_hash = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
-        vec[token_hash % dim] += 1.0
-    norm = sum(x * x for x in vec) ** 0.5
-    return [x / norm if norm else 0.0 for x in vec]
 
 
 def vector_context(question: str, patient_id: str | None, limit: int) -> list[dict[str, Any]]:
-    query_vector = stable_embedding(question)
-    query_filter = None
-    if patient_id:
-        query_filter = {"must": [{"key": "patient_id", "match": {"value": patient_id}}]}
-
-    results = qdrant.search(
-        collection_name=settings.qdrant_collection,
-        query_vector=query_vector,
-        query_filter=query_filter,
-        limit=limit,
-    )
-    return [
-        {
-            "score": result.score,
-            "event_id": result.payload.get("event_id"),
-            "patient_id": result.payload.get("patient_id"),
-            "event_type": result.payload.get("event_type"),
-            "text": result.payload.get("text"),
-        }
-        for result in results
-    ]
+    return vector_search(qdrant, settings.qdrant_collection, question, patient_id, limit)
 
 
 def graph_context(patient_ids: list[str]) -> list[dict[str, Any]]:
-    with neo4j.session() as session:
-        records = session.run(
-            """
-            MATCH (p:Patient)
-            WHERE p.id IN $patient_ids
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[hc:HAS_CONDITION]->(c:Condition)
-                            RETURN collect(DISTINCT {name: c.name, onset_ts: toString(hc.onset_ts)})[..20] AS conditions
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_SYMPTOM]->(s:Symptom)
-                            RETURN collect(DISTINCT s.name)[..20] AS symptoms
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_OBSERVATION]->(o:Observation)
-                            RETURN collect(
-                                DISTINCT {name: o.name, value: o.value, unit: o.unit, abnormal: o.abnormal, panel: o.lab_panel, specimen: o.specimen_type, event_ts: toString(o.event_ts)}
-                            )[..20] AS observations
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_MEDICATION_ORDER]->(mo:MedicationOrder)-[:ORDERS_MEDICATION]->(m:Medication)
-                            RETURN collect(
-                                DISTINCT {medication: m.name, drug_class: m.drug_class, dose: mo.dose, route: mo.route, frequency: mo.frequency, order_type: mo.order_type, order_ts: toString(mo.event_ts)}
-                            )[..20] AS medications
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_MEDICATION_ORDER]->(mo:MedicationOrder)-[:ORDERS_MEDICATION]->(m:Medication)
-                            WHERE NOT mo.order_type IN $excluded_order_types
-                            OPTIONAL MATCH (m)-[i:INTERACTS_WITH]->(m2:Medication)
-                            WITH m, i, m2 WHERE i IS NOT NULL
-                            RETURN collect(
-                                DISTINCT {from: m.name, to: m2.name, risk: i.risk, severity: i.severity}
-                            )[..20] AS interactions
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_DEVICE_READING]->(dr:DeviceReading)
-                            RETURN collect(
-                                DISTINCT {
-                                    heart_rate: dr.heart_rate,
-                                    spo2: dr.spo2,
-                                    bp: toString(dr.systolic_bp) + '/' + toString(dr.diastolic_bp),
-                                    temp_c: dr.temperature_c,
-                                    rr: dr.respiratory_rate,
-                                    alert: dr.alert
-                                }
-                            )[..20] AS vitals
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_CLAIM]->(cl:Claim)
-                            OPTIONAL MATCH (cl)-[:SUBMITTED_TO]->(pay:Payer)
-                            OPTIONAL MATCH (cl)-[:FOR_PROCEDURE]->(proc:Procedure)
-                            RETURN collect(
-                                DISTINCT {payer: coalesce(pay.name, cl.payer), code: proc.code, description: proc.description, status: cl.status, claim_type: cl.claim_type, billed: cl.billed_amount}
-                            )[..20] AS claims
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_OBSERVATION]->(o:Observation)-[mi:MAY_INDICATE]->(c:Condition)
-                            RETURN collect(
-                                DISTINCT {observation: o.name, value: o.value, unit: o.unit, indicated_condition: c.name, reason: mi.reason}
-                            )[..20] AS lab_signals
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_CONDITION]->(c:Condition)-[:CODED_AS]->(icd:ICD10Code)
-                            RETURN collect(DISTINCT {condition: c.name, icd10: icd.code})[..20] AS icd10_codes
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:REPORTED_ADVERSE_REACTION]->(ae:AdverseEvent)-[:ASSOCIATED_WITH_MEDICATION]->(m:Medication)
-                            WITH ae, m WHERE ae IS NOT NULL
-                            RETURN collect(
-                                DISTINCT {symptom: ae.symptom_name, medication: m.name, severity: ae.severity, meddra_term: ae.meddra_term}
-                            )[..20] AS adverse_events
-                        }
-
-                        CALL (p) {
-                            OPTIONAL MATCH (p)-[:HAS_CONDITION]->(c:Condition)<-[ci:CONTRAINDICATED_FOR]-(m:Medication)
-                            WHERE EXISTS { MATCH (p)-[:HAS_MEDICATION_ORDER]->(mo:MedicationOrder)-[:ORDERS_MEDICATION]->(m) WHERE NOT mo.order_type IN $excluded_order_types }
-                            RETURN collect(
-                                DISTINCT {medication: m.name, condition: c.name, reason: ci.reason, severity: ci.severity}
-                            )[..10] AS contraindications
-                        }
-
-            RETURN p.id AS patient_id,
-                                     p.age AS age,
-                                     p.sex AS sex,
-                                     p.risk_tier AS risk_tier,
-                                     conditions,
-                                     symptoms,
-                                     observations,
-                                     medications,
-                                     interactions,
-                                     vitals,
-                                     claims,
-                                     lab_signals,
-                                     icd10_codes,
-                                     adverse_events,
-                                     contraindications
-            """,
-            {"patient_ids": patient_ids, "excluded_order_types": ["discontinued", "hold"]},
-        )
-        return [dict(record) for record in records]
-
-
-def _compact_vector_context(vector_ctx: list[dict[str, Any]]) -> str:
-    if not vector_ctx:
-        return "- none"
-
-    lines: list[str] = []
-    for item in vector_ctx[: settings.max_context_items]:
-        lines.append(
-            "- "
-            f"patient={item.get('patient_id', 'unknown')} "
-            f"event={item.get('event_type', 'unknown')} "
-            f"score={float(item.get('score', 0.0)):.3f}"
-        )
-    return "\n".join(lines)
-
-
-def _compact_graph_context(graph_ctx: list[dict[str, Any]]) -> str:
-    if not graph_ctx:
-        return "- none"
-
-    chunks: list[str] = []
-    for patient in graph_ctx[: settings.max_context_items]:
-        patient_id = patient.get("patient_id", "unknown")
-        age = patient.get("age", "?")
-        sex = patient.get("sex", "?")
-        risk_tier = patient.get("risk_tier", "?")
-        raw_conditions = patient.get("conditions", [])[:5]
-        conditions = ", ".join(
-            c.get("name", c) if isinstance(c, dict) else str(c) for c in raw_conditions
-        ) or "none"
-        symptoms = ", ".join(patient.get("symptoms", [])[:5]) or "none"
-
-        observations = patient.get("observations", [])[:3]
-        observation_summary = "; ".join(
-            f"{obs.get('name', 'unknown')}={obs.get('value', 'n/a')}{obs.get('unit', '')}"
-            for obs in observations
-        ) or "none"
-
-        medications = patient.get("medications", [])[:3]
-        medication_summary = "; ".join(
-            f"{med.get('medication', 'unknown')} {med.get('dose', '')} {med.get('route', '')}".strip()
-            for med in medications
-        ) or "none"
-
-        interactions = [i for i in patient.get("interactions", [])[:3] if i.get("to")]
-        interaction_summary = "; ".join(
-            f"{i.get('from', '?')}+{i.get('to', '?')} ({i.get('risk', '?')}/{i.get('severity', '?')})"
-            for i in interactions
-        ) or "none"
-
-        lab_signals = patient.get("lab_signals", [])[:5]
-        lab_signal_summary = "; ".join(
-            f"{s.get('observation', '?')}={s.get('value', '?')} \u2192 {s.get('indicated_condition', '?')}"
-            for s in lab_signals
-        ) or "none"
-
-        vitals_alerts = [v.get("alert") for v in patient.get("vitals", [])[:5] if v.get("alert")]
-        alert_summary = "; ".join(vitals_alerts) or "none"
-
-        adverse_events = patient.get("adverse_events", [])[:3]
-        adverse_summary = "; ".join(
-            f"{ae.get('symptom', '?')} \u2190 {ae.get('medication', '?')} [{ae.get('severity', '?')}]"
-            for ae in adverse_events
-        ) or "none"
-
-        contraindications = patient.get("contraindications", [])[:3]
-        contra_summary = "; ".join(
-            f"{c.get('medication', '?')} \u26a0 {c.get('condition', '?')} ({c.get('reason', '?')})"
-            for c in contraindications
-        ) or "none"
-
-        chunks.append(
-            f"- patient={patient_id} age={age} sex={sex} risk={risk_tier}\n"
-            f"  conditions={conditions}\n"
-            f"  symptoms={symptoms}\n"
-            f"  observations={observation_summary}\n"
-            f"  lab_signals={lab_signal_summary}\n"
-            f"  medications={medication_summary}\n"
-            f"  drug_interactions={interaction_summary}\n"
-            f"  adverse_events={adverse_summary}\n"
-            f"  contraindications={contra_summary}\n"
-            f"  device_alerts={alert_summary}"
-        )
-
-    return "\n".join(chunks)
+    return graph_search(neo4j, patient_ids)
 
 
 def ask_ollama(question: str, vector_ctx: list[dict[str, Any]], graph_ctx: list[dict[str, Any]]) -> str:
-    vector_brief = _compact_vector_context(vector_ctx)
-    graph_brief = _compact_graph_context(graph_ctx)
-
-    prompt = f"""
-You are a clinical decision-support RAG assistant for synthetic demo data only.
-Do not provide final medical advice. Summarize likely context and evidence.
-
-Question:
-{question}
-
-Vector context from Qdrant:
-{vector_brief}
-
-Graph context from Neo4j:
-{graph_brief}
-
-Answer with:
-1. Key findings
-2. Relationship-based reasoning
-3. Evidence snippets
-4. Safety caveat
-"""
-    return llm_provider.generate(
-        prompt=prompt,
+    return synthesize_answer(
+        question, vector_ctx, graph_ctx, llm_provider,
         timeout_seconds=settings.llm_timeout_seconds,
         max_tokens=settings.llm_max_tokens,
-        temperature=0.2,
+        max_items=settings.max_context_items,
     )
 
 
@@ -711,129 +455,22 @@ def _run_query_single_pass(
     }
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return value[: max_chars - 3] + "..."
-
-
-def _graph_limits(caller_role: str) -> tuple[int, int]:
-    if caller_role == "export":
-        return settings.max_evidence_chars * 2, settings.max_context_items * 2
-    return settings.max_evidence_chars, settings.max_context_items
-
-
-def _sanitize_graph_value(value: Any, *, text_limit: int, list_limit: int) -> Any:
-    if isinstance(value, str):
-        return _truncate_text(value, text_limit)
-    if isinstance(value, list):
-        return [
-            _sanitize_graph_value(item, text_limit=text_limit, list_limit=list_limit)
-            for item in value[:list_limit]
-        ]
-    if isinstance(value, dict):
-        return {
-            key: _sanitize_graph_value(item, text_limit=text_limit, list_limit=list_limit)
-            for key, item in value.items()
-        }
-    return value
-
-
-def _sanitize_vector_context(items: list[dict[str, Any]], *, include_text: bool = False) -> list[dict[str, Any]]:
-    sanitized: list[dict[str, Any]] = []
-    for item in items[: settings.max_context_items]:
-        safe_item = {
-            "score": item.get("score"),
-            "event_id": item.get("event_id"),
-            "patient_id": item.get("patient_id"),
-            "event_type": item.get("event_type"),
-        }
-        text = item.get("text")
-        if include_text and text:
-            safe_item["text"] = _truncate_text(str(text), settings.max_evidence_chars)
-        elif text:
-            safe_item["text_redacted"] = True
-        sanitized.append(safe_item)
-    return sanitized
-
-
-def _vector_text_mode(caller_role: str, include_raw_payload: bool = False) -> str:
-    if caller_role == "export":
-        return "bounded"
-    if include_raw_payload:
-        return "request-denied"
-    return "none"
-
-
-def _sanitize_vector_context_for_role(
-    items: list[dict[str, Any]],
-    *,
-    caller_role: str,
-    include_raw_payload: bool = False,
-) -> list[dict[str, Any]]:
-    text_mode = _vector_text_mode(caller_role, include_raw_payload=include_raw_payload)
-    sanitized: list[dict[str, Any]] = []
-    for item in items[: settings.max_context_items]:
-        safe_item = {
-            "score": item.get("score"),
-            "event_id": item.get("event_id"),
-            "patient_id": item.get("patient_id"),
-            "event_type": item.get("event_type"),
-        }
-        text = item.get("text")
-        if text_mode == "bounded" and text:
-            safe_item["text"] = _truncate_text(str(text), settings.max_evidence_chars)
-        elif text:
-            safe_item["text_redacted"] = True
-        sanitized.append(safe_item)
-    return sanitized
-
-
-def _sanitize_graph_context_for_role(
-    items: list[dict[str, Any]],
-    *,
-    caller_role: str,
-) -> list[dict[str, Any]]:
-    text_limit, list_limit = _graph_limits(caller_role)
-    return [
-        _sanitize_graph_value(item, text_limit=text_limit, list_limit=list_limit)
-        for item in items[:list_limit]
-    ]
-
-
-def _apply_response_budget(payload: dict[str, Any]) -> dict[str, Any]:
-    payload.setdefault("guardrails", {})
-    payload["guardrails"].setdefault("response_truncated", False)
-
-    while len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) > settings.max_response_bytes:
-        payload["guardrails"]["response_truncated"] = True
-        vector_items = payload.get("vector_context") or []
-        if vector_items:
-            vector_items.pop()
-            continue
-
-        graph_items = payload.get("graph_context") or []
-        if graph_items:
-            graph_items.pop()
-            continue
-
-        answer = payload.get("answer")
-        if isinstance(answer, str) and len(answer) > 80:
-            payload["answer"] = _truncate_text(answer, max(80, len(answer) - 80))
-            continue
-
-        break
-
-    encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    if len(encoded) > settings.max_response_bytes:
-        raise RuntimeError("Unable to fit response within configured response budget")
-    return payload
-
-
 def _patient_scope(patient_id: str | None) -> list[str] | str:
     return [patient_id] if patient_id else "cohort"
+
+
+def _sanitize_vector(items, *, caller_role, include_raw_payload=False):
+    return sanitize_vector_context_for_role(
+        items, caller_role=caller_role, include_raw_payload=include_raw_payload,
+        max_context_items=settings.max_context_items, max_evidence_chars=settings.max_evidence_chars,
+    )
+
+
+def _sanitize_graph(items, *, caller_role):
+    return sanitize_graph_context_for_role(
+        items, caller_role=caller_role,
+        max_evidence_chars=settings.max_evidence_chars, max_context_items=settings.max_context_items,
+    )
 
 
 def _build_query_response(
@@ -842,21 +479,21 @@ def _build_query_response(
     *,
     caller_role: str,
 ) -> dict[str, Any]:
-    text_mode = _vector_text_mode(caller_role)
+    text_mode = vector_text_mode(caller_role)
     payload = {
         "question": result["question"],
         "request_type": result.get("request_type"),
         "retrieval_plan": result.get("retrieval_plan"),
         "patients": result.get("patients", []),
-        "vector_context": _sanitize_vector_context_for_role(
+        "vector_context": _sanitize_vector(
             result.get("vector_context", []),
             caller_role=caller_role,
         ),
-        "graph_context": _sanitize_graph_context_for_role(
+        "graph_context": _sanitize_graph(
             result.get("graph_context", []),
             caller_role=caller_role,
         ),
-        "answer": _truncate_text(str(result.get("answer") or ""), settings.max_answer_chars),
+        "answer": truncate_text(str(result.get("answer") or ""), settings.max_answer_chars),
         "retrieved_at": _ts(),
         "trace_id": trace_id,
         "guardrails": {
@@ -870,7 +507,7 @@ def _build_query_response(
     }
     if result.get("react"):
         payload["react"] = result["react"]
-    return _apply_response_budget(payload)
+    return apply_response_budget(payload, max_response_bytes=settings.max_response_bytes)
 
 
 def _execute_with_audit(
@@ -962,7 +599,7 @@ def skills_plan(
             caller_role=caller_role,
             request_payload=request_payload,
             patient_scope="none",
-            fn=lambda trace_id: _apply_response_budget(
+            fn=lambda trace_id: apply_response_budget(
                 {
                     **build_skill_plan(
                         load_skills(str(settings.skills_layer_path)),
@@ -1031,7 +668,7 @@ def patient_context_get(
 
     def _handler(trace_id: str) -> dict[str, Any]:
         result = run_query("Return patient graph context for review.", req.patient_id)
-        graph_items = _sanitize_graph_context_for_role(
+        graph_items = _sanitize_graph(
             result.get("graph_context", []),
             caller_role="read_only",
         )
@@ -1041,7 +678,7 @@ def patient_context_get(
         if not req.include_interactions:
             for item in graph_items:
                 item.pop("interactions", None)
-        return _apply_response_budget(
+        return apply_response_budget(
             {
                 "patient_id": req.patient_id,
                 "graph_context": graph_items,
@@ -1078,10 +715,10 @@ def vector_evidence_search(
         caller_role="read_only",
         request_payload=req.model_dump(exclude_none=True),
         patient_scope=_patient_scope(req.patient_id),
-        fn=lambda trace_id: _apply_response_budget(
+        fn=lambda trace_id: apply_response_budget(
             {
                 "question": req.question,
-                "vector_context": _sanitize_vector_context_for_role(
+                "vector_context": _sanitize_vector(
                     run_query(req.question, req.patient_id, top_k=req.top_k).get("vector_context", []),
                     caller_role="read_only",
                 ),
@@ -1139,10 +776,10 @@ def risk_summary_generate(
             event_type = item.get("event_type")
             if event_type and event_type not in risk_signals:
                 risk_signals.append(event_type)
-        return _apply_response_budget(
+        return apply_response_budget(
             {
                 "patient_id": req.patient_id,
-                "summary": _truncate_text(str(result.get("answer") or ""), settings.max_answer_chars),
+                "summary": truncate_text(str(result.get("answer") or ""), settings.max_answer_chars),
                 "risk_signals": risk_signals[: settings.max_context_items],
                 "retrieved_at": _ts(),
                 "trace_id": trace_id,
@@ -1175,20 +812,20 @@ def evidence_bundle_export(
 
     def _handler(trace_id: str) -> dict[str, Any]:
         result = run_query(req.question, req.patient_id)
-        text_mode = _vector_text_mode("export", include_raw_payload=req.include_raw_payload)
+        text_mode = vector_text_mode("export", include_raw_payload=req.include_raw_payload)
         payload = {
             "question": req.question,
             "patients": result.get("patients", []),
-            "vector_context": _sanitize_vector_context_for_role(
+            "vector_context": _sanitize_vector(
                 result.get("vector_context", []),
                 caller_role="export",
                 include_raw_payload=req.include_raw_payload,
             ),
-            "graph_context": _sanitize_graph_context_for_role(
+            "graph_context": _sanitize_graph(
                 result.get("graph_context", []),
                 caller_role="export",
             ),
-            "answer": _truncate_text(str(result.get("answer") or ""), settings.max_answer_chars),
+            "answer": truncate_text(str(result.get("answer") or ""), settings.max_answer_chars),
             "retrieved_at": _ts(),
             "trace_id": trace_id,
             "guardrails": {
@@ -1201,7 +838,7 @@ def evidence_bundle_export(
                 "response_truncated": False,
             },
         }
-        return _apply_response_budget(payload)
+        return apply_response_budget(payload, max_response_bytes=settings.max_response_bytes)
 
     return _execute_with_audit(
         tool_name="evidence_bundle_export",
@@ -1224,15 +861,15 @@ def timeline_explain(
             f"Explain timeline progression for patient {req.patient_id} across the last {req.time_window_hours} hours.",
             req.patient_id,
         )
-        graph_items = _sanitize_graph_context_for_role(
+        graph_items = _sanitize_graph(
             result.get("graph_context", []),
             caller_role="generation",
         )
-        return _apply_response_budget(
+        return apply_response_budget(
             {
                 "patient_id": req.patient_id,
                 "time_window_hours": req.time_window_hours,
-                "timeline_summary": _truncate_text(
+                "timeline_summary": truncate_text(
                     str(result.get("answer") or ""), settings.max_answer_chars
                 ),
                 "graph_context": graph_items,
@@ -1268,10 +905,10 @@ def medication_risk_assess(patient_id: str) -> dict[str, Any]:
         )
         graph_items = result.get("graph_context", [])
         first_patient = graph_items[0] if graph_items else {}
-        return _apply_response_budget(
+        return apply_response_budget(
             {
                 "patient_id": req.patient_id,
-                "risk_assessment": _truncate_text(
+                "risk_assessment": truncate_text(
                     str(result.get("answer") or ""), settings.max_answer_chars
                 ),
                 "contraindications": first_patient.get("contraindications", [])[: settings.max_context_items],
@@ -1308,10 +945,10 @@ def coding_gap_detect(
         result = run_query(req.question, req.patient_id)
         graph_items = result.get("graph_context", [])
         first_patient = graph_items[0] if graph_items else {}
-        return _apply_response_budget(
+        return apply_response_budget(
             {
                 "patient_id": req.patient_id,
-                "coding_gap_summary": _truncate_text(
+                "coding_gap_summary": truncate_text(
                     str(result.get("answer") or ""), settings.max_answer_chars
                 ),
                 "claims": first_patient.get("claims", [])[: settings.max_context_items],
@@ -1346,14 +983,14 @@ def cohort_risk_summary(
 
     def _handler(trace_id: str) -> dict[str, Any]:
         result = run_query(req.question, patient_id=None, top_k=req.top_k)
-        return _apply_response_budget(
+        return apply_response_budget(
             {
                 "question": req.question,
-                "cohort_summary": _truncate_text(
+                "cohort_summary": truncate_text(
                     str(result.get("answer") or ""), settings.max_answer_chars
                 ),
                 "patients": result.get("patients", []),
-                "vector_context": _sanitize_vector_context_for_role(
+                "vector_context": _sanitize_vector(
                     result.get("vector_context", []),
                     caller_role="generation",
                 ),
@@ -1386,7 +1023,7 @@ def skills_plan_get(
     req = SkillsPlanRequest(business_goal=business_goal, agent=(agent or None))
 
     def _handler(trace_id: str) -> dict[str, Any]:
-        return _apply_response_budget(
+        return apply_response_budget(
             {
                 **build_skill_plan(
                     load_skills(str(settings.skills_layer_path)),

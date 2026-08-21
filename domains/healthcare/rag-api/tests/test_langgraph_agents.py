@@ -277,3 +277,148 @@ class TestEvaluation:
     def test_answer_quality_error(self):
         result = evaluate_answer_quality({"answer": "LLM error: timeout"})
         assert result["score"] == 0.0
+
+
+# ── Polypharmacy medication safety scenario tests ─────────────────────────
+
+class TestPolypharmacyScenario:
+    """Tests for the primary multi-agent use case: polypharmacy patient with
+    anticoagulant + antiplatelet + dual potassium-sparing agents, CKD, and
+    abnormal labs."""
+
+    @pytest.fixture
+    def polypharmacy_state(self) -> HealthcareAgentState:
+        return {
+            "question": "Review medication safety: are there dangerous interactions or contraindications for this patient given their current labs and conditions?",
+            "patient_id": "patient-0001",
+            "request_type": "medication_safety",
+            "plan_query_text": "Medication safety focus: Review medication safety",
+            "plan_top_k": 6,
+            "plan_reason": "Question contains medication safety semantics.",
+            "vector_context": [
+                {"event_id": "e1", "patient_id": "patient-0001", "event_type": "medication_order", "score": 0.92},
+                {"event_id": "e2", "patient_id": "patient-0001", "event_type": "medication_order", "score": 0.88},
+                {"event_id": "e3", "patient_id": "patient-0001", "event_type": "lab_result", "score": 0.85},
+            ],
+            "graph_context": [
+                {
+                    "patient_id": "patient-0001",
+                    "age": 72,
+                    "sex": "M",
+                    "risk_tier": "high",
+                    "conditions": [
+                        {"name": "Chronic Kidney Disease"},
+                        {"name": "Hyperkalemia"},
+                        {"name": "Hypertension"},
+                    ],
+                    "symptoms": ["dizziness"],
+                    "observations": [
+                        {"name": "Potassium", "value": "6.1", "unit": "mmol/L", "abnormal": True},
+                        {"name": "Creatinine", "value": "1.8", "unit": "mg/dL", "abnormal": True},
+                    ],
+                    "medications": [
+                        {"medication": "Warfarin", "drug_class": "Anticoagulant", "dose": "5mg", "route": "oral", "order_type": "ordered"},
+                        {"medication": "Aspirin", "drug_class": "Antiplatelet", "dose": "81mg", "route": "oral", "order_type": "ordered"},
+                        {"medication": "Lisinopril", "drug_class": "ACE Inhibitor", "dose": "10mg", "route": "oral", "order_type": "ordered"},
+                        {"medication": "Spironolactone", "drug_class": "Potassium-Sparing Diuretic", "dose": "25mg", "route": "oral", "order_type": "ordered"},
+                    ],
+                    "interactions": [
+                        {"from": "Warfarin", "to": "Aspirin", "risk": "bleeding_risk", "severity": "high"},
+                        {"from": "Lisinopril", "to": "Spironolactone", "risk": "hyperkalemia_risk", "severity": "moderate"},
+                    ],
+                    "adverse_events": [
+                        {"symptom": "dizziness", "medication": "Lisinopril", "severity": "low", "meddra_term": "Dizziness"},
+                    ],
+                    "contraindications": [
+                        {"medication": "Lisinopril", "condition": "Hyperkalemia", "reason": "worsens_hyperkalemia", "severity": "high"},
+                        {"medication": "Spironolactone", "condition": "Hyperkalemia", "reason": "worsens_hyperkalemia", "severity": "high"},
+                    ],
+                    "lab_signals": [
+                        {"observation": "Potassium", "value": "6.1", "unit": "mmol/L", "indicated_condition": "Hyperkalemia", "reason": "elevated_potassium"},
+                        {"observation": "Creatinine", "value": "1.8", "unit": "mg/dL", "indicated_condition": "Chronic Kidney Disease", "reason": "elevated_creatinine"},
+                    ],
+                    "icd10_codes": [
+                        {"condition": "Chronic Kidney Disease", "icd10": "N18.9"},
+                        {"condition": "Hypertension", "icd10": "I10"},
+                    ],
+                    "claims": [],
+                    "vitals": [],
+                },
+            ],
+            "patient_ids": ["patient-0001"],
+            "messages": [],
+            "confidence": 0.0,
+            "iteration": 0,
+        }
+
+    def test_triage_routes_to_medication_safety(self, polypharmacy_state):
+        result = _route_specialist(polypharmacy_state)
+        assert result == "medication_safety"
+
+    def test_medication_agent_extracts_interactions(self, polypharmacy_state):
+        result = medication_safety_agent(polypharmacy_state)
+        msg = result["messages"][0]
+        assert msg["agent"] == "medication_safety"
+        assert msg["patients_with_risks"] == 1
+        risks = msg["risks"][0]
+        assert risks["interaction_count"] == 2
+        assert risks["contraindication_count"] == 2
+
+    def test_lab_agent_extracts_abnormal_potassium(self, polypharmacy_state):
+        result = lab_interpretation_agent(polypharmacy_state)
+        msg = result["messages"][0]
+        assert msg["patients_with_signals"] == 1
+        signals = msg["signals"][0]
+        assert signals["lab_signal_count"] == 2
+        assert signals["abnormal_observation_count"] == 2
+
+    def test_coding_agent_finds_uncoded_hyperkalemia(self, polypharmacy_state):
+        result = coding_review_agent(polypharmacy_state)
+        msg = result["messages"][0]
+        # Hyperkalemia is in conditions but not in icd10_codes → uncoded
+        assert msg["patients_reviewed"] == 1
+        assert "Hyperkalemia" in msg["reviews"][0]["uncoded_conditions"]
+
+    def test_confidence_reaches_1_with_dual_evidence(self, polypharmacy_state):
+        result = confidence_evaluator(polypharmacy_state)
+        assert result["confidence"] == 1.0
+
+    def test_full_agent_trace_covers_medication_path(self, polypharmacy_state):
+        """The medication safety path should activate triage, both retrievers,
+        and the medication_safety specialist."""
+        from langgraph_agents.evaluation import evaluate_agent_coverage
+        trace = [
+            {"agent": "triage"},
+            {"agent": "vector_retrieval"},
+            {"agent": "graph_retrieval"},
+            {"agent": "medication_safety"},
+            {"agent": "confidence_evaluator"},
+            {"agent": "synthesis"},
+        ]
+        expected = ["triage", "vector_retrieval", "graph_retrieval", "medication_safety"]
+        result = evaluate_agent_coverage(trace, expected)
+        assert result["score"] == 1.0
+
+    def test_interaction_chain_warfarin_aspirin(self, polypharmacy_state):
+        """Verify the Warfarin+Aspirin bleeding risk is surfaced."""
+        result = medication_safety_agent(polypharmacy_state)
+        risks = result["messages"][0]["risks"][0]
+        interactions = risks["interactions"]
+        bleeding = [i for i in interactions if i["risk"] == "bleeding_risk" and i["severity"] == "high"]
+        assert len(bleeding) >= 1
+        pair = bleeding[0]
+        assert {pair["from"], pair["to"]} == {"Warfarin", "Aspirin"}
+
+    def test_contraindication_chain_confirmed_by_lab(self, polypharmacy_state):
+        """Verify contraindications for Hyperkalemia are present alongside
+        the lab signal that confirms the condition."""
+        graph = polypharmacy_state["graph_context"][0]
+        contras = graph["contraindications"]
+        hyperkalemia_contras = [c for c in contras if c["condition"] == "Hyperkalemia"]
+        assert len(hyperkalemia_contras) == 2
+        contra_meds = {c["medication"] for c in hyperkalemia_contras}
+        assert contra_meds == {"Lisinopril", "Spironolactone"}
+        lab_signals = graph["lab_signals"]
+        potassium_signal = [s for s in lab_signals if s["indicated_condition"] == "Hyperkalemia"]
+        assert len(potassium_signal) == 1
+        assert float(potassium_signal[0]["value"]) >= 5.5

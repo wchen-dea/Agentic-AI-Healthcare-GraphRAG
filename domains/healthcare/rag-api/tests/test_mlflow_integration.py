@@ -243,8 +243,8 @@ class TestRunMlflowEvaluation:
                 }
 
             results = run_mlflow_evaluation(mock_query, "test", log_to_mlflow=False)
-            # 5 cases + 1 aggregate
-            assert len(results) == 6
+            # 8 cases + 1 aggregate
+            assert len(results) == 9
             agg = results[-1]
             assert "aggregate" in agg
             assert agg["mode"] == "test"

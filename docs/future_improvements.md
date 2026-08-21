@@ -13,7 +13,7 @@ Completed or largely implemented:
 
 - Stage 0 documentation and baseline architecture references,
 - ontology configuration, ontology loader, and rule-pack integration in Flink modules,
-- shared rag-api domain package (`domain/models.py`, `domain/planner.py`, `domain/evidence.py`),
+- shared rag-api domain package (`domain/models.py`, `domain/planner.py`, `domain/evidence.py`, `domain/retrieval.py`, `domain/synthesis.py`, `domain/response_policy.py`),
 - planner-driven query orchestration with deterministic ranking and planner metadata,
 - expanded MCP tools (`timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`),
 - planner quality suites (`test_planner_evaluation.py`, `test_planner_edge_cases.py`),

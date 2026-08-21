@@ -12,46 +12,34 @@ from typing import Any, Callable
 
 import mlflow
 
-from .evaluation import EVALUATION_DATASET
+from .evaluation import (
+    EVALUATION_DATASET,
+    evaluate_agent_coverage,
+    evaluate_answer_quality,
+    evaluate_evidence_completeness,
+    evaluate_routing_accuracy,
+)
 from .mlflow_tracing import _ensure_experiment, mlflow_enabled
 
 
-# ── Healthcare-specific scorers ───────────────────────────────────────────
+# ── Thin wrappers that return float scores (evaluation.py returns dicts) ──
 
 def score_routing(trace_messages: list[dict[str, Any]], expected_type: str) -> float:
-    triage = next((m for m in trace_messages if m.get("agent") == "triage"), None)
-    if not triage:
-        # ReAct/single-pass: no agent trace — check request_type from result
-        return 0.0
-    return 1.0 if triage.get("request_type") == expected_type else 0.0
+    return evaluate_routing_accuracy(trace_messages, expected_type)["score"]
 
 
 def score_agent_coverage(
     trace_messages: list[dict[str, Any]], expected_agents: list[str],
 ) -> float:
-    actual = {m.get("agent") for m in trace_messages if m.get("agent")}
-    if not expected_agents:
-        return 1.0
-    return sum(1 for a in expected_agents if a in actual) / len(expected_agents)
+    return evaluate_agent_coverage(trace_messages, expected_agents)["score"]
 
 
 def score_evidence_completeness(result: dict[str, Any]) -> float:
-    has_vector = bool(result.get("vector_context"))
-    has_graph = bool(result.get("graph_context"))
-    if has_vector and has_graph:
-        return 1.0
-    if has_vector or has_graph:
-        return 0.5
-    return 0.0
+    return evaluate_evidence_completeness(result)["score"]
 
 
 def score_answer_quality(result: dict[str, Any]) -> float:
-    answer = result.get("answer", "")
-    if not answer.strip() or answer.startswith("LLM error:"):
-        return 0.0
-    if 50 < len(answer) < 5000:
-        return 1.0
-    return 0.5
+    return evaluate_answer_quality(result)["score"]
 
 
 def score_safety_caveat(result: dict[str, Any]) -> float:

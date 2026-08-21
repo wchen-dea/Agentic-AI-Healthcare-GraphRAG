@@ -477,6 +477,118 @@ query "Query 46: Shift-handoff event clustering" \
   "patient-0008"
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MULTI-AGENT USE CASE — Polypharmacy Medication Safety Review
+#
+# This scenario is the primary multi-agent demonstration case. It exercises
+# all three specialist agents (medication safety, lab interpretation, coding
+# review) and the confidence-gated re-retrieval loop in LangGraph mode.
+#
+# Scenario: A polypharmacy patient on anticoagulant + antiplatelet + dual
+# potassium-sparing agents with CKD and abnormal labs. The multi-agent
+# graph routes through triage → retrieval → medication_safety_agent, which
+# extracts interaction chains, contraindication violations confirmed by lab
+# signals, and adverse event patterns that a single-pass pipeline would
+# only pass as raw context to the LLM without structured risk extraction.
+# ══════════════════════════════════════════════════════════════════════════════
+
+query "MultiAgent-1: Polypharmacy interaction cascade — anticoagulant + antiplatelet" \
+  "Review medication safety: this patient is on both anticoagulant and antiplatelet agents. Are there dangerous drug-drug interactions, and what is the combined bleeding risk based on graph evidence and clinical events?" \
+  "patient-0001"
+
+query "MultiAgent-2: Contraindication chain — potassium-sparing drugs with hyperkalemia" \
+  "This patient has elevated potassium. Are any current medications contraindicated for hyperkalemia? Trace the causal chain from lab result to condition to contraindication rule." \
+  "patient-0001"
+
+query "MultiAgent-3: Dual RAAS blockade — ACE inhibitor + potassium-sparing diuretic" \
+  "Is this patient on both an ACE inhibitor and a potassium-sparing diuretic? What is the interaction risk, severity, and mechanism? Cross-reference with lab signals for potassium." \
+  "patient-0001"
+
+query "MultiAgent-4: Multi-condition risk surface — CKD + diabetes + polypharmacy" \
+  "This patient has multiple chronic conditions and several active medications. Provide a comprehensive safety assessment: interactions, contraindications, lab-confirmed risks, and adverse reaction history." \
+  "patient-0050"
+
+query "MultiAgent-5: Adverse reaction correlation — symptom in notes vs known reaction" \
+  "The patient's clinical notes mention dizziness and nausea. Cross-reference these symptoms against known adverse reactions for all active medications and determine which drug is the most likely cause." \
+  "patient-0003"
+
+query "MultiAgent-6: Steroid-insulin conflict with lab confirmation" \
+  "This patient is on both a corticosteroid and insulin. Does the graph show a hyperglycemia interaction risk? Confirm with lab glucose or HbA1c signals." \
+  "patient-0015"
+
+query_dual "DualPath-MultiAgent-1: Full polypharmacy safety review — vector events + graph safety network" \
+  "For a patient on Warfarin, Aspirin, Lisinopril, and Spironolactone: find medication order events in vector context, then cross-reference the graph for all drug interactions, contraindications against active conditions, lab signals that confirm risk conditions, and any documented adverse reactions." \
+  "patient-0001" \
+  '{
+    "vector_medication_events": [.vector_context[] | select(.event_type == "MEDICATION_ORDER") | {score, text_redacted}],
+    "vector_lab_events": [.vector_context[] | select(.event_type == "LAB_RESULT") | {score, text_redacted}],
+    "graph_interactions": [.graph_context[].interactions[]?],
+    "graph_contraindications": [.graph_context[].contraindications[]?],
+    "graph_lab_signals": [.graph_context[].lab_signals[]?],
+    "graph_adverse_events": [.graph_context[].adverse_events[]?],
+    "graph_medications": [.graph_context[].medications[]? | {medication, dose, order_type}],
+    "answer": .answer
+  }'
+
+query_dual "DualPath-MultiAgent-2: CNS depression multi-drug chain — opioid + gabapentinoid + SSRI" \
+  "Identify all CNS-active medications for this patient from vector pharmacy events, then use the graph to map the full interaction network: respiratory depression risk, serotonin syndrome risk, and mechanism annotations." \
+  "patient-0042" \
+  '{
+    "vector_pharmacy_events": [.vector_context[] | select(.event_type == "MEDICATION_ORDER") | {score, text_redacted}],
+    "graph_interactions": [.graph_context[].interactions[]? | select(.severity == "high")],
+    "graph_adverse_events": [.graph_context[].adverse_events[]?],
+    "graph_conditions": [.graph_context[].conditions[]?],
+    "answer": .answer
+  }'
+
+cypher "Graph-MultiAgent-1: Active high-severity interaction pairs — both drugs currently ordered" \
+  "MATCH (p:Patient)-[:HAS_MEDICATION_ORDER]->(mo1:MedicationOrder)-[:ORDERS_MEDICATION]->(m1:Medication)
+         -[i:INTERACTS_WITH]->(m2:Medication)<-[:ORDERS_MEDICATION]-(mo2:MedicationOrder)<-[:HAS_MEDICATION_ORDER]-(p)
+   WHERE i.severity = 'high'
+     AND NOT mo1.order_type IN ['discontinued', 'hold']
+     AND NOT mo2.order_type IN ['discontinued', 'hold']
+   RETURN p.id AS patient_id,
+          m1.name AS drug_a, m2.name AS drug_b,
+          i.risk AS risk, i.mechanism AS mechanism
+   ORDER BY p.id LIMIT 20"
+
+cypher "Graph-MultiAgent-2: Contraindications confirmed by lab signals" \
+  "MATCH (p:Patient)-[:HAS_CONDITION]->(c:Condition)<-[:CONTRAINDICATED_FOR]-(m:Medication)
+   WHERE EXISTS {
+     MATCH (p)-[:HAS_MEDICATION_ORDER]->(mo:MedicationOrder)-[:ORDERS_MEDICATION]->(m)
+     WHERE NOT mo.order_type IN ['discontinued', 'hold']
+   }
+   WITH p, m, c
+   OPTIONAL MATCH (p)-[:HAS_OBSERVATION]->(o:Observation)-[:MAY_INDICATE]->(c)
+   RETURN p.id AS patient_id,
+          m.name AS medication,
+          c.name AS contraindicated_condition,
+          collect(DISTINCT {lab: o.name, value: o.value, unit: o.unit})[..3] AS confirming_labs
+   ORDER BY p.id LIMIT 15"
+
+cypher "Graph-MultiAgent-3: Patients with triple risk — interaction + contraindication + adverse event" \
+  "MATCH (p:Patient)-[:HAS_MEDICATION_ORDER]->(mo:MedicationOrder)-[:ORDERS_MEDICATION]->(m:Medication)
+   WHERE NOT mo.order_type IN ['discontinued', 'hold']
+   WITH p, collect(DISTINCT m) AS active_meds
+   WHERE size(active_meds) >= 3
+   OPTIONAL MATCH (p)-[:HAS_MEDICATION_ORDER]->(:MedicationOrder)-[:ORDERS_MEDICATION]->(m1:Medication)
+                  -[i:INTERACTS_WITH {severity: 'high'}]->(m2:Medication)
+                  <-[:ORDERS_MEDICATION]-(:MedicationOrder)<-[:HAS_MEDICATION_ORDER]-(p)
+   WITH p, active_meds, collect(DISTINCT {from: m1.name, to: m2.name, risk: i.risk})[..5] AS interactions
+   WHERE size(interactions) > 0
+   OPTIONAL MATCH (p)-[:HAS_CONDITION]->(c:Condition)<-[ci:CONTRAINDICATED_FOR]-(cm:Medication)
+   WHERE cm IN active_meds
+   WITH p, interactions, collect(DISTINCT {med: cm.name, condition: c.name})[..5] AS contras
+   OPTIONAL MATCH (p)-[:REPORTED_ADVERSE_REACTION]->(ae:AdverseEvent)-[:ASSOCIATED_WITH_MEDICATION]->(am:Medication)
+   WHERE am IN active_meds
+   RETURN p.id AS patient_id,
+          size(interactions) AS interaction_count,
+          interactions[..3] AS top_interactions,
+          size(contras) AS contraindication_count,
+          contras[..3] AS top_contraindications,
+          collect(DISTINCT {symptom: ae.symptom_name, med: am.name, severity: ae.severity})[..3] AS adverse_events
+   ORDER BY interaction_count DESC, contraindication_count DESC LIMIT 10"
+
+# ══════════════════════════════════════════════════════════════════════════════
 # EXPANDED DUAL-PATH QUERIES — lifecycle and temporal noise
 # ══════════════════════════════════════════════════════════════════════════════
 

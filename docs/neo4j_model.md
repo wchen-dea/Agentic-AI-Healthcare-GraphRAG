@@ -235,7 +235,7 @@ Property enrichment examples:
 
 ## How Graph Context Is Queried
 
-domains/healthcare/rag-api/app.py `graph_context()` retrieves for selected patient IDs:
+`domains/healthcare/rag-api/domain/retrieval.py` `graph_search()` retrieves for selected patient IDs:
 
 - conditions (with onset timestamps)
 - symptoms

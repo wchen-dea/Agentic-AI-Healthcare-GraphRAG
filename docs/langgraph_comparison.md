@@ -199,13 +199,16 @@ domains/healthcare/rag-api/
 │   ├── tools.py             # LangChain tool wrappers
 │   ├── evaluation.py        # Lightweight evaluation helpers
 │   ├── mlflow_tracing.py    # MLflow span decorators and trace wrappers
-│   └── mlflow_eval.py       # MLflow evaluation harness and scorers
+│   └── mlflow_eval.py       # MLflow evaluation harness (delegates to evaluation.py)
 ├── domain/
-│   ├── react_controller.py  # Existing ReAct loop (unchanged)
-│   ├── planner.py           # Existing deterministic planner (unchanged)
-│   ├── evidence.py          # Existing evidence ranking (reused)
-│   └── models.py            # Existing types (reused)
-├── app.py                   # Router: single-pass | ReAct | LangGraph
+│   ├── retrieval.py         # Embedding, vector search, graph search (Cypher)
+│   ├── synthesis.py         # Prompt construction and LLM synthesis
+│   ├── response_policy.py   # Truncation, sanitization, budget enforcement, confidence
+│   ├── planner.py           # Request classification and retrieval planning
+│   ├── evidence.py          # Deterministic evidence ranking
+│   ├── react_controller.py  # ReAct loop orchestration
+│   └── models.py            # Shared types (RequestType, RetrievalPlan)
+├── app.py                   # Composition root: settings, clients, HTTP routes, MCP tools
 └── tests/
     ├── test_langgraph_agents.py
     └── test_mlflow_integration.py

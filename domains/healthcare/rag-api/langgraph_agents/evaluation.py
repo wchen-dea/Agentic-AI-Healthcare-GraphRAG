@@ -69,6 +69,24 @@ EVALUATION_DATASET = [
         "expected_type": "cohort_triage",
         "expected_agents": ["triage", "vector_retrieval", "graph_retrieval"],
     },
+    {
+        "question": "Review medication safety: are there dangerous interactions or contraindications for this patient given their current labs and conditions?",
+        "patient_id": "patient-0001",
+        "expected_type": "medication_safety",
+        "expected_agents": ["triage", "vector_retrieval", "graph_retrieval", "medication_safety"],
+    },
+    {
+        "question": "This patient has elevated potassium. Are any current medications contraindicated for hyperkalemia?",
+        "patient_id": "patient-0001",
+        "expected_type": "medication_safety",
+        "expected_agents": ["triage", "vector_retrieval", "graph_retrieval", "medication_safety"],
+    },
+    {
+        "question": "Provide a comprehensive safety assessment: interactions, contraindications, lab-confirmed risks, and adverse reaction history for this polypharmacy patient.",
+        "patient_id": "patient-0050",
+        "expected_type": "medication_safety",
+        "expected_agents": ["triage", "vector_retrieval", "graph_retrieval", "medication_safety"],
+    },
 ]
 
 
