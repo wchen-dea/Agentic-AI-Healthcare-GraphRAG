@@ -2,10 +2,15 @@
 
 ## Purpose
 
-This document tracks execution backlog items and staged work that remain after current implementation milestones.
+This document is the actionable execution backlog for the platform. It tracks what remains to build, prioritized by impact and informed by [industry landscape analysis](healthcare_ai_agent_landscape.md).
+
+**For executives:** Staged delivery plan with clear completion criteria and AI-trends-driven priorities.
+
+**For architects:** Capability gaps mapped to specific modules, with effort estimates and dependency chains.
+
+**For engineers:** Sprint-level work items with acceptance criteria, file touchpoints, and CI integration points.
 
 Use [target_architecture.md](target_architecture.md) for strategic architecture and capability intent.
-Use this file for delivery planning, prioritization, and completion tracking.
 
 ## Current Status Summary
 
@@ -44,7 +49,7 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `domains/healthcare/rag-api/tests/`
+- `domains/healthcare/agents/tests/`
 - `docs/ai_qa.md`
 - `.github/workflows/rag-api-contracts.yml`
 - `.github/workflows/ontology-conformance.yml`
@@ -59,9 +64,9 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `domains/healthcare/rag-api/llm_provider.py`
-- `domains/healthcare/rag-api/app.py`
-- `domains/healthcare/rag-api/tests/test_contracts.py`
+- `domains/healthcare/agents/llm_provider.py`
+- `domains/healthcare/agents/app.py`
+- `domains/healthcare/agents/tests/test_contracts.py`
 
 ### 3. Finish terminology and ontology governance depth
 
@@ -73,10 +78,10 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `domains/healthcare/config/ontology/`
+- `data-platform/healthcare/config/ontology/`
 - `scripts/generate_ontology_seed_cypher.py`
 - `scripts/validate_ontology.py`
-- `domains/healthcare/neo4j/generated_ontology_seeds.cypher`
+- `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`
 
 ### 4. Production controls for non-demo readiness (Stage 5)
 
@@ -151,19 +156,19 @@ CI checks: New workflow job `grounding-scorecard`; uploads JSON/Markdown report 
 - [ ] 3. ReAct loop hardening (phase 2)
 Scope: Extend loop stop criteria, fallback behavior, and loop metadata tests.
 Acceptance criteria: ReAct tests cover confidence stop, max-iteration stop, no-progress stop, and fallback path; no regression in planner suites.
-CI checks: `python3 domains/healthcare/rag-api/tests/test_react_controller.py`; `python3 domains/healthcare/rag-api/tests/test_planner_evaluation.py`; `python3 domains/healthcare/rag-api/tests/test_planner_edge_cases.py`; aggregated via `domains/healthcare/scripts/test_react_planner.sh`.
+CI checks: `python3 domains/healthcare/agents/tests/test_react_controller.py`; `python3 domains/healthcare/agents/tests/test_planner_evaluation.py`; `python3 domains/healthcare/agents/tests/test_planner_edge_cases.py`; aggregated via `domains/healthcare/scripts/test_react_planner.sh`.
 
 - [ ] 4. Evidence fusion reranking
 Scope: Add deterministic cross-source reranking using relevance + recency + graph signal weight.
 Acceptance criteria: Ranking function documented and unit tested; top-k ordering deterministic across repeated runs; route quality improves on fixture set.
-CI checks: New unit suite in `domains/healthcare/rag-api/tests/` and benchmark delta assertion in `retrieval-benchmark` job.
+CI checks: New unit suite in `domains/healthcare/agents/tests/` and benchmark delta assertion in `retrieval-benchmark` job.
 
 ### Sprint 2: Runtime Resilience and Governance Promotion
 
 - [ ] 5. Multi-provider runtime + failover
 Scope: Add second provider adapter and deterministic failover policy.
 Acceptance criteria: Adapter switch by env works; timeout/5xx failover tested; retrieval orchestration unchanged.
-CI checks: Extend `domains/healthcare/rag-api/tests/test_contracts.py` with provider/failover cases; add matrix job in `.github/workflows/rag-api-contracts.yml`.
+CI checks: Extend `domains/healthcare/agents/tests/test_contracts.py` with provider/failover cases; add matrix job in `.github/workflows/rag-api-contracts.yml`.
 
 - [ ] 6. Ontology governance depth
 Scope: Increase vocabulary mapping coverage and drift checks.
@@ -173,7 +178,7 @@ CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python 
 - [ ] 7. Policy-as-code and PHI boundaries
 Scope: Encode policy classes, redaction rules, and retention constraints as testable rules.
 Acceptance criteria: Policy fixtures cover allowed/denied tool calls and redaction classes; export guardrails validated for all roles.
-CI checks: Add policy regression suite in `domains/healthcare/rag-api/tests/`; run as required check in `rag-api-contracts.yml`.
+CI checks: Add policy regression suite in `domains/healthcare/agents/tests/`; run as required check in `rag-api-contracts.yml`.
 
 - [ ] 8. Progressive delivery SLO gates
 Scope: Define promotion gates for latency, error rate, and grounding score.

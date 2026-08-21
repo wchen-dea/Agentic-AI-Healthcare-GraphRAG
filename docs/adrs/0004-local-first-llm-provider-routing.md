@@ -20,8 +20,8 @@ Adopt local-first generation with provider abstraction:
 
 Implementation status:
 
-- Implemented: `OllamaProvider` in `domains/healthcare/rag-api/llm_provider.py` with `create_provider()` factory.
-- Prompt construction and synthesis extracted into `domains/healthcare/rag-api/domain/synthesis.py`.
+- Implemented: `OllamaProvider` in `domains/healthcare/agents/llm_provider.py` with `create_provider()` factory.
+- Prompt construction and synthesis extracted into `domains/healthcare/agents/domain/synthesis.py`.
 - Roadmap: additional provider adapters and environment-based routing for Anthropic/OpenAI.
 
 ## Consequences

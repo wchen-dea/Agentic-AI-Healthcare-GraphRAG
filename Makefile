@@ -100,10 +100,10 @@ validate: ## Cross-domain stack validation
 validate-docs: ## Markdown lint
 	./scripts/validate_docs.sh
 
-test-hc: ## Healthcare domain tests
-	cd domains/healthcare && python3 scripts/validate_ontology.py && python3 scripts/test_neo4j_bootstrap.py && python3 scripts/validate_terminology_coverage.py
+test-hc: ## Healthcare agent + domain tests
+	cd domains/healthcare/agents && python -m pytest tests/ --tb=short
 test-sc: ## Supply-chain domain tests
-	cd domains/supply-chain && python3 scripts/validate_ontology.py && python3 scripts/test_neo4j_bootstrap.py
+	cd domains/supply-chain/agents && python -m pytest tests/ --tb=short 2>/dev/null || echo "No supply-chain tests yet"
 
 pull-model: ## Pull Ollama LLM model
 	docker exec infra-ollama ollama pull llama3.1

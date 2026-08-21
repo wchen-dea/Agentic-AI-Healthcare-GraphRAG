@@ -21,14 +21,14 @@ Embed FastMCP in the same rag-api process and expose MCP at `/mcp`.
 
 - RAG REST remains at `/query`.
 - Human diagnostic endpoint remains at `/mcp/health`.
-- `domains/healthcare/mcp-server/` remains as a standalone reference scaffold, not default runtime.
+- The standalone mcp-server scaffold has been removed; embedded MCP is the only runtime.
 
 Implementation:
 
 - Embedded MCP tools run in the same process as REST query orchestration.
 - Ten MCP tools are exposed: `patient_context_get`, `vector_evidence_search`, `graphrag_answer_generate`, `risk_summary_generate`, `evidence_bundle_export`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`, `skills_plan_get`.
 - Skills planning is available through both REST (`POST /skills/plan`) and MCP (`skills_plan_get`).
-- Tool policy gating is centralized in `domains/healthcare/rag-api/config/tool_policies.json`.
+- Tool policy gating is centralized in `domains/healthcare/agents/config/tool_policies.json`.
 
 ## Consequences
 
@@ -52,7 +52,7 @@ Trade-offs:
 
 - Verify MCP health: `curl -s http://localhost:8000/mcp/health | jq .`
 - Run MCP handshake smoke test: `python3 ./domains/healthcare/scripts/mcp_smoke_test.py`
-- Contract tests in `domains/healthcare/rag-api/tests/test_contracts.py` validate MCP tool shapes.
+- Contract tests in `domains/healthcare/agents/tests/test_contracts.py` validate MCP tool shapes.
 
 ## Related
 

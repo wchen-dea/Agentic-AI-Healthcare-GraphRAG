@@ -26,8 +26,8 @@ The architecture needs one authoritative format and validation policy that is en
 
 Adopt a standardized Skills layer with generator-plus-validator enforcement.
 
-1. Canonical source of truth for planning remains `domains/healthcare/rag-api/config/skills_layer.json`.
-2. Runtime resolution remains in `domains/healthcare/rag-api/skills_layer.py` and is exposed by:
+1. Canonical source of truth for planning remains `domains/healthcare/agents/config/skills_layer.json`.
+2. Runtime resolution remains in `domains/healthcare/agents/skills_layer.py` and is exposed by:
    - `POST /skills/plan`
    - `skills_plan_get`
 3. Generated skill package artifacts under `domains/healthcare/skills/` are maintained by `scripts/generate_agent_skills.py`.
@@ -64,12 +64,12 @@ Trade-offs:
 
 ## Rollout and Verification
 
-1. Maintain planner source in `domains/healthcare/rag-api/config/skills_layer.json`.
+1. Maintain planner source in `domains/healthcare/agents/config/skills_layer.json`.
 2. Generate artifacts with `python scripts/generate_agent_skills.py`.
 3. Validate artifacts with `python scripts/validate_agent_skills.py`.
 4. Enforce generator `--check` plus validator in CI.
 5. Run optional upstream `skills-ref validate` with best-effort install and graceful skip.
-6. Verify contract behavior through `domains/healthcare/rag-api/tests/test_contracts.py` coverage for skills plan resolution.
+6. Verify contract behavior through `domains/healthcare/agents/tests/test_contracts.py` coverage for skills plan resolution.
 
 ## Related
 

@@ -1,5 +1,7 @@
 # Technical Specifications
 
+This document is the authoritative reference for container topology, library versions, API contracts, environment configuration, and observability endpoints. Use it as the source of truth for deployment and integration decisions.
+
 ## 1. Container Inventory
 
 All services are defined in `container/docker-compose.infra.yml` and `container/docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
@@ -19,11 +21,11 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
 | `healthcare-neodash` | neo4jlabs/neodash | latest | 5005 | Neo4j dashboard UI |
 | `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
-| `healthcare-flink-jobmanager` | custom (domains/healthcare/flink-app/Dockerfile) | — | 8082 | Flink JobManager |
-| `healthcare-flink-taskmanager` | custom (domains/healthcare/flink-app/Dockerfile) | — | — | Flink TaskManager |
-| `healthcare-flink-app` | custom (domains/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
-| `healthcare-producer` | custom (domains/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
-| `healthcare-rag-api` | custom (domains/healthcare/rag-api/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
+| `healthcare-flink-jobmanager` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | 8082 | Flink JobManager |
+| `healthcare-flink-taskmanager` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | — | Flink TaskManager |
+| `healthcare-flink-app` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
+| `healthcare-producer` | custom (data-platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
+| `healthcare-rag-api` | custom (domains/healthcare/agents/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
 | `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (Nginx) |
 | `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
 | `infra-blackbox-exporter` | prom/blackbox-exporter | latest | 9115 | HTTP probe exporter |
@@ -41,14 +43,14 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `supplychain-neo4j-init` | neo4j | 5.26.2 | — | One-shot supply chain Cypher seed |
 | `supplychain-qdrant` | qdrant/qdrant | latest | 6335 (HTTP), 6336 (gRPC) | Supply chain vector store |
 | `supplychain-kafka-init` | confluentinc/cp-kafka | 7.9.0 | — | One-shot supply chain topic creation |
-| `supplychain-producer` | custom (domains/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
+| `supplychain-producer` | custom (data-platform/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
 | `localstack` | localstack/localstack | 3.8.0 | 4566, 4510–4559 | Local AWS-compatible services |
 
 ---
 
 ## 2. Library Versions
 
-### rag-api (`domains/healthcare/rag-api/requirements.txt`)
+### agents (`domains/healthcare/agents/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -69,7 +71,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 > **Note:** `pydantic` is pinned with a range (`>=2.11.7,<3.0.0`) rather than an exact version because `mcp==1.28.0` requires `pydantic>=2.12.0` on Python 3.14. The range allows pip to resolve on Python 3.11 (CI/Docker target) and 3.14+ without conflict.
 
-### flink-app (`domains/healthcare/flink-app/requirements.txt`)
+### flink-app (`data-platform/healthcare/flink-app/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -80,7 +82,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | qdrant-client | 1.11.3 | Qdrant upsert client |
 | requests | 2.32.3 | HTTP utilities |
 
-### producer (`domains/healthcare/producer/requirements.txt`)
+### producer (`data-platform/healthcare/producer/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -98,7 +100,6 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | flink-app (healthcare) | 3.11 (via Flink image) | custom Flink Dockerfile |
 | flink-processor (supply-chain) | 3.11 | python:3.11-slim |
 | producer (both domains) | 3.11 | python:3.11-slim |
-| mcp-server (standalone) | 3.11 | python:3.11-slim |
 | CI test runner | 3.11 | ubuntu-latest + setup-python@v5 |
 | Local dev (uv) | 3.11 | `.python-version` + `pyproject.toml` |
 
@@ -162,7 +163,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 ## 4. Avro Envelope Schema
 
-**File:** `domains/healthcare/schemas/medical_event.avsc`  
+**File:** `data-platform/healthcare/schemas/medical_event.avsc`  
 **Namespace:** `com.healthcare.graphrag`  
 **Record name:** `MedicalEvent`  
 **Schema version:** `1.0.0`
@@ -256,7 +257,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | HTTP port | 7474 |
 | Bolt port | 7687 |
 | Auth | `neo4j / ${NEO4J_PASSWORD:-healthcare123}` |
-| Init script | `domains/healthcare/neo4j/init.cypher` (mounted at startup) |
+| Init script | `data-platform/healthcare/neo4j/init.cypher` (mounted at startup) |
 
 ### Node labels (19)
 
@@ -307,7 +308,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `MANAGED_BY` | Patient → Provider | — |
 | `COVERED_BY` | Patient → Payer | — |
 
-### Seed data (from `domains/healthcare/neo4j/init.cypher`)
+### Seed data (from `data-platform/healthcare/neo4j/init.cypher`)
 
 | Category | Count |
 |----------|-------|
@@ -353,7 +354,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `coding_gap_detect` | `generation` | run_query() + ICD-10 gap analysis |
 | `cohort_risk_summary` | `generation` | run_query() + cross-patient aggregation |
 
-### Role-based access policy (`domains/healthcare/rag-api/config/tool_policies.json`)
+### Role-based access policy (`domains/healthcare/agents/config/tool_policies.json`)
 
 | Role | Permitted tools |
 |------|----------------|
@@ -483,13 +484,13 @@ When `MLFLOW_TRACKING_URI` is set, MLflow traces every query pipeline as a neste
 ## 11. CI / CD Pipeline
 
 **File:** `.github/workflows/rag-api-contracts.yml`  
-**Trigger:** push or PR to `dev` branch touching `domains/healthcare/rag-api/**`, `domains/healthcare/skills/**`, skill-generation scripts, or the workflow file itself
+**Trigger:** push or PR to `dev` branch touching `domains/healthcare/agents/**`, `domains/healthcare/skills/**`, skill-generation scripts, or the workflow file itself
 
 | Job | Runner | Steps |
 |-----|--------|-------|
 | `skills-layer-validation` | ubuntu-latest | Checkout → Python 3.11 → `python scripts/generate_agent_skills.py --check` → `python scripts/validate_agent_skills.py` → optional `skills-ref validate` pass (best-effort install, skip on unavailable binary) |
-| `contract-tests` | ubuntu-latest | Checkout → Python 3.11 + pip cache → install `domains/healthcare/rag-api/requirements.txt` → `python domains/healthcare/rag-api/tests/test_contracts.py` (10 tests, ~1-3 s) → `python domains/healthcare/rag-api/tests/test_planner_evaluation.py` (fixture-driven route/plan assertions) |
-| `container-build` | ubuntu-latest | Checkout → `docker build -f domains/healthcare/rag-api/Dockerfile` |
+| `contract-tests` | ubuntu-latest | Checkout → Python 3.11 + pip cache → install `domains/healthcare/agents/requirements.txt` → `python domains/healthcare/agents/tests/test_contracts.py` (10 tests, ~1-3 s) → `python domains/healthcare/agents/tests/test_planner_evaluation.py` (fixture-driven route/plan assertions) |
+| `container-build` | ubuntu-latest | Checkout → `docker build -f domains/healthcare/agents/Dockerfile` |
 
 Both jobs run in parallel. Neither requires live external services (all dependencies mocked in contract tests).
 

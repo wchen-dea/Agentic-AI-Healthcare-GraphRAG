@@ -32,34 +32,34 @@ Out of scope (initial version):
 
 Primary implementation and integration touchpoints:
 
-- `domains/healthcare/rag-api/app.py`
+- `domains/healthcare/agents/app.py`
   - request handling and `POST /query`
   - composition root: settings, clients, audit logging, tool metrics
-- `domains/healthcare/rag-api/domain/retrieval.py`
+- `domains/healthcare/agents/domain/retrieval.py`
   - embedding, vector search, graph search (Cypher query)
-- `domains/healthcare/rag-api/domain/synthesis.py`
+- `domains/healthcare/agents/domain/synthesis.py`
   - prompt construction and LLM synthesis
-- `domains/healthcare/rag-api/domain/response_policy.py`
+- `domains/healthcare/agents/domain/response_policy.py`
   - truncation, sanitization, budget enforcement, confidence estimation
-- `domains/healthcare/rag-api/domain/planner.py`
+- `domains/healthcare/agents/domain/planner.py`
   - request classification and retrieval plan selection
-- `domains/healthcare/rag-api/domain/evidence.py`
+- `domains/healthcare/agents/domain/evidence.py`
   - deterministic ranking for vector and graph contexts
-- `domains/healthcare/rag-api/skills_layer.py`
+- `domains/healthcare/agents/skills_layer.py`
   - business goal to skill/tool resolution
-- `domains/healthcare/rag-api/config/tool_policies.json`
+- `domains/healthcare/agents/config/tool_policies.json`
   - role to tool authorization policy
-- `domains/healthcare/rag-api/tests/test_contracts.py`
+- `domains/healthcare/agents/tests/test_contracts.py`
   - API and tool contract, guardrail, and policy tests
-- `domains/healthcare/rag-api/tests/test_planner_evaluation.py`
+- `domains/healthcare/agents/tests/test_planner_evaluation.py`
   - planner fixture-driven route/plan assertions
-- `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
+- `domains/healthcare/agents/tests/test_planner_edge_cases.py`
   - deterministic planner/ranking edge assertions
 
 Implemented files:
 
-- `domains/healthcare/rag-api/domain/react_controller.py` — ReAct loop state and execution logic
-- `domains/healthcare/rag-api/tests/test_react_controller.py` — deterministic loop tests
+- `domains/healthcare/agents/domain/react_controller.py` — ReAct loop state and execution logic
+- `domains/healthcare/agents/tests/test_react_controller.py` — deterministic loop tests
 
 Not yet implemented from this spec:
 
@@ -74,7 +74,7 @@ The LangGraph multi-agent mode (ADR-0007) provides the richer specialist routing
 
 ## Runtime Configuration
 
-Environment settings in `domains/healthcare/rag-api/app.py` `Settings`:
+Environment settings in `domains/healthcare/agents/app.py` `Settings`:
 
 - `RAG_API_REACT_ENABLED` (default: `false`)
 - `RAG_API_REACT_MAX_ITERS` (default: `3`, min: `1`, max: `6`)
@@ -166,7 +166,7 @@ Initial action set should reuse existing runtime call paths:
 - `graphrag_answer_generate` -> calls synthesis over accumulated evidence
 - `skills_plan_get` (optional for business-goal routed flows)
 
-Role policy source of truth remains `domains/healthcare/rag-api/config/tool_policies.json`.
+Role policy source of truth remains `domains/healthcare/agents/config/tool_policies.json`.
 
 If an action is not allowed for role:
 
@@ -294,7 +294,7 @@ Privacy rule: do not return internal `thought` text by default.
 
 ## Metrics and Audit Additions
 
-Add optional metrics labels/counters in `domains/healthcare/rag-api/app.py`:
+Add optional metrics labels/counters in `domains/healthcare/agents/app.py`:
 
 - `rag_api_react_iterations` (histogram)
 - `rag_api_react_stop_total{reason=...}` (counter)
@@ -309,7 +309,7 @@ Audit event additions:
 
 ## Test Plan Mapped to Current Suite
 
-### 1. Unit tests: new `domains/healthcare/rag-api/tests/test_react_controller.py`
+### 1. Unit tests: new `domains/healthcare/agents/tests/test_react_controller.py`
 
 Core deterministic tests:
 
@@ -331,7 +331,7 @@ Core deterministic tests:
 6. `test_response_remains_within_budget_after_loop`
 - Verifies byte budget and truncation metadata.
 
-### 2. Contract tests: extend `domains/healthcare/rag-api/tests/test_contracts.py`
+### 2. Contract tests: extend `domains/healthcare/agents/tests/test_contracts.py`
 
 Add focused tests:
 
@@ -340,14 +340,14 @@ Add focused tests:
 3. `test_query_react_respects_role_policy`
 4. `test_query_react_guardrails_match_existing_defaults`
 
-### 3. Planner tests: optional extension in `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
+### 3. Planner tests: optional extension in `domains/healthcare/agents/tests/test_planner_edge_cases.py`
 
 Add action-selection edge assertions:
 
 1. `test_react_choose_action_prefers_missing_channel`
 2. `test_react_choose_action_for_medication_safety_prefers_graph_when_interactions_missing`
 
-### 4. Fixtures: new `domains/healthcare/rag-api/tests/fixtures/react_cases.json`
+### 4. Fixtures: new `domains/healthcare/agents/tests/fixtures/react_cases.json`
 
 Fixture fields:
 

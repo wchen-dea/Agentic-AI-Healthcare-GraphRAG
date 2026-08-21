@@ -38,7 +38,7 @@ The model prioritizes traceability, simple traversal patterns, and deterministic
 
 ## Constraints And Seed Data
 
-Initialization in domains/healthcare/neo4j/init.cypher creates uniqueness constraints for:
+Initialization in data-platform/healthcare/neo4j/init.cypher creates uniqueness constraints for:
 
 - Patient.id
 - Encounter.id
@@ -236,7 +236,7 @@ Property enrichment examples:
 
 ## How Graph Context Is Queried
 
-`domains/healthcare/rag-api/domain/retrieval.py` `graph_search()` retrieves for selected patient IDs:
+`domains/healthcare/agents/domain/retrieval.py` `graph_search()` retrieves for selected patient IDs:
 
 - conditions (with onset timestamps)
 - symptoms
@@ -381,4 +381,4 @@ The supply-chain domain uses a separate Neo4j instance (`supplychain-neo4j` on p
 | HAS_RISK_SIGNAL | Supplier/Part | RiskSignal | detected_ts |
 | HOLDS_INVENTORY | Facility | Part | on_hand_qty, below_reorder, days_of_supply |
 
-Constraints and seeds: `domains/supply-chain/neo4j/init.cypher` and `domains/supply-chain/neo4j/generated_ontology_seeds.cypher`.
+Constraints and seeds: `data-platform/supply-chain/neo4j/init.cypher` and `data-platform/supply-chain/neo4j/generated_ontology_seeds.cypher`.

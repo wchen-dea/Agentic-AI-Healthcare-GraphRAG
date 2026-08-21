@@ -2,17 +2,15 @@
 
 ## Purpose
 
-This document translates the current Healthcare GraphRAG demo architecture into a concrete reference architecture for a governed, ontology-aware, agentic healthcare intelligence platform.
+This document defines the strategic target for the healthcare intelligence platform — bridging the gap between the current implementation and a fully governed, production-grade agentic system.
 
-It focuses on three improvements:
+**For executives:** This is the capability roadmap showing where investment closes the gap to enterprise-grade healthcare AI.
 
-- explicit healthcare ontology and terminology control,
-- skill-based retrieval and reasoning orchestration,
-- staged implementation that fits the current repository structure.
+**For architects:** This is the reference architecture with implementation status, capability map, and measurable gaps.
 
-Initial ontology files now live under `domains/healthcare/config/ontology/`, and current implementation status is documented in [technical_specs.md](technical_specs.md), [runbook.md](runbook.md), [skills_layer.md](skills_layer.md), and [future_improvements.md](future_improvements.md).
+**For engineers:** This is the delivery backlog with acceptance criteria, file touchpoints, and staged execution order.
 
-This document separates implemented capabilities from the staged roadmap for the repository.
+Current ontology files live under `data-platform/healthcare/config/ontology/`. Implementation status details are in [technical_specs.md](technical_specs.md), [runbook.md](runbook.md), [skills_layer.md](skills_layer.md), and [future_improvements.md](future_improvements.md).
 
 ## Target Outcome
 
@@ -30,7 +28,7 @@ Desired characteristics:
 
 Implemented in the current repository:
 
-- ontology-driven ingestion modules exist in `domains/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
+- ontology-driven ingestion modules exist in `data-platform/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
 - dual persistence remains active across Qdrant and Neo4j,
 - `rag-api` query flow now includes request classification, retrieval planning, and deterministic evidence ranking,
 - LLM calls are routed through a provider adapter abstraction (`llm_provider.py`, default `ollama`),
@@ -175,7 +173,7 @@ flowchart LR
 
 ## Ontology Model
 
-The ontology layer is implemented under `domains/healthcare/config/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
+The ontology layer is implemented under `data-platform/healthcare/config/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
 
 ### Implemented ontology packages
 
@@ -191,7 +189,7 @@ The ontology layer is implemented under `domains/healthcare/config/ontology/` an
 ### Repository shape
 
 ```text
-domains/healthcare/config/ontology/
+data-platform/healthcare/config/ontology/
   entities.yaml
   relationships.yaml
   vocabularies.yaml
@@ -261,18 +259,18 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 
 | Capability area | Current state in repo | Target state | Primary repo touchpoints |
 | --- | --- | --- | --- |
-| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `domains/healthcare/schemas/medical_event.avsc`, `docs/kafka_schema.md`, `domains/healthcare/producer/produce_events.py` |
-| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `domains/healthcare/flink-app/healthcare_graph_rag_job.py`, `domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `domains/healthcare/flink-app/app/` |
-| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `domains/healthcare/config/ontology/vocabularies.yaml` and mapping files |
+| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `data-platform/healthcare/schemas/medical_event.avsc`, `docs/kafka_schema.md`, `data-platform/healthcare/producer/produce_events.py` |
+| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `data-platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `data-platform/healthcare/flink-app/app/` |
+| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `data-platform/healthcare/config/ontology/vocabularies.yaml` and mapping files |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
-| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/neo4j_model.md`, `domains/healthcare/neo4j/init.cypher`, Flink graph writes |
-| Vector retrieval | stable embedding (MiniLM-L6-v2) with deterministic top-k similarity via `domain/retrieval.py` | neural reranking, richer filters, optional cross-encoder | `domains/healthcare/rag-api/domain/retrieval.py`, `domains/healthcare/flink-app/app/text_processing.py` |
-| Query orchestration | request classification, retrieval plan selection, and evidence ranking are implemented with deterministic planner logic; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning and ranking | `domains/healthcare/rag-api/app.py`, `domains/healthcare/rag-api/domain/`, `domains/healthcare/rag-api/langgraph_agents/` |
-| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `domains/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/rag-api/langgraph_agents/agents.py` |
-| Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/rag-api/app.py` |
-| MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/mcp_layer_design.md`, `domains/healthcare/rag-api/app.py`, `domains/healthcare/rag-api/config/tool_policies.json` |
-| Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/rag-api/app.py`, `domains/healthcare/rag-api/config/tool_policies.json` |
-| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/rag-api/tests/`, `scripts/validate_ontology.py`, `docs/ai_qa.md` |
+| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/neo4j_model.md`, `data-platform/healthcare/neo4j/init.cypher`, Flink graph writes |
+| Vector retrieval | stable embedding (MiniLM-L6-v2) with deterministic top-k similarity via `domain/retrieval.py` | neural reranking, richer filters, optional cross-encoder | `domains/healthcare/agents/domain/retrieval.py`, `data-platform/healthcare/flink-app/app/text_processing.py` |
+| Query orchestration | request classification, retrieval plan selection, and evidence ranking are implemented with deterministic planner logic; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning and ranking | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/domain/`, `domains/healthcare/agents/langgraph_agents/` |
+| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/agents/langgraph_agents/agents.py` |
+| Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agents/app.py` |
+| MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/mcp_layer_design.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
+| Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
+| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `scripts/validate_ontology.py`, `docs/ai_qa.md` |
 
 ## Execution Backlog
 

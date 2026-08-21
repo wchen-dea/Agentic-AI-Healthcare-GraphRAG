@@ -23,9 +23,9 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: /bin/sh /bootstrap.sh
     volumes:
-      - ../domains/supply-chain/neo4j/init.cypher:/init.cypher
-      - ../domains/supply-chain/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
-      - ../domains/supply-chain/neo4j/bootstrap.sh:/bootstrap.sh
+      - ../data-platform/supply-chain/neo4j/init.cypher:/init.cypher
+      - ../data-platform/supply-chain/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
+      - ../data-platform/supply-chain/neo4j/bootstrap.sh:/bootstrap.sh
 
   qdrant-sc:
     image: qdrant/qdrant:latest
@@ -58,7 +58,7 @@ services:
   sc-producer:
     build:
       context: ..
-      dockerfile: domains/supply-chain/producer/Dockerfile
+      dockerfile: data-platform/supply-chain/producer/Dockerfile
     container_name: supplychain-producer
     depends_on:
       sc-kafka-init:
@@ -70,7 +70,7 @@ services:
       TRANSACTION_EVENTS_PER_INTERVAL: "3"
       REFERENCE_EVENTS_PER_INTERVAL: "2"
     volumes:
-      - ../domains/supply-chain/schemas:/app/schemas
+      - ../data-platform/supply-chain/schemas:/app/schemas
 
   sc-webapp:
     build:
@@ -85,7 +85,7 @@ services:
   sc-rag-api:
     build:
       context: ..
-      dockerfile: domains/supply-chain/rag-api/Dockerfile
+      dockerfile: domains/supply-chain/agents/Dockerfile
     container_name: supplychain-rag-api
     depends_on:
       - qdrant-sc
@@ -105,7 +105,7 @@ services:
   sc-flink-processor:
     build:
       context: ..
-      dockerfile: domains/supply-chain/flink-app/Dockerfile
+      dockerfile: data-platform/supply-chain/flink-app/Dockerfile
     container_name: supplychain-flink-processor
     depends_on:
       sc-kafka-init:

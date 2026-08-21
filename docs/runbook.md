@@ -177,7 +177,7 @@ make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps
 
 Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer, localstack.
 
-Note: MCP is embedded in rag-api in the current architecture, so no separate mcp-server container is expected.
+Note: MCP is embedded in the agents service in the current architecture; MCP is embedded in the agents process.
 
 Producer startup is intentionally blocked until `schema-registry` is healthy and `kafka-init` completes successfully.
 

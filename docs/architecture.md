@@ -2,9 +2,23 @@
 
 ## Purpose
 
-This repository demonstrates a local-first healthcare event intelligence stack that combines streaming ingestion, dual persistence (vector + graph), and grounded LLM answer generation.
+This document defines the technical architecture for a production-grade multi-agent healthcare intelligence platform. The system combines:
 
-It is optimized for reproducible local experimentation with clear lineage and full observability.
+- **Streaming data platform** — Kafka + PyFlink for real-time event enrichment with Avro schema governance
+- **Dual evidence stores** — Qdrant (semantic retrieval) + Neo4j (relationship reasoning) as complementary evidence channels
+- **Multi-agent orchestration** — LangGraph StateGraph with specialist agents for domain-specific reasoning
+- **Agent harness** — retry, guardrails, prompt injection detection, confidence gating, and MLflow observability
+- **Grounded generation** — deterministic evidence assembly before probabilistic LLM synthesis
+
+The architecture is optimized for reproducible local experimentation with clear lineage, full observability, and a path to production deployment.
+
+## Architectural Principles
+
+1. **Evidence before generation** — deterministic retrieval, ranking, and safety checks complete before any LLM call
+2. **Separation of data platform and AI** — `data-platform/` owns ingestion and stores; `domains/` owns reasoning and delivery
+3. **Domain-specific agents share infrastructure** — harness, response policy, MLflow tracing, and MCP protocol are reusable across domains
+4. **Feature-flagged orchestration modes** — single-pass, ReAct, and LangGraph coexist without code duplication
+5. **Observable by default** — every query produces Prometheus metrics, audit records, and optional MLflow traces
 
 ## ADR References
 
@@ -50,7 +64,7 @@ The platform supports parallel domain deployments sharing infrastructure (Kafka 
 
 | Domain | Directory | Neo4j Port | Qdrant Port | Topic Prefix |
 | --- | --- | --- | --- | --- |
-| Healthcare Provider | root (`domains/healthcare/producer/`, `domains/healthcare/flink-app/`, `domains/healthcare/rag-api/`) | 7474/7687 | 6333 | `healthcare.*` |
+| Healthcare Provider | root (`data-platform/healthcare/producer/`, `data-platform/healthcare/flink-app/`, `domains/healthcare/agents/`) | 7474/7687 | 6333 | `healthcare.*` |
 | Supply Chain Resilience | `domains/supply-chain/` | 7475/7688 | 6335 | `supplychain.*` |
 
 Each domain brings its own: Avro envelope schema, ontology YAML (entities, seeds, rules), graph write functions, producer event generators, and RAG API planner/classifier. The streaming pipeline, embedding infrastructure, and observability stack are reused.
@@ -97,7 +111,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 | Event-Driven Pipeline | producer -> Kafka -> PyFlink -> Qdrant/Neo4j | Decouples producers from downstream processing and supports replay/backfill | Implemented |
 | Dual Materialized Views | Qdrant (semantic view) + Neo4j (relationship view) | Keeps retrieval optimized for both similarity search and graph reasoning | Implemented |
 | Shared-Core, Multi-Interface (Hexagonal-style boundary) | One query core reused by REST and embedded MCP tools | Avoids duplicated business logic across API surfaces | Implemented |
-| Policy Enforcement Point | Role/tool authorization and response guardrails in rag-api | Centralizes access control and output safety rules | Implemented |
+| Policy Enforcement Point | Role/tool authorization and response guardrails in the agents service | Centralizes access control and output safety rules | Implemented |
 | Contract-First Tooling | MCP tool request/response schemas and contract tests | Keeps tool semantics stable while internals change | Implemented |
 | Bounded Context Window | Max question/context/evidence/answer and response-byte budgets | Prevents unbounded prompt/output growth and latency spikes | Implemented |
 | Observability by Design | Prometheus metrics + Grafana latency dashboards + health probes | Makes latency and failure modes visible during iteration | Implemented |
@@ -107,16 +121,16 @@ This architecture intentionally combines several patterns so streaming ingestion
 
 ### Pattern Mapping to Repository Components
 
-- Event-Driven Pipeline: [domains/healthcare/producer/produce_events.py](../domains/healthcare/producer/produce_events.py), [domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [container/docker-compose.infra.yml](../container/docker-compose.infra.yml)
-- Dual Materialized Views: [domains/healthcare/flink-app/healthcare_graph_rag_job.py](../domains/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/neo4j_model.md](neo4j_model.md)
-- Shared-Core, Multi-Interface: [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`run_query`, REST `/query`, MCP tools)
-- Policy Enforcement Point: [domains/healthcare/rag-api/domain/response_policy.py](../domains/healthcare/rag-api/domain/response_policy.py) (sanitization, truncation, budget), [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`_authorize`, `_execute_with_audit`)
-- Contract-First Tooling: [domains/healthcare/rag-api/tests/test_contracts.py](../domains/healthcare/rag-api/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
-- Bounded Context Window: [domains/healthcare/rag-api/domain/response_policy.py](../domains/healthcare/rag-api/domain/response_policy.py) (`apply_response_budget`, `truncate_text`)
+- Event-Driven Pipeline: [data-platform/healthcare/producer/produce_events.py](../data-platform/healthcare/producer/produce_events.py), [data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [container/docker-compose.infra.yml](../container/docker-compose.infra.yml)
+- Dual Materialized Views: [data-platform/healthcare/flink-app/healthcare_graph_rag_job.py](../data-platform/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/neo4j_model.md](neo4j_model.md)
+- Shared-Core, Multi-Interface: [domains/healthcare/agents/app.py](../domains/healthcare/agents/app.py) (`run_query`, REST `/query`, MCP tools)
+- Policy Enforcement Point: [domains/healthcare/agents/domain/response_policy.py](../domains/healthcare/agents/domain/response_policy.py) (sanitization, truncation, budget), [domains/healthcare/agents/app.py](../domains/healthcare/agents/app.py) (`_authorize`, `_execute_with_audit`)
+- Contract-First Tooling: [domains/healthcare/agents/tests/test_contracts.py](../domains/healthcare/agents/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
+- Bounded Context Window: [domains/healthcare/agents/domain/response_policy.py](../domains/healthcare/agents/domain/response_policy.py) (`apply_response_budget`, `truncate_text`)
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
 - Adapter Pattern (roadmap): [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md)
-- Multi-Agent Orchestration: [domains/healthcare/rag-api/langgraph_agents/](../domains/healthcare/rag-api/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
-- MLflow Tracing: [domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py](../domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py), [domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py](../domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py)
+- Multi-Agent Orchestration: [domains/healthcare/agents/langgraph_agents/](../domains/healthcare/agents/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
+- MLflow Tracing: [domains/healthcare/agents/langgraph_agents/mlflow_tracing.py](../domains/healthcare/agents/langgraph_agents/mlflow_tracing.py), [domains/healthcare/agents/langgraph_agents/mlflow_eval.py](../domains/healthcare/agents/langgraph_agents/mlflow_eval.py)
 
 ## Modern AI Stack Frameworks and Design Patterns Summary
 
@@ -131,7 +145,7 @@ This section maps the current implementation to a modern AI application stack mo
 | API and tool protocol layer | FastAPI, MCP, tool contracts | FastAPI + embedded FastMCP + MCP tool contracts | Implemented |
 | Agent / orchestration layer | Planner, skill registry, multi-step controller | Deterministic planner + skills layer + role-aware tool policies | Implemented (baseline) |
 | LangGraph multi-agent orchestration | StateGraph with conditional routing and specialist agents | LangGraph StateGraph with triage, retrieval, specialist, and synthesis agents | Implemented (feature-flagged) |
-| ReAct-style iterative control | Reason-act-observe loop controller | Feature-flagged ReAct loop path in rag-api | Implemented (phase 1 skeleton) |
+| ReAct-style iterative control | Reason-act-observe loop controller | Feature-flagged ReAct loop path in the agents service | Implemented (phase 1 skeleton) |
 | Model provider abstraction | Adapter for local and managed providers | Ollama runtime + provider adapter structure | Implemented (single provider runtime) |
 | Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites + MLflow evaluation harness | Implemented (partial) |
 | Observability and operations | Metrics, dashboards, probes, runbooks | Prometheus + Grafana + blackbox probes + MLflow tracing + runbook | Implemented |
@@ -242,55 +256,61 @@ flowchart LR
   subgraph Infra[Shared Infrastructure]
     K[Kafka]
     SR[Schema Registry] --> K
-    L[LLM runtime]
+    L[LLM runtime - Ollama]
     PR[Prometheus]
     GF[Grafana]
+    MLF[MLflow]
     CDK[Conduktor]
   end
 
-  subgraph HC[Healthcare Domain]
-    HP[HC Producer] --> K
-    K --> HF[HC PyFlink]
-    HF --> HOL[Ontology loader]
-    HOL --> HNM[Normalization and rules]
-    HNM --> HQ[HC Qdrant]
-    HNM --> HN[HC Neo4j]
-    HRAG[HC rag-api] --> HQ
-    HRAG --> HN
+  subgraph DP[data-platform/]
+    subgraph DPHC[healthcare]
+      HP[Producer] --> K
+      K --> HF[PyFlink]
+      HF --> HOL[Ontology + Rules]
+      HOL --> HQ[Qdrant]
+      HOL --> HN[Neo4j]
+    end
+    subgraph DPSC[supply-chain]
+      SP[Producer] --> K
+      K --> SF[PyFlink]
+      SF --> SOL[Ontology + Rules]
+      SOL --> SQ[Qdrant]
+      SOL --> SN[Neo4j]
+    end
   end
 
-  subgraph SC[Supply-Chain Domain]
-    SP[SC Producer] --> K
-    K --> SF[SC PyFlink]
-    SF --> SOL[Ontology loader]
-    SOL --> SNM[Normalization and rules]
-    SNM --> SQ[SC Qdrant]
-    SNM --> SN[SC Neo4j]
-    SRAG[SC rag-api] --> SQ
-    SRAG --> SN
+  subgraph Domains[domains/ - AI Agents]
+    subgraph HCA[healthcare/agents]
+      HDOM[domain/ - retrieval, synthesis, harness]
+      HLG[langgraph_agents/ - multi-agent graph]
+      HDOM --> HLG
+    end
+    subgraph SCA[supply-chain/agents]
+      SDOM[domain/ - retrieval, synthesis, harness]
+      SLG[langgraph_agents/ - multi-agent graph]
+      SDOM --> SLG
+    end
   end
 
-  subgraph APIProc[rag-api Process per domain]
-    CORE[Shared planner and retrieval core]
-    PLAN[Request classifier and planner]
-    RANK[Evidence ranker and policy shaper]
-    LGRAPH[LangGraph multi-agent router]
-    ADAPT[LLM provider adapter]
-    CORE --> PLAN --> LGRAPH --> RANK --> ADAPT
+  subgraph UI[Application Layer]
+    HWeb[HC Web] --> HCA
+    SWeb[SC Web] --> SCA
+    MCPClient[MCP Client] --> HCA
+    MCPClient --> SCA
   end
 
-  subgraph AI[AI Application Layer]
-    UI[Provider Web] --> HRAG
-    UI2[SC Web] --> SRAG
-    MCPClient[MCP Client] --> HRAG
-    MCPClient --> SRAG
-    ADAPT --> L
-  end
+  HCA --> HQ
+  HCA --> HN
+  SCA --> SQ
+  SCA --> SN
+  HLG --> L
+  SLG --> L
 
   K -. inspect .-> CDK
-  CORE -. probe .-> PR
+  HCA -. metrics .-> PR
+  HCA -. trace .-> MLF
   PR --> GF
-  CORE -. trace .-> MLF[MLflow]
 ```
 
 ## Component Interaction Diagram
@@ -385,7 +405,7 @@ flowchart TD
 
 ### Local Development
 
-Current implementation uses Ollama in domains/healthcare/rag-api/app.py.
+Current implementation uses Ollama in domains/healthcare/agents/app.py.
 
 - Local endpoint via OLLAMA_URL.
 - Local model choice via OLLAMA_MODEL.
@@ -402,7 +422,7 @@ MCP delivery in the current implementation:
 
 ### Roadmap Extension: Anthropic/OpenAI Routing
 
-The current repository runtime includes a provider adapter in `domains/healthcare/rag-api/llm_provider.py` and uses Ollama as the default configured provider.
+The current repository runtime includes a provider adapter in `domains/healthcare/agents/llm_provider.py` and uses Ollama as the default configured provider.
 
 For production extension, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
 
@@ -440,7 +460,7 @@ Use a secret manager for API keys. Do not store credentials in files or compose 
 
 ### Producer
 
-domains/healthcare/producer/produce_events.py emits two event families:
+data-platform/healthcare/producer/produce_events.py emits two event families:
 
 - Transactional events:
   - clinical notes
@@ -477,7 +497,7 @@ There is no demo auto-submit service in the current implementation.
 
 ### Native PyFlink Job
 
-domains/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py is the active stream job:
+data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py is the active stream job:
 
 - Builds one KafkaSource per topic in ALL_TOPICS.
 - Tags each record with its topic and unions all streams.
@@ -493,7 +513,7 @@ Execution details:
 
 ### Processor Logic Reuse
 
-domains/healthcare/flink-app/healthcare_graph_rag_job.py provides:
+data-platform/healthcare/flink-app/healthcare_graph_rag_job.py provides:
 
 - stable_embedding for deterministic embeddings,
 - clinical_text rendering with optional reference-data expansion,
@@ -530,7 +550,7 @@ See [neo4j_model.md](neo4j_model.md) for the full model.
 
 ### RAG API
 
-domains/healthcare/rag-api/app.py exposes:
+domains/healthcare/agents/app.py exposes:
 
 - GET /health
 - GET /metrics
@@ -625,7 +645,7 @@ def llm_client_from_env() -> LLMClient:
   return OllamaClient(base_url=os.getenv("OLLAMA_URL", "http://ollama:11434"))
 ```
 
-Suggested integration point in [domains/healthcare/rag-api/app.py](domains/healthcare/rag-api/app.py):
+Suggested integration point in [domains/healthcare/agents/app.py](domains/healthcare/agents/app.py):
 
 - Keep query orchestration as is.
 - Replace direct generation call in ask_ollama(...) with ask_llm(...).

@@ -44,7 +44,7 @@ services:
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data
-      - ../domains/healthcare/neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
+      - ../data-platform/healthcare/neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
 
   neo4j-init:
     image: neo4j:5.26.2
@@ -54,9 +54,9 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: /bin/sh /bootstrap.sh
     volumes:
-      - ../domains/healthcare/neo4j/init.cypher:/init.cypher
-      - ../domains/healthcare/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
-      - ../domains/healthcare/neo4j/bootstrap.sh:/bootstrap.sh
+      - ../data-platform/healthcare/neo4j/init.cypher:/init.cypher
+      - ../data-platform/healthcare/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
+      - ../data-platform/healthcare/neo4j/bootstrap.sh:/bootstrap.sh
 
   neodash:
     image: neo4jlabs/neodash:latest
@@ -80,7 +80,7 @@ services:
   flink-jobmanager:
     build:
       context: ..
-      dockerfile: domains/healthcare/flink-app/Dockerfile
+      dockerfile: data-platform/healthcare/flink-app/Dockerfile
     container_name: healthcare-flink-jobmanager
     ports:
       - "8082:8081"
@@ -97,7 +97,7 @@ services:
   flink-taskmanager:
     build:
       context: ..
-      dockerfile: domains/healthcare/flink-app/Dockerfile
+      dockerfile: data-platform/healthcare/flink-app/Dockerfile
     container_name: healthcare-flink-taskmanager
     depends_on:
       - flink-jobmanager
@@ -112,7 +112,7 @@ services:
   producer:
     build:
       context: ..
-      dockerfile: domains/healthcare/producer/Dockerfile
+      dockerfile: data-platform/healthcare/producer/Dockerfile
     container_name: healthcare-producer
     depends_on:
       kafka-init:
@@ -128,7 +128,7 @@ services:
   flink-app:
     build:
       context: ..
-      dockerfile: domains/healthcare/flink-app/Dockerfile
+      dockerfile: data-platform/healthcare/flink-app/Dockerfile
     container_name: healthcare-flink-app
     depends_on:
       flink-jobmanager:
@@ -162,7 +162,7 @@ services:
   rag-api:
     build:
       context: ..
-      dockerfile: domains/healthcare/rag-api/Dockerfile
+      dockerfile: domains/healthcare/agents/Dockerfile
     container_name: healthcare-rag-api
     depends_on:
       - qdrant

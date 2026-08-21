@@ -53,10 +53,10 @@ Trade-offs:
 ## Rollout and Verification
 
 - All 97 existing tests pass without modification.
-- `python -m pytest domains/healthcare/rag-api/tests/ --tb=line` confirms no regressions.
+- `python -m pytest domains/healthcare/agents/tests/ --tb=line` confirms no regressions.
 - Docker build includes the new modules via `COPY domain ./domain` in the Dockerfile.
 
 ## Related
 
 - [ADR-0007: LangGraph multi-agent query orchestration](./0007-langgraph-multi-agent-orchestration.md)
-- [domains/healthcare/rag-api/domain/](../../domains/healthcare/rag-api/domain/)
+- [domains/healthcare/agents/domain/](../../domains/healthcare/agents/domain/)

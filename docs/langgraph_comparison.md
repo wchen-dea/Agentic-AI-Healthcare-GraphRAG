@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document compares three query orchestration modes in the healthcare GraphRAG system:
+This document provides a technical comparison of the three query orchestration modes available in the healthcare agents service. Use it to understand trade-offs for latency, reasoning depth, observability, and deployment complexity when selecting a mode for a given workload.
 
 | Aspect | Single-Pass | ReAct Controller | LangGraph Multi-Agent |
 |--------|------------|-----------------|----------------------|
@@ -190,7 +190,7 @@ State is immutable within each node; updates are returned as dicts.
 ## File Structure
 
 ```
-domains/healthcare/rag-api/
+domains/healthcare/agents/
 ├── langgraph_agents/
 │   ├── __init__.py          # Public API
 │   ├── state.py             # HealthcareAgentState TypedDict

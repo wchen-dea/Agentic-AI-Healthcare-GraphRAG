@@ -75,7 +75,7 @@ Trade-offs:
 - Set `RAG_API_LANGGRAPH_ENABLED=true` in `.env` and rebuild `rag-api`.
 - Verify with: `curl -s -X POST http://localhost:8000/query -H "Content-Type: application/json" -d '{"question":"Review medication safety for this patient","patient_id":"patient-0001"}' | jq '.langgraph'`
 - Expected: non-null `langgraph` block with `agent_trace`, `iterations`, `confidence`.
-- Run tests: `python -m pytest domains/healthcare/rag-api/tests/test_langgraph_agents.py`
+- Run tests: `python -m pytest domains/healthcare/agents/tests/test_langgraph_agents.py`
 - Polypharmacy scenario tests validate specialist agent activation and interaction chain extraction.
 
 ## Related
@@ -83,5 +83,5 @@ Trade-offs:
 - [ADR-0005: Embed FastMCP in rag-api](./0005-embed-fastmcp-in-rag-api.md)
 - [ADR-0004: Local-first LLM with provider routing](./0004-local-first-llm-provider-routing.md)
 - [docs/langgraph_comparison.md](../langgraph_comparison.md)
-- [domains/healthcare/rag-api/langgraph_agents/](../../domains/healthcare/rag-api/langgraph_agents/)
-- [domains/healthcare/rag-api/domain/](../../domains/healthcare/rag-api/domain/)
+- [domains/healthcare/agents/langgraph_agents/](../../domains/healthcare/agents/langgraph_agents/)
+- [domains/healthcare/agents/domain/](../../domains/healthcare/agents/domain/)

@@ -1,0 +1,7 @@
+{
+  "roles": {
+    "read_only": ["skills_plan_get", "supplier_context_get", "vector_evidence_search"],
+    "generation": ["query", "graphrag_answer_generate", "risk_summary_generate", "disruption_impact_assess", "inventory_reorder_check"],
+    "export": ["evidence_bundle_export"]
+  }
+}

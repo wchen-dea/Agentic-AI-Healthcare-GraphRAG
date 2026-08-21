@@ -10,9 +10,9 @@ The standardization and CI validation policy for this layer is formalized in [AD
 
 The layer is runtime-backed (not documentation-only):
 
-- Skill catalog and goal mappings are defined in [rag-api/config/skills_layer.json](../domains/healthcare/rag-api/config/skills_layer.json).
-- Resolution logic is implemented in [rag-api/skills_layer.py](../domains/healthcare/rag-api/skills_layer.py).
-- LangGraph multi-agent orchestration maps skills to specialized agent nodes in [rag-api/langgraph_agents/agents.py](../domains/healthcare/rag-api/langgraph_agents/agents.py).
+- Skill catalog and goal mappings are defined in [agents/config/skills_layer.json](../domains/healthcare/agents/config/skills_layer.json).
+- Resolution logic is implemented in [agents/skills_layer.py](../domains/healthcare/agents/skills_layer.py).
+- LangGraph multi-agent orchestration maps skills to specialized agent nodes in [agents/langgraph_agents/agents.py](../domains/healthcare/agents/langgraph_agents/agents.py).
 - Runtime access is exposed through:
   - REST: POST /skills/plan
   - MCP tool: skills_plan_get
@@ -101,11 +101,11 @@ Arguments:
 
 ## Role and Policy
 
-skills_plan_get is authorized in read_only role via [rag-api/config/tool_policies.json](../domains/healthcare/rag-api/config/tool_policies.json).
+skills_plan_get is authorized in read_only role via [agents/config/tool_policies.json](../domains/healthcare/agents/config/tool_policies.json).
 
 ## Validation
 
-Contracts are tested in [rag-api/tests/test_contracts.py](../domains/healthcare/rag-api/tests/test_contracts.py), including:
+Contracts are tested in [agents/tests/test_contracts.py](../domains/healthcare/agents/tests/test_contracts.py), including:
 
 - successful plan generation for known business goal
 - deterministic flow shape and tool outputs

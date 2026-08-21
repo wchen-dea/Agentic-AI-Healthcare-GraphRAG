@@ -21,15 +21,20 @@ Skill composition roadmap strategy is described in [target_architecture.md](targ
 
 ```text
 AI Client (Copilot, Claude Desktop, custom agent)
-  -> Embedded MCP endpoint in rag-api (/mcp)
-  -> Existing services behind rag-api:
-     - neo4j (graph context)
-     - qdrant (vector context)
-     - kafka (optional async task events)
+  -> Embedded MCP endpoint at /mcp (domains/healthcare/agents/app.py)
+  -> domain/ modules:
+     - retrieval.py (Neo4j graph_search + Qdrant vector_search)
+     - synthesis.py (LLM prompt + generation)
+     - response_policy.py (sanitization + budget)
+     - harness.py (retry, guards, prompt registry)
+  -> langgraph_agents/ (optional multi-agent routing)
+  -> External stores:
+     - Neo4j (data-platform/healthcare/neo4j)
+     - Qdrant (data-platform/healthcare via flink-app)
+     - Ollama (infra)
 ```
 
-Default runtime mode is embedded MCP inside rag-api.
-The `domains/healthcare/mcp-server/` folder remains a standalone reference scaffold for optional split-service deployments.
+MCP is embedded in the healthcare agents service (ADR-0005). The standalone mcp-server scaffold has been removed.
 
 ## 1) Tool Inventory
 
@@ -367,7 +372,7 @@ Do not log raw PHI payloads. Prefer hashes, IDs, and minimal metadata.
 ### Stage 0: Local Design and Contract Freeze
 
 1. Finalize tool contracts and JSON schemas in this document.
-2. MCP tool surface is implemented in rag-api over the shared query orchestration.
+2. MCP tool surface is implemented in the agents service over the shared query orchestration.
 3. Contract tests with static fixtures and CI validation are in place.
 
 Exit criteria:
@@ -377,7 +382,7 @@ Exit criteria:
 
 Current status:
 
-- Completed in current implementation (embedded MCP in rag-api with 10 tools).
+- Completed in current implementation (embedded MCP in the agents service with 10 tools).
 
 ### Stage 1: Local Demo Integration
 
@@ -421,7 +426,7 @@ Exit criteria:
 
 ## Current Implementation Note
 
-The embedded MCP layer in `domains/healthcare/rag-api/app.py` ships ten tools and shares the same retrieval + guardrail core used by `POST /query`.
+The embedded MCP layer in `domains/healthcare/agents/app.py` ships ten tools and shares the same retrieval + guardrail core used by `POST /query`.
 
 When LangGraph mode is enabled (`RAG_API_LANGGRAPH_ENABLED=true`), MCP tool calls route through the multi-agent StateGraph with specialist agents for medication safety, lab interpretation, and coding review.
 
