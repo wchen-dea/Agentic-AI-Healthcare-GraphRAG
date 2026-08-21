@@ -123,7 +123,7 @@ curl -s -X POST "http://localhost:8000/query" \
 
 Expected: non-null object with `enabled`, `iterations`, `final_reason`, `confidence`, and `agent_trace`.
 
-LangGraph takes priority over ReAct when both are enabled. See [langgraph_comparison.md](langgraph_comparison.md) for details.
+LangGraph takes priority over ReAct when both are enabled. See [10_langgraph_comparison.md](10_langgraph_comparison.md) for details.
 
 ### Optional: Enable MLflow Tracing
 

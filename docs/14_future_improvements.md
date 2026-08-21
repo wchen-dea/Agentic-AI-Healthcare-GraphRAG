@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document is the actionable execution backlog for the platform. It tracks what remains to build, prioritized by impact and informed by [industry landscape analysis](healthcare_ai_agent_landscape.md).
+This document is the actionable execution backlog for the platform. It tracks what remains to build, prioritized by impact and informed by [industry landscape analysis](11_healthcare_ai_agent_landscape.md).
 
 **For executives:** Staged delivery plan with clear completion criteria and AI-trends-driven priorities.
 
@@ -10,7 +10,7 @@ This document is the actionable execution backlog for the platform. It tracks wh
 
 **For engineers:** Sprint-level work items with acceptance criteria, file touchpoints, and CI integration points.
 
-Use [target_architecture.md](target_architecture.md) for strategic architecture and capability intent.
+Use [target_02_architecture.md](target_02_architecture.md) for strategic architecture and capability intent.
 
 ## Current Status Summary
 
@@ -50,7 +50,7 @@ Target outcomes:
 Suggested repo touchpoints:
 
 - `domains/healthcare/agents/tests/`
-- `docs/ai_qa.md`
+- `docs/12_ai_qa.md`
 - `.github/workflows/rag-api-contracts.yml`
 - `.github/workflows/ontology-conformance.yml`
 
@@ -95,8 +95,8 @@ Target outcomes:
 Suggested repo touchpoints:
 
 - `deploy/production/`
-- `docs/runbook.md`
-- `docs/technical_specs.md`
+- `docs/13_runbook.md`
+- `docs/06_technical_specs.md`
 - monitoring and alerting assets
 
 ## Staged Plan Status

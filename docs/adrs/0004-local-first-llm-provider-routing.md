@@ -51,6 +51,6 @@ Trade-offs:
 
 ## Related
 
-- [Architecture](../architecture.md)
-- [MCP Layer Design](../mcp_layer_design.md)
-- [Skills Layer](../skills_layer.md)
+- [Architecture](../02_architecture.md)
+- [MCP Layer Design](../07_mcp_layer_design.md)
+- [Skills Layer](../08_skills_layer.md)

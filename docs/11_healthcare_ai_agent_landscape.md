@@ -125,7 +125,7 @@ Based on the industry architecture analysis, the following extensions would brin
 
 ## Related
 
-- [target_architecture.md](target_architecture.md) — Target architecture principles and capability map
-- [future_improvements.md](future_improvements.md) — Execution backlog including AI trends gap items
-- [langgraph_comparison.md](langgraph_comparison.md) — Multi-agent orchestration mode comparison
-- [architecture.md](architecture.md) — System architecture and maturity scorecard
+- [target_02_architecture.md](target_02_architecture.md) — Target architecture principles and capability map
+- [14_future_improvements.md](14_future_improvements.md) — Execution backlog including AI trends gap items
+- [10_langgraph_comparison.md](10_langgraph_comparison.md) — Multi-agent orchestration mode comparison
+- [02_architecture.md](02_architecture.md) — System architecture and maturity scorecard

@@ -15,7 +15,7 @@ Goals:
 - [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
 - [ADR-0004: Local-first LLM with provider routing](adrs/0004-local-first-llm-provider-routing.md)
 
-Skill composition roadmap strategy is described in [target_architecture.md](target_architecture.md), with actionable backlog sequencing in [future_improvements.md](future_improvements.md).
+Skill composition roadmap strategy is described in [target_02_architecture.md](target_02_architecture.md), with actionable backlog sequencing in [14_future_improvements.md](14_future_improvements.md).
 
 ## Architecture Placement
 
@@ -57,7 +57,7 @@ Notes:
 
 - Keep tool names stable; evolve behavior via versioned schemas.
 - Add async tools optionally when needed (`ai_task_submit`, `ai_task_status_get`).
-- Skill-composed tool expansion roadmap is documented in [skills_layer.md](skills_layer.md), [target_architecture.md](target_architecture.md), and [future_improvements.md](future_improvements.md).
+- Skill-composed tool expansion roadmap is documented in [08_skills_layer.md](08_skills_layer.md), [target_02_architecture.md](target_02_architecture.md), and [14_future_improvements.md](14_future_improvements.md).
 
 ## 2) Request/Response Schemas
 

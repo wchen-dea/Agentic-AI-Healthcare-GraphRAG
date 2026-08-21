@@ -10,7 +10,7 @@ This document defines the strategic target for the healthcare intelligence platf
 
 **For engineers:** This is the delivery backlog with acceptance criteria, file touchpoints, and staged execution order.
 
-Current ontology files live under `data-platform/healthcare/config/ontology/`. Implementation status details are in [technical_specs.md](technical_specs.md), [runbook.md](runbook.md), [skills_layer.md](skills_layer.md), and [future_improvements.md](future_improvements.md).
+Current ontology files live under `data-platform/healthcare/config/ontology/`. Implementation status details are in [06_technical_specs.md](06_technical_specs.md), [13_runbook.md](13_runbook.md), [08_skills_layer.md](08_skills_layer.md), and [14_future_improvements.md](14_future_improvements.md).
 
 ## Target Outcome
 
@@ -58,7 +58,7 @@ Current gaps to close:
 - quality validation now covers planner behavior and contracts, but retrieval benchmarks and grounded-answer scorecards remain limited,
 - production controls (policy classes, privacy posture, staged rollout controls) remain incomplete for non-demo workloads.
 
-AI-trends-driven gaps (see [future_improvements.md](future_improvements.md) for detailed backlog):
+AI-trends-driven gaps (see [14_future_improvements.md](14_future_improvements.md) for detailed backlog):
 
 - no structured output generation (JSON-mode or schema-constrained extraction),
 - no dynamic model routing based on task complexity or cost targets,
@@ -259,22 +259,22 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 
 | Capability area | Current state in repo | Target state | Primary repo touchpoints |
 | --- | --- | --- | --- |
-| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `data-platform/healthcare/schemas/medical_event.avsc`, `docs/kafka_schema.md`, `data-platform/healthcare/producer/produce_events.py` |
+| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `data-platform/healthcare/schemas/medical_event.avsc`, `docs/04_kafka_schema.md`, `data-platform/healthcare/producer/produce_events.py` |
 | Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `data-platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `data-platform/healthcare/flink-app/app/` |
 | Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `data-platform/healthcare/config/ontology/vocabularies.yaml` and mapping files |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
-| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/neo4j_model.md`, `data-platform/healthcare/neo4j/init.cypher`, Flink graph writes |
+| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/05_neo4j_model.md`, `data-platform/healthcare/neo4j/init.cypher`, Flink graph writes |
 | Vector retrieval | stable embedding (MiniLM-L6-v2) with deterministic top-k similarity via `domain/retrieval.py` | neural reranking, richer filters, optional cross-encoder | `domains/healthcare/agents/domain/retrieval.py`, `data-platform/healthcare/flink-app/app/text_processing.py` |
 | Query orchestration | request classification, retrieval plan selection, and evidence ranking are implemented with deterministic planner logic; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning and ranking | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/domain/`, `domains/healthcare/agents/langgraph_agents/` |
 | Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/agents/langgraph_agents/agents.py` |
 | Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agents/app.py` |
-| MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/mcp_layer_design.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
+| MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/07_mcp_layer_design.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
 | Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
-| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `scripts/validate_ontology.py`, `docs/ai_qa.md` |
+| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `scripts/validate_ontology.py`, `docs/12_ai_qa.md` |
 
 ## Execution Backlog
 
-Actionable implementation backlog items, staged delivery sequencing, and recommended execution order now live in [future_improvements.md](future_improvements.md).
+Actionable implementation backlog items, staged delivery sequencing, and recommended execution order now live in [14_future_improvements.md](14_future_improvements.md).
 
 This keeps the target architecture focused on strategic design while the backlog remains execution-oriented and easier to update as implementation progresses.
 

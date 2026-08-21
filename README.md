@@ -431,7 +431,7 @@ LANGGRAPH_MAX_ITERATIONS=3
 When enabled, `/query` responses include a `langgraph` block with agent trace metadata.
 LangGraph takes priority over ReAct when both are enabled.
 
-See [docs/langgraph_comparison.md](docs/langgraph_comparison.md) for architecture details.
+See [docs/10_langgraph_comparison.md](docs/10_langgraph_comparison.md) for architecture details.
 
 ### Optional: Enable MLflow Tracing (Local)
 
@@ -617,18 +617,18 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 
 | Document | Purpose |
 |----------|---------|
-| [docs/architecture.md](docs/architecture.md) | System architecture, design patterns, component diagrams |
+| [docs/02_architecture.md](docs/02_architecture.md) | System architecture, design patterns, component diagrams |
 | [docs/adrs/README.md](docs/adrs/README.md) | Architecture Decision Records index |
-| [docs/technical_specs.md](docs/technical_specs.md) | Container inventory, library versions, API specification |
-| [docs/business_specs.md](docs/business_specs.md) | Use cases, business rules, stakeholders, AI governance |
-| [docs/kafka_schema.md](docs/kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
-| [docs/neo4j_model.md](docs/neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
-| [docs/mcp_layer_design.md](docs/mcp_layer_design.md) | MCP tool contracts, schemas, rollout phases |
-| [docs/skills_layer.md](docs/skills_layer.md) | Skills layer flow, generated packages, and validation |
-| [docs/langgraph_comparison.md](docs/langgraph_comparison.md) | Multi-agent architecture comparison (single-pass vs ReAct vs LangGraph) |
-| [docs/healthcare_ai_agent_landscape.md](docs/healthcare_ai_agent_landscape.md) | Industry AI agent landscape analysis and platform alignment |
-| [docs/runbook.md](docs/runbook.md) | Operations runbook, health checks, failure modes |
-| [docs/ai_qa.md](docs/ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
+| [docs/06_technical_specs.md](docs/06_technical_specs.md) | Container inventory, library versions, API specification |
+| [docs/01_business_specs.md](docs/01_business_specs.md) | Use cases, business rules, stakeholders, AI governance |
+| [docs/04_kafka_schema.md](docs/04_kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
+| [docs/05_neo4j_model.md](docs/05_neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
+| [docs/07_mcp_layer_design.md](docs/07_mcp_layer_design.md) | MCP tool contracts, schemas, rollout phases |
+| [docs/08_skills_layer.md](docs/08_skills_layer.md) | Skills layer flow, generated packages, and validation |
+| [docs/10_langgraph_comparison.md](docs/10_langgraph_comparison.md) | Multi-agent architecture comparison (single-pass vs ReAct vs LangGraph) |
+| [docs/11_healthcare_ai_agent_landscape.md](docs/11_healthcare_ai_agent_landscape.md) | Industry AI agent landscape analysis and platform alignment |
+| [docs/13_runbook.md](docs/13_runbook.md) | Operations runbook, health checks, failure modes |
+| [docs/12_ai_qa.md](docs/12_ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
 | [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |
 | [deploy/production/k8s/README.md](deploy/production/k8s/README.md) | Kubernetes manifests |
 | [domains/supply-chain/README.md](domains/supply-chain/README.md) | Supply Chain domain: graph model, events, quick start |
