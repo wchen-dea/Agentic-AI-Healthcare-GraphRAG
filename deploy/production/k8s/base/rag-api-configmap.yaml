@@ -16,3 +16,8 @@ data:
   OLLAMA_URL: "http://ollama:11434"
   OLLAMA_MODEL: "llama3.1"
   MCP_SERVER_NAME: "HealthcareGraphRAG MCP"
+  RAG_API_LANGGRAPH_ENABLED: "false"
+  LANGGRAPH_MAX_ITERATIONS: "3"
+  MLFLOW_TRACKING_URI: "http://mlflow:5000"
+  MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"
+  RAG_API_ALLOW_ROLE_HEADER: "false"

@@ -1,43 +1,38 @@
-# Kubernetes Deployment (AI Components Only)
+# Kubernetes Deployment
 
-This bundle deploys only AI app deliverables from this repository.
+This bundle deploys the full platform stack to Kubernetes.
 
-In scope:
+## Components
 
-- rag-api (includes embedded FastMCP endpoint at `/mcp`)
-- provider-web
-- optional standalone mcp-server (separate manifests)
-
-Out of scope and externally managed:
-
-- source data systems and upstream environments
-- Confluent Kafka (managed by operations)
-- Apache Flink on AWS EKS/Kubernetes (managed independently)
+| Component | Manifest | Replicas | Purpose |
+| --- | --- | --- | --- |
+| Healthcare agents | `rag-api-deployment.yaml` | 2 (HPA: 2–6) | AI agents with embedded MCP at `/mcp` |
+| Provider web | `provider-web-deployment.yaml` | 2 (HPA: 2–5) | Static frontend UI |
+| Flink JobManager | `flink-jobmanager-deployment.yaml` | 1 | Shared Flink cluster coordinator |
+| Flink TaskManager | `flink-taskmanager-deployment.yaml` | 2 | Shared Flink cluster workers |
+| Flink job submit | `flink-job-submit.yaml` | Job | Healthcare PyFlink job submission |
+| MLflow | `mlflow-deployment.yaml` | 1 | Agent tracing and evaluation (5Gi PVC) |
 
 ## Structure
 
-- `base/`: rag-api and provider-web Kubernetes manifests + kustomization
-- `optional-mcp/`: standalone MCP deployment manifests + kustomization
-- `ingress.example.yaml`: example ingress routes for AI endpoints
+- `base/`: all Kubernetes manifests + kustomization
+- `ingress.example.yaml`: example ingress routes
 
-Minimal platform controls included:
+## Platform Controls
 
-- NetworkPolicy set: default deny ingress for namespace.
-- NetworkPolicy set: explicit ingress allow for `rag-api` (8000), `provider-web` (80), and optional `mcp-server` (8010).
-- HorizontalPodAutoscaler set: `rag-api` (min 2, max 6).
-- HorizontalPodAutoscaler set: `provider-web` (min 2, max 5).
-- HorizontalPodAutoscaler set: optional `mcp-server` (min 2, max 4).
+- NetworkPolicy: default deny ingress for namespace
+- NetworkPolicy: explicit allow for `rag-api` (8000), `provider-web` (80), `flink-jobmanager` (8081/6123), `mlflow` (5000)
+- HPA: `rag-api` (2–6), `provider-web` (2–5)
+- HPAs require metrics-server in the cluster
 
-Note: HPAs require metrics-server (or compatible metrics pipeline) in the cluster.
+## Configuration Guidelines
 
-## Kubernetes Configuration Guidelines
-
-- Use dedicated namespaces per environment and keep RBAC scoped to the minimum required subjects.
-- Replace example secret manifests with values sourced from your cluster secret workflow before apply.
-- Pin image tags or digests in the deployment manifests and promote the same tested image between environments.
-- Set ingress hosts, TLS certificates, and DNS records explicitly for each environment.
-- Review NetworkPolicy rules together with ingress controller behavior so only intended traffic reaches `rag-api`, `provider-web`, and optional `mcp-server`.
-- Confirm that HPA settings match real workload behavior and that cluster autoscaling can support the requested replica ranges.
+- Use dedicated namespaces per environment with scoped RBAC.
+- Replace example secret manifests with values from your cluster secret workflow.
+- Pin image tags or digests and promote the same tested image between environments.
+- Set ingress hosts, TLS certificates, and DNS records per environment.
+- Review NetworkPolicy rules with ingress controller behavior.
+- For production MLflow, replace SQLite backend with PostgreSQL and use object storage for artifacts.
 - Add pod disruption budgets, resource requests and limits, and rollout strategy settings if your production platform standards require them.
 - Forward logs, metrics, and audit events to centralized observability systems rather than relying only on in-cluster inspection.
 
@@ -55,22 +50,6 @@ cp base/rag-api-secret.example.yaml base/rag-api-secret.yaml
 ```bash
 kubectl apply -k base
 kubectl apply -f base/rag-api-secret.yaml
-```
-
-## Deploy Optional Standalone MCP
-
-1. Create MCP secret manifest:
-
-```bash
-cp optional-mcp/mcp-secret.example.yaml optional-mcp/mcp-secret.yaml
-# edit optional-mcp/mcp-secret.yaml values
-```
-
-1. Apply resources:
-
-```bash
-kubectl apply -k optional-mcp
-kubectl apply -f optional-mcp/mcp-secret.yaml
 ```
 
 ## Optional Ingress
