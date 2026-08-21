@@ -13,6 +13,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         clean ps logs logs-sc \
         neo4j-hc neo4j-sc qdrant-hc qdrant-sc \
         query-hc query-sc api-hc api-sc \
+        flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
         test-hc test-sc pull-model fresh
 
@@ -64,7 +65,7 @@ ps: ## Show running containers
 logs:    ## Tail healthcare logs
 	$(DC_HC) logs -f --tail 20
 logs-sc: ## Tail supply-chain logs
-	$(DC_SC) logs -f --tail 20 sc-producer sc-flink-processor sc-rag-api
+	$(DC_SC) logs -f --tail 20 sc-producer sc-flink-app sc-rag-api
 
 # ── Service access ────────────────────────────────────────────────────────────
 
@@ -87,6 +88,13 @@ query-hc: ## Run healthcare query examples
 	./domains/healthcare/scripts/query_examples.sh
 query-sc: ## Run supply-chain query examples
 	./domains/supply-chain/scripts/query_examples.sh
+
+flink-hc: ## Healthcare Flink job overview
+	@curl -s http://localhost:8082/jobs/overview | python3 -m json.tool
+flink-sc: ## Supply-chain Flink job overview
+	@curl -s http://localhost:8083/jobs/overview | python3 -m json.tool
+mlflow: ## MLflow health check
+	@curl -s http://localhost:5000/health && echo
 
 topics: ## List Kafka topics
 	docker exec infra-kafka kafka-topics --bootstrap-server kafka:29092 --list
