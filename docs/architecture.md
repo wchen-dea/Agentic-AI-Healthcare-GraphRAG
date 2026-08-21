@@ -10,9 +10,9 @@ It is optimized for reproducible local experimentation with clear lineage and fu
 
 Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
 
-- [ADR-0002: Use dual persistence (Qdrant + Neo4j)](adrs/0002-dual-persistence-qdrant-neo4j.md)
-- [ADR-0003: Qdrant as the streaming vector store for real-time RAG](adrs/0003-qdrant-streaming-vector-store.md)
-- [ADR-0006: Local-first LLM with provider routing](adrs/0006-local-first-llm-provider-routing.md)
+- [ADR-0001: Use dual persistence (Qdrant + Neo4j)](adrs/0001-dual-persistence-qdrant-neo4j.md)
+- [ADR-0002: Qdrant as the streaming vector store for real-time RAG](adrs/0002-qdrant-streaming-vector-store.md)
+- [ADR-0004: Local-first LLM with provider routing](adrs/0004-local-first-llm-provider-routing.md)
 - [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
 
 Roadmap design strategy is documented in [docs/target_architecture.md](target_architecture.md), and execution backlog details are maintained in [docs/future_improvements.md](future_improvements.md).
@@ -109,7 +109,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 - Contract-First Tooling: [domains/healthcare/rag-api/tests/test_contracts.py](../domains/healthcare/rag-api/tests/test_contracts.py), [docs/mcp_layer_design.md](mcp_layer_design.md)
 - Bounded Context Window: [domains/healthcare/rag-api/domain/response_policy.py](../domains/healthcare/rag-api/domain/response_policy.py) (`apply_response_budget`, `truncate_text`)
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
-- Adapter Pattern (roadmap): [docs/adrs/0006-local-first-llm-provider-routing.md](adrs/0006-local-first-llm-provider-routing.md)
+- Adapter Pattern (roadmap): [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md)
 - Multi-Agent Orchestration: [domains/healthcare/rag-api/langgraph_agents/](../domains/healthcare/rag-api/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
 - MLflow Tracing: [domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py](../domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py), [domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py](../domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py)
 

@@ -13,7 +13,7 @@ Goals:
 ## ADR References
 
 - [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
-- [ADR-0006: Local-first LLM with provider routing](adrs/0006-local-first-llm-provider-routing.md)
+- [ADR-0004: Local-first LLM with provider routing](adrs/0004-local-first-llm-provider-routing.md)
 
 Skill composition roadmap strategy is described in [target_architecture.md](target_architecture.md), with actionable backlog sequencing in [future_improvements.md](future_improvements.md).
 

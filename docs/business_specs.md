@@ -320,7 +320,7 @@ dependency. This ensures:
 - Predictable inference costs (no per-token fees)
 - Model selection is operator-controlled via `OLLAMA_MODEL`
 
-Anthropic/OpenAI routing is documented as a roadmap extension (ADR-0006) but is not
+Anthropic/OpenAI routing is documented as a roadmap extension (ADR-0004) but is not
 active in the current implementation.
 
 Multi-agent orchestration is implemented via LangGraph with specialist agents for

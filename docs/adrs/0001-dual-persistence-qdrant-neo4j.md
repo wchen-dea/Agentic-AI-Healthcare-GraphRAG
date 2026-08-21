@@ -1,7 +1,7 @@
-# ADR-0002: Use dual persistence (Qdrant + Neo4j)
+# ADR-0001: Use dual persistence (Qdrant + Neo4j)
 
 - Status: accepted
-- Date: 2026-06-26
+- Date: 2026-06-12
 - Deciders: platform team
 - Supersedes: none
 - Superseded by: none
@@ -109,7 +109,7 @@ Trade-offs:
 
 ## Related
 
-- [ADR-0003: Qdrant as the streaming vector store for real-time RAG](./0003-qdrant-streaming-vector-store.md)
+- [ADR-0002: Qdrant as the streaming vector store for real-time RAG](./0002-qdrant-streaming-vector-store.md)
 - [Architecture](../architecture.md)
 - [Skills Layer](../skills_layer.md)
 - [Neo4j Graph Model](../neo4j_model.md)

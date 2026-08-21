@@ -1,4 +1,4 @@
-# ADR-0001: Ontology Governance and Seed Generation
+# ADR-0003: Ontology Governance and Seed Generation
 
 - Status: accepted
 - Date: 2026-06-12
@@ -71,8 +71,8 @@ Trade-offs:
 
 ## Related
 
-- [ADR-0002: Use dual persistence (Qdrant + Neo4j)](./0002-dual-persistence-qdrant-neo4j.md)
-- [ADR-0004: Skills layer standardization and validation](./0004-skills-layer-standardization-and-validation.md)
+- [ADR-0001: Use dual persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
+- [ADR-0006: Skills layer standardization and validation](./0006-skills-layer-standardization-and-validation.md)
 - [Target Architecture](../target_architecture.md)
 - [Technical Specs](../technical_specs.md)
 - [Runbook](../runbook.md)

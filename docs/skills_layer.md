@@ -6,7 +6,7 @@ This project now includes an explicit Skills layer that operationalizes the flow
 
 Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools
 
-The standardization and CI validation policy for this layer is formalized in [ADR-0004](adrs/0004-skills-layer-standardization-and-validation.md).
+The standardization and CI validation policy for this layer is formalized in [ADR-0006](adrs/0006-skills-layer-standardization-and-validation.md).
 
 The layer is runtime-backed (not documentation-only):
 
