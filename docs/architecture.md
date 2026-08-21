@@ -10,10 +10,15 @@ It is optimized for reproducible local experimentation with clear lineage and fu
 
 Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
 
-- [ADR-0001: Use dual persistence (Qdrant + Neo4j)](adrs/0001-dual-persistence-qdrant-neo4j.md)
-- [ADR-0002: Qdrant as the streaming vector store for real-time RAG](adrs/0002-qdrant-streaming-vector-store.md)
+- [ADR-0001: Dual persistence (Qdrant + Neo4j)](adrs/0001-dual-persistence-qdrant-neo4j.md)
+- [ADR-0002: Qdrant as the streaming vector store](adrs/0002-qdrant-streaming-vector-store.md)
+- [ADR-0003: Ontology governance and seed generation](adrs/0003-ontology-governance-and-seed-generation.md)
 - [ADR-0004: Local-first LLM with provider routing](adrs/0004-local-first-llm-provider-routing.md)
 - [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
+- [ADR-0006: Skills layer standardization](adrs/0006-skills-layer-standardization-and-validation.md)
+- [ADR-0007: LangGraph multi-agent orchestration](adrs/0007-langgraph-multi-agent-orchestration.md)
+- [ADR-0008: MLflow tracing and evaluation](adrs/0008-mlflow-tracing-and-evaluation.md)
+- [ADR-0009: Domain module extraction](adrs/0009-domain-module-extraction.md)
 
 Roadmap design strategy is documented in [docs/target_architecture.md](target_architecture.md), and execution backlog details are maintained in [docs/future_improvements.md](future_improvements.md).
 
@@ -521,22 +526,29 @@ domains/healthcare/rag-api/app.py exposes:
 - POST /query
 - POST /mcp (MCP streamable HTTP protocol endpoint)
 
-Embedded MCP tools exposed from domains/healthcare/rag-api/app.py:
+Embedded MCP tools (10 total):
 
 - patient_context_get
 - vector_evidence_search
 - graphrag_answer_generate
 - risk_summary_generate
 - evidence_bundle_export
+- timeline_explain
+- medication_risk_assess
+- coding_gap_detect
+- cohort_risk_summary
+- skills_plan_get
 
 Query flow:
 
-1. Embed user question with stable_embedding.
-2. Search Qdrant for nearest evidence, optionally filtered by patient_id.
+1. Classify request type and select retrieval plan (`domain/planner.py`).
+2. Embed user question (`domain/retrieval.py`) and search Qdrant for nearest evidence.
 3. Collect patient IDs from vector hits and optional request scope.
-4. Pull graph summary from Neo4j for those patients.
-5. Build a synthesis prompt and call Ollama /api/generate.
-6. Return answer plus vector_context and graph_context.
+4. Query Neo4j patient graph (`domain/retrieval.py`).
+5. Rank evidence deterministically (`domain/evidence.py`).
+6. Dispatch to query mode: single-pass, ReAct loop, or LangGraph multi-agent.
+7. Build synthesis prompt and call LLM provider (`domain/synthesis.py`).
+8. Apply response policy (`domain/response_policy.py`) and return answer with evidence.
 
 #### Provider-Agnostic LLM Interface Sketch (Roadmap)
 

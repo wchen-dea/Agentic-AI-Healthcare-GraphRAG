@@ -247,7 +247,7 @@ between the query and the embedded clinical text.
 
 ```bash
 # Run the full query suite and capture vector scores
-./scripts/query_examples.sh 2>/dev/null \
+./domains/healthcare/scripts/query_examples.sh 2>/dev/null \\
   | jq -r 'select(.vector_context) | .question[:60], (.vector_context | map(.score))'
 ```
 
@@ -352,12 +352,12 @@ style produces structurally distinct output:
 
 ## 5. Integration Smoke Tests (Live Stack)
 
-**File:** `scripts/mcp_smoke_test.py`  
+**File:** `domains/healthcare/scripts/mcp_smoke_test.py`  
 **Requires:** running stack (`docker compose up -d`)
 
 ```bash
 # MCP handshake + tool-list validation
-python3 scripts/mcp_smoke_test.py
+python3 domains/healthcare/scripts/mcp_smoke_test.py
 
 # Dual-path evidence smoke query
 curl -s -X POST http://localhost:8000/query \

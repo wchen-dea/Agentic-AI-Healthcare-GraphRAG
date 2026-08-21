@@ -151,7 +151,7 @@ CI checks: New workflow job `grounding-scorecard`; uploads JSON/Markdown report 
 - [ ] 3. ReAct loop hardening (phase 2)
 Scope: Extend loop stop criteria, fallback behavior, and loop metadata tests.
 Acceptance criteria: ReAct tests cover confidence stop, max-iteration stop, no-progress stop, and fallback path; no regression in planner suites.
-CI checks: `python3 domains/healthcare/rag-api/tests/test_react_controller.py`; `python3 domains/healthcare/rag-api/tests/test_planner_evaluation.py`; `python3 domains/healthcare/rag-api/tests/test_planner_edge_cases.py`; aggregated via `scripts/test_react_planner.sh`.
+CI checks: `python3 domains/healthcare/rag-api/tests/test_react_controller.py`; `python3 domains/healthcare/rag-api/tests/test_planner_evaluation.py`; `python3 domains/healthcare/rag-api/tests/test_planner_edge_cases.py`; aggregated via `domains/healthcare/scripts/test_react_planner.sh`.
 
 - [ ] 4. Evidence fusion reranking
 Scope: Add deterministic cross-source reranking using relevance + recency + graph signal weight.
@@ -207,7 +207,7 @@ The `domains/supply-chain/` scaffold is in place with producer, graph_writes, pi
 
 To add a third domain (e.g., Insurance Claims, Cybersecurity SOC):
 
-1. Create `domains/<name>/` with: `domains/healthcare/config/ontology/`, `domains/healthcare/producer/`, `domains/healthcare/flink-app/app/`, `domains/healthcare/rag-api/domain/`, `domains/healthcare/neo4j/`, `domains/healthcare/schemas/`
+1. Create `domains/<name>/` with: `config/ontology/`, `producer/`, `flink-app/app/`, `rag-api/domain/`, `neo4j/`, `schemas/`
 2. Define Avro envelope schema with domain-specific ID fields
 3. Write docker-compose overlay with isolated Neo4j + Qdrant + topic init
 4. Implement graph_writes and pipeline_service for the domain's entity model

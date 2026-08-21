@@ -69,11 +69,12 @@ Seeded drug interaction relationships:
 - (Metformin)-[:INTERACTS_WITH {risk: nephrotoxicity_risk, severity: moderate}]->(Vancomycin)
 
 Seeded Condition nodes (aligned with lab signal rules): Hyperkalemia, Hyperglycemia, Diabetes Mellitus, Chronic Kidney Disease, Acute Myocardial Infarction, Anemia, Hyperlipidemia, Hypothyroidism, Hyperthyroidism, Hyponatremia, Hypernatremia, Infection, Anticoagulation Concern, Hypertension, Heart Failure.
-Drug safety seed data (FAERS-aligned):
+Drug safety seed data (FAERS-aligned, from `generated_ontology_seeds.cypher`):
 
 - 6 `AdverseOutcome` nodes: DE, LT, HO, DS, CA, OT
-- `HAS_KNOWN_REACTION` edges: 10 medications → matching symptom strings (e.g. Lisinopril→cough, Atorvastatin→leg cramps, Metoprolol→dizziness)
-- `CONTRAINDICATED_FOR` edges: 6 medication-condition pairs (e.g. Metformin→CKD, Lisinopril→Hyperkalemia, Vancomycin→CKD)
+- 41 `INTERACTS_WITH` edges with `risk`, `severity`, and `mechanism` annotations (e.g. Warfarin+Aspirin additive_anticoagulation, Morphine+Gabapentin additive_CNS_depression)
+- 46 `HAS_KNOWN_REACTION` edges with MedDRA terms (e.g. Lisinopril→Cough, Atorvastatin→Myalgia, Insulin Glargine→Hypoglycaemia/Confusion)
+- 23 `CONTRAINDICATED_FOR` edges with reason and severity (e.g. Metformin→CKD lactic_acidosis_risk, Lisinopril→Hyperkalemia worsens_hyperkalemia, Ibuprofen→Heart Failure NSAID_fluid_retention)
 ## Base Lineage Pattern
 
 Every transactional event writes the base lineage:

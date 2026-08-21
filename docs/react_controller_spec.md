@@ -56,18 +56,25 @@ Primary implementation and integration touchpoints:
 - `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
   - deterministic planner/ranking edge assertions
 
-Recommended new files:
+Implemented files:
 
-- `domains/healthcare/rag-api/domain/react_controller.py`
-  - ReAct loop state, policy checks, and execution logic
-- `domains/healthcare/rag-api/tests/test_react_controller.py`
-  - deterministic loop tests
-- `domains/healthcare/rag-api/tests/fixtures/react_cases.json`
-  - loop scenario fixtures
+- `domains/healthcare/rag-api/domain/react_controller.py` — ReAct loop state and execution logic
+- `domains/healthcare/rag-api/tests/test_react_controller.py` — deterministic loop tests
+
+Not yet implemented from this spec:
+
+- Policy-aware action selection (current implementation always uses `vector_and_graph_retrieve`)
+- Observation character budget (`RAG_API_REACT_OBSERVATION_CHAR_BUDGET`)
+- Action authorization via `_authorize` within the loop
+- Retry with downgraded inputs on retrieval failure
+- Detailed observation objects and plan history in state
+- ReAct-specific Prometheus metrics and audit fields
+
+The LangGraph multi-agent mode (ADR-0007) provides the richer specialist routing that the Phase 2 ReAct design proposed. See [langgraph_comparison.md](langgraph_comparison.md) for details.
 
 ## Runtime Configuration
 
-Add optional environment settings in `domains/healthcare/rag-api/app.py` `Settings`:
+Environment settings in `domains/healthcare/rag-api/app.py` `Settings`:
 
 - `RAG_API_REACT_ENABLED` (default: `false`)
 - `RAG_API_REACT_MAX_ITERS` (default: `3`, min: `1`, max: `6`)

@@ -10,7 +10,7 @@ This document compares three query orchestration modes in the healthcare GraphRA
 | Orchestration | Sequential function calls | Bounded iteration loop | StateGraph with conditional edges |
 | Agent count | 0 (procedural) | 0 (single loop) | 8 nodes (5 specialist + 3 control) |
 | Routing | Keyword heuristics | Same heuristics, repeated per iteration | Triage agent → conditional edges |
-| Parallelism | None | None | Possible via LangGraph `Send()` |
+| Parallelism | None | None | Sequential today; `Send()` available for future parallel dispatch |
 | Observability | Prometheus metrics + audit log | Iteration metadata in response | LangSmith traces + MLflow spans + agent message trail |
 | Confidence gate | None | Binary (both channels = 1.0) | Same heuristic, with re-retrieval loop |
 | Tool selection | Fixed: vector + graph | Fixed: vector + graph per iteration | Per-agent tool binding |

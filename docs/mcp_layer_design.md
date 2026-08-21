@@ -31,7 +31,7 @@ AI Client (Copilot, Claude Desktop, custom agent)
 Default runtime mode is embedded MCP inside rag-api.
 The `domains/healthcare/mcp-server/` folder remains a standalone reference scaffold for optional split-service deployments.
 
-## 1) Minimal Tool List
+## 1) Tool Inventory
 
 Use a minimal toolset while covering high-value workflows.
 
@@ -366,7 +366,7 @@ Do not log raw PHI payloads. Prefer hashes, IDs, and minimal metadata.
 
 ### Stage 0: Local Design and Contract Freeze
 
-1. Finalize 5-tool contract and JSON schemas in this document.
+1. Finalize tool contracts and JSON schemas in this document.
 2. MCP tool surface is implemented in rag-api over the shared query orchestration.
 3. Contract tests with static fixtures and CI validation are in place.
 
@@ -377,7 +377,7 @@ Exit criteria:
 
 Current status:
 
-- Completed in current implementation (embedded MCP in rag-api with the 5-tool surface).
+- Completed in current implementation (embedded MCP in rag-api with 10 tools).
 
 ### Stage 1: Local Demo Integration
 

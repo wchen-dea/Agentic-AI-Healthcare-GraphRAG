@@ -301,7 +301,7 @@ Business rules that are encoded in the platform and enforced automatically:
 | Domain | Implemented capabilities | Extension path |
 |--------|-------------------------|---------------|
 | **Acute Clinical Operations** | Clinical notes (diagnosis + symptom + ICD-10), lab signals (14 rules), device alerts (5 types), vital sign trending | Add imaging, ECG, and nursing assessment event types |
-| **Medication Management** | 24-drug catalog, 15 interaction pairs with mechanisms, 20+ adverse reaction rules, 11 contraindications | Expand interaction knowledge base; integrate formulary and allergy data |
+| **Medication Management** | 48-drug catalog, 41 interaction pairs with mechanisms, 46 adverse reaction rules, 23 contraindications | Expand interaction knowledge base; integrate formulary and allergy data |
 | **Pharmacovigilance** | FAERS-aligned adverse outcome vocabulary, streaming adverse event detection, medication signal ranking | Connect to live FAERS database; add regulatory reporting workflow |
 | **Revenue Cycle** | Claims with CPT, ICD-10, billed/allowed amounts, payer linkage, hospitalisation outcome flags | Add prior-auth events, remittance advice, appeal tracking |
 | **Population Health** | Cross-patient cohort queries, risk tier on patient nodes, chronic condition signal graph | Add SDOH data, predictive risk scoring, outreach workflow |

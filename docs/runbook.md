@@ -152,7 +152,7 @@ After running queries, traces appear in the MLflow Tracing UI at http://localhos
 Run only ReAct and planner test suites (CI-safe shortcut):
 
 ```bash
-./scripts/test_react_planner.sh
+./domains/healthcare/scripts/test_react_planner.sh
 ```
 
 Stop all services:
@@ -172,7 +172,7 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 ### 1) Container Status
 
 ```bash
-docker compose ps
+make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps
 ```
 
 Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer, localstack.
@@ -219,7 +219,7 @@ Expected response includes:
 ### 5) MCP Handshake Smoke Test
 
 ```bash
-python3 ./scripts/mcp_smoke_test.py
+python3 ./domains/healthcare/scripts/mcp_smoke_test.py
 ```
 
 Expected output starts with:
@@ -473,7 +473,7 @@ curl -s -X PATCH http://localhost:8082/jobs/<demo_job_id>
 2. Ensure no legacy submitter container exists:
 
 ```bash
-docker compose ps
+make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps
 ```
 
 3. Re-run with orphan cleanup:

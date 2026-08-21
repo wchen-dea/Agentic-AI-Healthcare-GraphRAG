@@ -338,23 +338,27 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `GET` | `/mcp/health` | None | MCP diagnostic probe |
 | `*` | `/mcp` | MCP protocol | FastMCP Streamable HTTP endpoint |
 
-### MCP tools (6)
+### MCP tools (10)
 
 | Tool | Caller role | Backing path |
 |------|------------|-------------|
 | `skills_plan_get` | `read_only` | load_skills_layer() + build_skill_plan() |
 | `patient_context_get` | `read_only` | graph_context() |
 | `vector_evidence_search` | `read_only` | vector_context() |
-| `graphrag_answer_generate` | `generation` | run_query() + ask_ollama() |
+| `graphrag_answer_generate` | `generation` | run_query() + synthesize_answer() |
 | `risk_summary_generate` | `generation` | run_query() + prompt template |
 | `evidence_bundle_export` | `export` | run_query() + bounded text |
+| `timeline_explain` | `generation` | run_query() + graph context |
+| `medication_risk_assess` | `generation` | run_query() + interaction/contraindication extraction |
+| `coding_gap_detect` | `generation` | run_query() + ICD-10 gap analysis |
+| `cohort_risk_summary` | `generation` | run_query() + cross-patient aggregation |
 
 ### Role-based access policy (`domains/healthcare/rag-api/config/tool_policies.json`)
 
 | Role | Permitted tools |
 |------|----------------|
 | `read_only` | `skills_plan_get`, `patient_context_get`, `vector_evidence_search` |
-| `generation` | `query`, `graphrag_answer_generate`, `risk_summary_generate` |
+| `generation` | `query`, `graphrag_answer_generate`, `risk_summary_generate`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary` |
 | `export` | `evidence_bundle_export` |
 
 ### Configurable limits (environment variables)
@@ -539,6 +543,10 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `RAG_API_DEFAULT_CALLER_ROLE` | `generation` | rag-api | Role when no header present |
 | `RAG_API_AUDIT_LOG_PATH` | `logs/rag_api_audit.log` | rag-api | Audit JSONL output path |
 | `RAG_API_SKILLS_LAYER_PATH` | `config/skills_layer.json` | rag-api | Skills layer source for plan resolution |
+| `RAG_API_REACT_ENABLED` | `false` | rag-api | Enable ReAct iterative query loop |
+| `RAG_API_REACT_MAX_ITERS` | `3` | rag-api | Max ReAct loop iterations (capped at 6) |
+| `RAG_API_REACT_MIN_CONFIDENCE` | `0.75` | rag-api | Confidence threshold for ReAct loop stop |
+| `RAG_API_REACT_MAX_NO_PROGRESS_STEPS` | `1` | rag-api | Max iterations without new evidence before stop |
 | `RAG_API_LANGGRAPH_ENABLED` | `false` | rag-api | Enable LangGraph multi-agent orchestration |
 | `LANGGRAPH_MAX_ITERATIONS` | `3` | rag-api | Max confidence re-retrieval loops in LangGraph mode |
 | `MLFLOW_TRACKING_URI` | (unset) | rag-api | MLflow server URL; enables tracing when set |
