@@ -60,6 +60,18 @@ Current gaps to close:
 - quality validation now covers planner behavior and contracts, but retrieval benchmarks and grounded-answer scorecards remain limited,
 - production controls (policy classes, privacy posture, staged rollout controls) remain incomplete for non-demo workloads.
 
+AI-trends-driven gaps (see [future_improvements.md](future_improvements.md) for detailed backlog):
+
+- no structured output generation (JSON-mode or schema-constrained extraction),
+- no dynamic model routing based on task complexity or cost targets,
+- no persistent agent memory for cross-session patient monitoring,
+- no input-side prompt injection detection or adversarial guardrails,
+- no streaming responses to client UIs,
+- no evaluation-gated CI/CD that blocks deployment below quality thresholds,
+- no per-user identity propagation or fine-grained data access governance,
+- no neural reranking between retrieval and synthesis,
+- no multimodal clinical image or document understanding.
+
 ## Target Architecture Principles
 
 1. Canonical semantics before retrieval.
@@ -67,6 +79,11 @@ Current gaps to close:
 3. Separation of domain knowledge, orchestration logic, and generation provider.
 4. Deterministic evidence assembly before probabilistic synthesis.
 5. Policy and provenance attached to every evidence path.
+6. Structured outputs with schema-constrained extraction for downstream system integration.
+7. Confidence-aware responses — abstain or escalate when evidence is insufficient.
+8. Evaluation-gated promotion — quality thresholds block releases, not just tests.
+9. Identity-aware governance — per-user access control propagated through the agent pipeline.
+10. Model-agnostic generation — route to local, managed, or specialized models based on task requirements.
 
 ## Target Architecture
 

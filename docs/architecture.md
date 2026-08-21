@@ -160,6 +160,13 @@ This section maps the current implementation to a modern AI application stack mo
 - Retrieval benchmark and grounded-answer scorecard automation are not fully enforced as release gates.
 - Policy and privacy controls are present at foundation level but not yet complete for non-demo production governance depth.
 - LangGraph and MLflow integrations are feature-flagged and require further production hardening for non-demo use.
+- No structured output generation (JSON-mode extraction for downstream system integration).
+- No persistent agent memory for cross-session patient context.
+- No input-side prompt injection detection or adversarial guardrails.
+- No dynamic model routing based on task complexity, latency, or cost.
+- No streaming responses (SSE) to client applications.
+- No evaluation-gated CI/CD pipeline that blocks deployment below quality thresholds.
+- No per-user identity propagation or data-classification-aware access control.
 
 ### Promotion Direction
 
@@ -191,6 +198,11 @@ Scoring guide:
 | Evaluation and quality gates | 3 | 4 | Contract + planner evaluation suites + MLflow evaluation harness | Add retrieval and grounding release gates |
 | Observability and operations | 4 | 4 | Prometheus, Grafana, probes, MLflow tracing, runbook | Add alert quality tuning and SLO dashboards |
 | Production governance and safety | 2 | 3 | Policy/deploy foundations under production bundle | Implement policy/privacy/SLO rollout controls |
+| Structured outputs and extraction | 1 | 3 | Free-text LLM responses only | Add JSON-mode structured generation for risk extraction |
+| Agent memory and context | 1 | 3 | Stateless per-request execution | Add persistent cross-session memory for longitudinal monitoring |
+| Model routing and optimization | 2 | 3 | Single Ollama provider | Add dynamic routing by task complexity and cost |
+| Input guardrails and safety | 2 | 3 | Role-based tool authorization only | Add prompt injection detection and input validation |
+| Streaming UX | 1 | 3 | Synchronous responses only | Add SSE streaming to provider web UI |
 
 Sprint tracking note:
 

@@ -212,3 +212,58 @@ To add a third domain (e.g., Insurance Claims, Cybersecurity SOC):
 3. Write docker-compose overlay with isolated Neo4j + Qdrant + topic init
 4. Implement graph_writes and pipeline_service for the domain's entity model
 5. Add planner classifier and retrieval plan for domain request types
+
+## AI Trends Gap Backlog
+
+The following backlog items are derived from industry trends analysis comparing this platform against leading-edge AI systems (2025-2026) and peer projects (Multiagent-App-On-Databricks, GenAI-with-MLflow-on-Databricks).
+
+### Stage 6: Advanced Agent Capabilities
+
+| # | Item | Industry trend | Effort | Priority |
+|---|------|---------------|--------|----------|
+| 1 | **Structured output generation** — JSON-mode or schema-constrained decoding for deterministic extraction of interactions, contraindications, and risk assessments | Instructor, OpenAI JSON mode, Pydantic-constrained generation | Low | High |
+| 2 | **Dynamic model routing** — route to different models based on query complexity, latency target, or cost budget | Martian, Unify, LiteLLM router | Medium | High |
+| 3 | **Persistent agent memory** — cross-session context retention for longitudinal patient monitoring and escalation tracking | Mem0, Zep, Letta | Medium | High |
+| 4 | **Input-side guardrails** — prompt injection detection and input validation before agent execution | Lakera Guard, NeMo Guardrails, Rebuff | Low-Medium | High |
+| 5 | **Streaming responses (SSE)** — server-sent events for real-time answer streaming to the provider web UI | FastAPI StreamingResponse, LangGraph streaming | Low | Medium |
+| 6 | **Evaluation-gated CI/CD** — MLflow evaluation scores as release gates that block deployment below thresholds | Mosaic AI Agent Evaluation, KPI-gated pipelines | Medium | High |
+| 7 | **Adversarial evaluation (red-teaming)** — automated probing for hallucination, safety violations, and edge-case failures | Garak, promptfoo, DeepEval adversarial | Medium | Medium |
+| 8 | **Confidence calibration** — selective abstention when evidence is insufficient rather than generating low-confidence answers | Conformal prediction, uncertainty quantification | Medium | Medium |
+
+### Stage 7: Enterprise Governance and Scale
+
+| # | Item | Industry trend | Effort | Priority |
+|---|------|---------------|--------|----------|
+| 9 | **Per-user identity and authorization** — propagate end-user identity through the agent pipeline for fine-grained access control | OBO tokens, Unity Catalog-style governance | Medium | High |
+| 10 | **Neural reranking** — add a cross-encoder or late-interaction reranker between retrieval and synthesis | ColBERT, Cohere Rerank, cross-encoder models | Medium | Medium |
+| 11 | **Inter-agent collaboration** — enable agents to delegate to each other, share intermediate state, or negotiate plans | AutoGen conversations, A2A protocol, CrewAI collaboration | High | Medium |
+| 12 | **Multimodal support** — clinical image analysis (radiology, pathology) and document OCR as retrieval sources | GPT-4o vision, medical imaging models | High | Low |
+| 13 | **Domain-specific fine-tuning** — LoRA or DPO fine-tuning on clinical summarization and medication safety reasoning | QLoRA, ORPO, domain distillation | High | Medium |
+| 14 | **Distributed agent systems** — agent execution across multiple processes or services with shared state coordination | LangGraph Cloud, distributed orchestration | High | Low |
+| 15 | **OpenTelemetry integration** — unified distributed tracing standard for correlation across Kafka, Flink, API, and agent spans | OTel collector, Jaeger, Tempo | Medium | Medium |
+
+### Competitive Parity Items (from Multiagent-App-On-Databricks)
+
+| # | Item | Their implementation | Our gap |
+|---|------|---------------------|---------|
+| 16 | **Citation enforcement in guardrails** — block responses that lack evidence references | Regex-based citation detection + `requires_evidence` flag | We redact evidence but don't enforce its presence in answers |
+| 17 | **Pluggable message bus for audit** — Kafka/RabbitMQ/UC table backends | `MessageBus` interface with 5 backends | We write JSONL audit logs only; no pluggable backend |
+| 18 | **React frontend with streaming** — real-time SSE to a modern UI | Vite + React + TypeScript + streaming | We have a static HTML form with synchronous responses |
+| 19 | **KPI-gated release pipeline** — quantitative thresholds block promotion | `EVAL_MIN_TOOL_CALL_ACCURACY`, `EVAL_MIN_GROUNDEDNESS`, etc. | We have scorers but no CI gate that blocks deployment |
+| 20 | **Multi-environment deployment** — dev/qa/stg/prod with config isolation | Databricks Asset Bundles + target configs | We have a single production bundle; no staged promotion |
+
+### Suggested Execution Sequence
+
+```text
+Near-term (next sprint):
+  #1 Structured outputs → #5 Streaming responses → #6 Evaluation-gated CI
+  #4 Input guardrails → #16 Citation enforcement
+
+Medium-term (next quarter):
+  #2 Model routing → #9 Per-user identity → #10 Neural reranking
+  #3 Persistent memory → #7 Adversarial evaluation → #19 KPI gates
+
+Long-term (roadmap):
+  #11 Inter-agent collaboration → #13 Fine-tuning → #12 Multimodal
+  #14 Distributed agents → #15 OpenTelemetry
+```
