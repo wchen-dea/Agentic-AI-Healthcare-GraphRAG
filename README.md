@@ -27,7 +27,8 @@ Production boundary in this repository:
 - Data Stores: Qdrant (vector), Neo4j (graph)
 - API and AI: FastAPI + embedded FastMCP, Ollama (local-first)
 - Frontend: Static provider web app (Nginx-served)
-- Observability: Prometheus, Grafana, Blackbox Exporter
+- Agent Orchestration: LangGraph multi-agent StateGraph, LangChain tools
+- Observability: Prometheus, Grafana, Blackbox Exporter, MLflow Tracing, LangSmith
 - Operations and Tooling: Docker Compose, Conduktor, NeoDash
 
 ## What This Repository Runs
@@ -92,7 +93,9 @@ Supply-chain service endpoints:
 - Streaming enrichment pattern: reference/master data fused into transactional events before vector and graph persistence.
 - Local-first AI runtime with bounded generation controls and model fallback for resilient development workflows.
 - Explainability by design: API returns both vector_context and graph_context alongside generated responses.
-- Operations-first engineering: Prometheus, Grafana, Flink UI, and Conduktor integrated for full-stack observability.
+- Multi-agent orchestration: LangGraph StateGraph with specialized agents (triage, retrieval, medication safety, lab interpretation, coding review, synthesis) and conditional routing.
+- MLflow tracing and evaluation: full span hierarchy for agent pipelines with healthcare-specific scorers and cross-mode comparison.
+- Operations-first engineering: Prometheus, Grafana, Flink UI, MLflow, and Conduktor integrated for full-stack observability.
 
 ## Runtime Summary
 
@@ -113,6 +116,7 @@ Ops/UI
   -> Flink dashboard
   -> Conduktor Console
   -> Prometheus + Grafana + Blackbox Exporter
+  -> MLflow Tracing UI
   -> Neo4j Browser + NeoDash
 ```
 
@@ -319,6 +323,32 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 When enabled, `/query` responses include an optional `react` block with loop metadata
 (`iterations`, `final_reason`, `confidence`, and `actions`).
 
+### Optional: Enable LangGraph Multi-Agent Mode (Local)
+
+The LangGraph mode replaces the single-pass/ReAct pipeline with a multi-agent StateGraph that routes through specialized agents (triage, retrieval, medication safety, lab interpretation, coding review, confidence evaluation, synthesis).
+
+```bash
+RAG_API_LANGGRAPH_ENABLED=true
+LANGGRAPH_MAX_ITERATIONS=3
+```
+
+When enabled, `/query` responses include a `langgraph` block with agent trace metadata.
+LangGraph takes priority over ReAct when both are enabled.
+
+See [docs/langgraph_comparison.md](docs/langgraph_comparison.md) for architecture details.
+
+### Optional: Enable MLflow Tracing (Local)
+
+MLflow traces all query modes (single-pass, ReAct, LangGraph) with nested span hierarchies.
+
+```bash
+MLFLOW_TRACKING_URI=http://localhost:5000
+MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
+```
+
+MLflow UI is available at http://localhost:5000 when the infra stack is running.
+Tracing activates automatically and has zero overhead when `MLFLOW_TRACKING_URI` is unset.
+
 ## LocalStack
 
 The local stack also includes `localstack` for development scenarios that need an AWS-compatible local endpoint surface.
@@ -355,6 +385,7 @@ Use this service for local-only integration and smoke testing. It is separate fr
 | LocalStack edge endpoint | <http://localhost:4566> |
 | Prometheus | <http://localhost:9090> |
 | Grafana | <http://localhost:3000> |
+| MLflow UI | <http://localhost:5000> |
 
 ## Default Credentials
 
@@ -439,6 +470,7 @@ domains/        Domain implementations
     neo4j/      Constraints and seed graph relationships
     producer/   Synthetic event producer
     rag-api/    FastAPI GraphRAG API
+      langgraph_agents/  LangGraph multi-agent orchestration and MLflow tracing
     schemas/    Avro envelope schema
     skills/     Generated Agent Skills packages
     scripts/    Domain-specific validation and query scripts
@@ -484,6 +516,7 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 | [docs/neo4j_model.md](docs/neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
 | [docs/mcp_layer_design.md](docs/mcp_layer_design.md) | MCP tool contracts, schemas, rollout phases |
 | [docs/skills_layer.md](docs/skills_layer.md) | Skills layer flow, generated packages, and validation |
+| [docs/langgraph_comparison.md](docs/langgraph_comparison.md) | Multi-agent architecture comparison (single-pass vs ReAct vs LangGraph) |
 | [docs/runbook.md](docs/runbook.md) | Operations runbook, health checks, failure modes |
 | [docs/ai_qa.md](docs/ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
 | [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |

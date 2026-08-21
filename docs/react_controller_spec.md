@@ -4,6 +4,8 @@
 
 This specification defines a concrete ReAct-style controller for the current GraphRAG runtime.
 
+Note: The ReAct controller is one of three query orchestration modes. See [langgraph_comparison.md](langgraph_comparison.md) for the comparison between single-pass, ReAct, and LangGraph multi-agent modes. The LangGraph multi-agent mode provides a more capable alternative with specialist agents and MLflow tracing.
+
 Design intent:
 
 - keep existing planner, retrieval, and guardrails behavior,

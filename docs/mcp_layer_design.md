@@ -421,4 +421,8 @@ Exit criteria:
 
 ## Current Implementation Note
 
-The embedded MCP layer in `domains/healthcare/rag-api/app.py` already ships all five tools and shares the same retrieval + guardrail core used by `POST /query`.
+The embedded MCP layer in `domains/healthcare/rag-api/app.py` ships ten tools and shares the same retrieval + guardrail core used by `POST /query`.
+
+When LangGraph mode is enabled (`RAG_API_LANGGRAPH_ENABLED=true`), MCP tool calls route through the multi-agent StateGraph with specialist agents for medication safety, lab interpretation, and coding review.
+
+When MLflow tracing is enabled (`MLFLOW_TRACKING_URI`), every MCP tool execution is traced as a nested span hierarchy visible in the MLflow Tracing UI. Trace IDs from the audit log can be correlated with MLflow spans for end-to-end observability.

@@ -17,14 +17,19 @@ Completed or largely implemented:
 - planner-driven query orchestration with deterministic ranking and planner metadata,
 - expanded MCP tools (`timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`),
 - planner quality suites (`test_planner_evaluation.py`, `test_planner_edge_cases.py`),
-- provider adapter abstraction with Ollama runtime adapter.
+- provider adapter abstraction with Ollama runtime adapter,
+- LangGraph multi-agent orchestration with eight specialized nodes and conditional routing (feature-flagged),
+- MLflow tracing with nested span hierarchy across agent nodes, retrievers, and LLM calls (feature-flagged),
+- MLflow evaluation harness with six healthcare-specific scorers and cross-mode comparison,
+- LangSmith integration for LangGraph pipeline tracing.
 
 Partially implemented:
 
 - terminology governance breadth and mapping coverage,
 - ontology conformance and retrieval quality benchmark depth,
 - provider abstraction breadth (single provider implementation today),
-- production privacy, policy, and rollout controls.
+- production privacy, policy, and rollout controls,
+- LangGraph and MLflow production hardening for non-demo use.
 
 ## Remaining High-Priority Backlog
 
@@ -97,16 +102,17 @@ flowchart LR
 	S1[Stage 1\nOntology normalization]
 	S2[Stage 2\nPlanner and ranking]
 	S3[Stage 3\nMCP expansion]
+	S35[Stage 3.5\nMulti-agent and tracing]
 	S4[Stage 4\nMulti-domain and provider breadth]
 	S5[Stage 5\nProduction controls]
 
-	S0 --> S1 --> S2 --> S3 --> S4 --> S5
+	S0 --> S1 --> S2 --> S3 --> S35 --> S4 --> S5
 
 	classDef done fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px,color:#1b5e20;
 	classDef progress fill:#fff8e1,stroke:#e65100,stroke-width:1px,color:#e65100;
 	classDef pending fill:#ffebee,stroke:#b71c1c,stroke-width:1px,color:#b71c1c;
 
-	class S0,S2,S3 done;
+	class S0,S2,S3,S35 done;
 	class S1,S4 progress;
 	class S5 pending;
 ```
@@ -117,6 +123,7 @@ flowchart LR
 | Stage 1 | Ontology externalization and normalization | Largely completed | Loader/normalization/rules modules exist; continue mapping depth work. |
 | Stage 2 | Query planner and evidence ranking | Completed (baseline) | Planner and ranking shipped with fixture and edge-case suites. |
 | Stage 3 | Skill-composed MCP expansion | Completed (current scope) | Expanded tools and policy updates shipped; continue iterative refinement as needed. |
+| Stage 3.5 | Multi-agent orchestration and tracing | Implemented (feature-flagged) | LangGraph StateGraph, MLflow tracing, evaluation harness shipped; production hardening pending. |
 | Stage 4 | Multi-domain support and provider abstraction | In progress | Supply-chain domain added; planner tests and provider abstraction started; benchmark/scorecard/provider breadth still open. |
 | Stage 5 | Production controls for real data readiness | Pending | Requires policy/privacy/SLO rollout controls for non-demo operation. |
 

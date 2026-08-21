@@ -9,6 +9,8 @@ different validation technique.
 
 Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [target_architecture.md](target_architecture.md), [future_improvements.md](future_improvements.md), [skills_layer.md](skills_layer.md), and [technical_specs.md](technical_specs.md).
 
+Multi-agent architecture comparison and evaluation framework details are in [langgraph_comparison.md](langgraph_comparison.md).
+
 ```
 Question
   │
@@ -398,7 +400,9 @@ git push → dev branch
   │     ├── uv sync (or python 3.11 venv fallback)
   │     ├── uv run python domains/healthcare/rag-api/tests/test_contracts.py  ← 10 tests, ~2-4 s
   │     ├── python domains/healthcare/rag-api/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
-  │     └── python domains/healthcare/rag-api/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
+  │     ├── python domains/healthcare/rag-api/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
+  │     ├── python -m pytest domains/healthcare/rag-api/tests/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
+  │     └── python -m pytest domains/healthcare/rag-api/tests/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
   │
   └── container-build job
         └── docker build -f domains/healthcare/rag-api/Dockerfile      ← validates image builds
@@ -421,3 +425,5 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 | Adverse event detection end-to-end | Inject known medication + symptom pair, assert `AdverseEvent` node via Cypher |
 | Contraindication alert end-to-end | Inject known condition + medication order, assert contraindication in `graph_context` |
 | Response style regression | Add contract test variant for `response_style: audit` verifying `trace_id` in answer |
+| LangGraph agent integration tests | Add end-to-end tests for specialist agent routing with live infrastructure |
+| MLflow evaluation gate | Add CI job that runs `run_mlflow_evaluation()` and fails when aggregate scores drop below threshold |

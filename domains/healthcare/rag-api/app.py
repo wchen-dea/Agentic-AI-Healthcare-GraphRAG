@@ -638,6 +638,24 @@ Answer with:
 
 def run_query(question: str, patient_id: str | None = None, top_k: int | None = None) -> dict[str, Any]:
     context_limit = min(top_k or settings.max_context_items, max(settings.max_context_items, 8))
+
+    # LangGraph multi-agent path (takes priority when enabled)
+    if _to_bool(os.getenv("RAG_API_LANGGRAPH_ENABLED"), default=False):
+        from langgraph_agents import run_langgraph_query
+        return run_langgraph_query(question=question, patient_id=patient_id)
+
+    # MLflow tracing for single-pass / ReAct when MLFLOW_TRACKING_URI is set
+    if os.getenv("MLFLOW_TRACKING_URI"):
+        from langgraph_agents.mlflow_tracing import trace_query
+        mode = "react" if settings.react_enabled else "single_pass"
+        return trace_query(question, patient_id, mode, _run_query_core, top_k=top_k)
+
+    return _run_query_core(question, patient_id, top_k)
+
+
+def _run_query_core(question: str, patient_id: str | None = None, top_k: int | None = None) -> dict[str, Any]:
+    context_limit = min(top_k or settings.max_context_items, max(settings.max_context_items, 8))
+
     if settings.react_enabled:
         loop_settings = ReactLoopSettings(
             max_iterations=settings.react_max_iters,

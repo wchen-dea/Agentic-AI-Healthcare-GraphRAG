@@ -97,6 +97,58 @@ curl -s -X POST "http://localhost:8000/query" \
 
 Expected: non-null object with `enabled`, `iterations`, and `final_reason`.
 
+### Optional: Enable LangGraph Multi-Agent Mode
+
+Add or update these variables in `.env`:
+
+```bash
+RAG_API_LANGGRAPH_ENABLED=true
+LANGGRAPH_MAX_ITERATIONS=3
+```
+
+Rebuild and recreate `rag-api`:
+
+```bash
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+```
+
+Verify with a smoke query and ensure a `langgraph` object is present in the response:
+
+```bash
+curl -s -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Summarize hyperkalemia risk","patient_id":"patient-0001"}' | jq '.langgraph'
+```
+
+Expected: non-null object with `enabled`, `iterations`, `final_reason`, `confidence`, and `agent_trace`.
+
+LangGraph takes priority over ReAct when both are enabled. See [langgraph_comparison.md](langgraph_comparison.md) for details.
+
+### Optional: Enable MLflow Tracing
+
+Add or update these variables in `.env`:
+
+```bash
+MLFLOW_TRACKING_URI=http://mlflow:5000
+MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
+```
+
+Rebuild and recreate `rag-api`:
+
+```bash
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+```
+
+Verify MLflow UI is reachable:
+
+```bash
+curl -s http://localhost:5000/health
+```
+
+After running queries, traces appear in the MLflow Tracing UI at http://localhost:5000. Tracing works for all three query modes (single-pass, ReAct, LangGraph).
+
 Run only ReAct and planner test suites (CI-safe shortcut):
 
 ```bash
@@ -288,6 +340,23 @@ The panel uses the query tool histogram and should display two series:
 
 - query p50
 - query p95
+
+### 11) MLflow Tracing Health (when enabled)
+
+```bash
+curl -s http://localhost:5000/health
+```
+
+Expected: HTTP 200. If the MLflow container is running, traces are viewable at http://localhost:5000.
+
+Verify traces are being recorded after a query:
+
+```bash
+curl -s -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Summarize hyperkalemia risk","patient_id":"patient-0001"}' > /dev/null
+# Then check MLflow UI for new trace spans
+```
 
 ## Smoke Query
 

@@ -97,6 +97,8 @@ This architecture intentionally combines several patterns so streaming ingestion
 | Bounded Context Window | Max question/context/evidence/answer and response-byte budgets | Prevents unbounded prompt/output growth and latency spikes | Implemented |
 | Observability by Design | Prometheus metrics + Grafana latency dashboards + health probes | Makes latency and failure modes visible during iteration | Implemented |
 | Adapter Pattern for LLM Providers | Provider-agnostic client sketch in architecture doc | Enables Anthropic/OpenAI routing without rewriting retrieval | Roadmap |
+| Multi-Agent Orchestration (LangGraph) | LangGraph StateGraph with specialist agents and conditional routing | Enables domain-specific reasoning branches and iterative confidence-gated retrieval | Implemented (feature-flagged) |
+| MLflow Tracing | Nested span hierarchy across agent nodes, retrievers, and LLM calls | Enables cross-mode pipeline comparison and healthcare-specific evaluation | Implemented (feature-flagged) |
 
 ### Pattern Mapping to Repository Components
 
@@ -108,6 +110,8 @@ This architecture intentionally combines several patterns so streaming ingestion
 - Bounded Context Window: [domains/healthcare/rag-api/app.py](../domains/healthcare/rag-api/app.py) (`max_*` settings and truncation/budget helpers)
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/runbook.md](runbook.md)
 - Adapter Pattern (roadmap): [docs/adrs/0006-local-first-llm-provider-routing.md](adrs/0006-local-first-llm-provider-routing.md)
+- Multi-Agent Orchestration: [domains/healthcare/rag-api/langgraph_agents/](../domains/healthcare/rag-api/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
+- MLflow Tracing: [domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py](../domains/healthcare/rag-api/langgraph_agents/mlflow_tracing.py), [domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py](../domains/healthcare/rag-api/langgraph_agents/mlflow_eval.py)
 
 ## Modern AI Stack Frameworks and Design Patterns Summary
 
@@ -121,10 +125,11 @@ This section maps the current implementation to a modern AI application stack mo
 | Retrieval stores | Vector DB + Graph DB + optional OLAP | Qdrant + Neo4j dual persistence | Implemented |
 | API and tool protocol layer | FastAPI, MCP, tool contracts | FastAPI + embedded FastMCP + MCP tool contracts | Implemented |
 | Agent / orchestration layer | Planner, skill registry, multi-step controller | Deterministic planner + skills layer + role-aware tool policies | Implemented (baseline) |
+| LangGraph multi-agent orchestration | StateGraph with conditional routing and specialist agents | LangGraph StateGraph with triage, retrieval, specialist, and synthesis agents | Implemented (feature-flagged) |
 | ReAct-style iterative control | Reason-act-observe loop controller | Feature-flagged ReAct loop path in rag-api | Implemented (phase 1 skeleton) |
 | Model provider abstraction | Adapter for local and managed providers | Ollama runtime + provider adapter structure | Implemented (single provider runtime) |
-| Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites | Implemented (partial) |
-| Observability and operations | Metrics, dashboards, probes, runbooks | Prometheus + Grafana + blackbox probes + runbook | Implemented |
+| Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites + MLflow evaluation harness | Implemented (partial) |
+| Observability and operations | Metrics, dashboards, probes, runbooks | Prometheus + Grafana + blackbox probes + MLflow tracing + runbook | Implemented |
 | Production governance and safety | Privacy policy, rollout gates, SLO controls | Deployment bundle and policy foundations present | In progress |
 
 ### Design Pattern Summary
@@ -136,6 +141,8 @@ This section maps the current implementation to a modern AI application stack mo
 | Shared-core multi-surface API | Prevents drift between REST and tool protocol behavior | Shared query core for REST and MCP tool endpoints | Implemented |
 | Planner-first retrieval orchestration | Improves determinism before LLM synthesis | Request classification + retrieval planning + ranking | Implemented |
 | ReAct iterative orchestration | Enables multi-step tool use with explicit stop criteria | ReAct controller feature flag path and response metadata | Implemented (phase 1 skeleton) |
+| LangGraph multi-agent orchestration | Enables specialized domain reasoning with graph-based agent routing | StateGraph with triage, retrieval, specialist, confidence, and synthesis nodes | Implemented (feature-flagged) |
+| MLflow tracing and evaluation | Enables cross-mode pipeline comparison and experiment tracking | Nested span tracing + healthcare scorers + mode comparison harness | Implemented (feature-flagged) |
 | Policy enforcement point | Centralizes authorization and output controls | Role/tool checks + evidence shaping + byte budgets | Implemented |
 | Adapter pattern for model providers | Decouples retrieval from generation vendor | Provider adapter abstraction with Ollama runtime | Implemented (partial breadth) |
 | Contract-first evolution | Keeps external API/tool behavior stable as internals evolve | Contract test suite and MCP schema discipline | Implemented |
@@ -147,6 +154,7 @@ This section maps the current implementation to a modern AI application stack mo
 - Multi-provider runtime breadth is not complete yet (adapter exists, runtime is primarily Ollama today).
 - Retrieval benchmark and grounded-answer scorecard automation are not fully enforced as release gates.
 - Policy and privacy controls are present at foundation level but not yet complete for non-demo production governance depth.
+- LangGraph and MLflow integrations are feature-flagged and require further production hardening for non-demo use.
 
 ### Promotion Direction
 
@@ -172,10 +180,11 @@ Scoring guide:
 | Retrieval stores (vector + graph) | 4 | 4 | Qdrant + Neo4j dual persistence in active flow | Add retrieval quality benchmark baselines |
 | API and MCP tool protocol | 4 | 4 | FastAPI + embedded MCP + contract tests | Expand protocol-level regression coverage |
 | Planner and skills orchestration | 3 | 4 | Deterministic planner + skills layer | Add route quality scorecards in CI |
+| LangGraph multi-agent orchestration | 3 | 4 | LangGraph StateGraph with specialist agents, feature-flagged | Add broader agent integration tests and production tuning |
 | ReAct iterative control | 3 | 4 | Feature-flagged ReAct loop and metadata | Add broader loop tests and stop/fallback metrics |
 | Model provider abstraction | 3 | 4 | Adapter structure with Ollama runtime | Add second provider + failover test suite |
-| Evaluation and quality gates | 3 | 4 | Contract + planner evaluation suites | Add retrieval and grounding release gates |
-| Observability and operations | 4 | 4 | Prometheus, Grafana, probes, runbook | Add alert quality tuning and SLO dashboards |
+| Evaluation and quality gates | 3 | 4 | Contract + planner evaluation suites + MLflow evaluation harness | Add retrieval and grounding release gates |
+| Observability and operations | 4 | 4 | Prometheus, Grafana, probes, MLflow tracing, runbook | Add alert quality tuning and SLO dashboards |
 | Production governance and safety | 2 | 3 | Policy/deploy foundations under production bundle | Implement policy/privacy/SLO rollout controls |
 
 Sprint tracking note:
@@ -195,6 +204,7 @@ Synthetic Producer
   -> FastAPI GraphRAG API
     -> request classification + retrieval planning
     -> vector and graph retrieval + evidence ranking
+    -> optional LangGraph multi-agent routing (specialist agents)
     -> provider-adapter generation (current runtime: Ollama)
       -> embedded MCP endpoint (/mcp)
 
@@ -203,6 +213,7 @@ Operational Plane
   -> Conduktor
   -> Prometheus + Blackbox Exporter
   -> Grafana dashboards + alerts
+  -> MLflow Tracing UI
   -> Neo4j Browser + NeoDash
   -> Provider Web UI
 ```
@@ -246,8 +257,9 @@ flowchart LR
     CORE[Shared planner and retrieval core]
     PLAN[Request classifier and planner]
     RANK[Evidence ranker and policy shaper]
+    LGRAPH[LangGraph multi-agent router]
     ADAPT[LLM provider adapter]
-    CORE --> PLAN --> RANK --> ADAPT
+    CORE --> PLAN --> LGRAPH --> RANK --> ADAPT
   end
 
   subgraph AI[AI Application Layer]
@@ -261,6 +273,7 @@ flowchart LR
   K -. inspect .-> CDK
   CORE -. probe .-> PR
   PR --> GF
+  CORE -. trace .-> MLF[MLflow]
 ```
 
 ## Component Interaction Diagram
@@ -629,6 +642,7 @@ monitoring config provides:
 - Prometheus scrape and alerting,
 - Blackbox probes for Kafka/Flink/Neo4j availability,
 - Grafana provisioning for dashboards,
+- MLflow tracing for agent pipeline spans, evaluation experiments, and cross-mode comparison,
 - Flink dashboard for job-level visibility,
 - Conduktor for Kafka topic/cluster/schema browsing.
 
@@ -684,3 +698,5 @@ Recommended next improvements:
 - Migrate wire format to Avro or Protobuf with compatibility enforcement.
 - Add API auth, role-based access control, and tighter CORS.
 - Add end-to-end test suites for stream processing and retrieval quality.
+- Harden LangGraph multi-agent routing with broader specialist-agent tests and production tuning.
+- Expand MLflow evaluation harness with retrieval benchmarks and grounding scorecards as CI gates.
