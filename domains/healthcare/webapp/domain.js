@@ -12,3 +12,12 @@ initQueryForm({
     return { question, patient_id: patientId || null, response_style: "concise" };
   }
 });
+
+// Wire example query links to populate form fields.
+document.querySelectorAll(".example-query").forEach(link => {
+  link.addEventListener("click", e => {
+    e.preventDefault();
+    document.getElementById("question").value = link.dataset.question;
+    document.getElementById("patientId").value = link.dataset.patient || "";
+  });
+});

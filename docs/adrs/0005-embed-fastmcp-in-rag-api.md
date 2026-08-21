@@ -1,7 +1,10 @@
 # ADR-0005: Embed FastMCP in rag-api
 
 - Status: accepted
-- Date: 2026-06-26
+- Date: 2026-06-12
+- Deciders: platform team
+- Supersedes: none
+- Superseded by: none
 
 ## Context
 
@@ -20,9 +23,10 @@ Embed FastMCP in the same rag-api process and expose MCP at `/mcp`.
 - Human diagnostic endpoint remains at `/mcp/health`.
 - `domains/healthcare/mcp-server/` remains as a standalone reference scaffold, not default runtime.
 
-Current implementation alignment:
+Implementation:
 
 - Embedded MCP tools run in the same process as REST query orchestration.
+- Ten MCP tools are exposed: `patient_context_get`, `vector_evidence_search`, `graphrag_answer_generate`, `risk_summary_generate`, `evidence_bundle_export`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`, `skills_plan_get`.
 - Skills planning is available through both REST (`POST /skills/plan`) and MCP (`skills_plan_get`).
 - Tool policy gating is centralized in `domains/healthcare/rag-api/config/tool_policies.json`.
 
@@ -39,8 +43,20 @@ Trade-offs:
 - Shared process resources across REST and MCP traffic.
 - Requires careful route and lifecycle handling for MCP streamable HTTP.
 
+## Alternatives Considered
+
+- Separate MCP service process: rejected because it duplicates retrieval and authorization logic and doubles the container count for local development.
+- gRPC protocol instead of MCP: rejected because MCP provides a standard tool protocol with ecosystem compatibility for agent frameworks.
+
+## Rollout and Verification
+
+- Verify MCP health: `curl -s http://localhost:8000/mcp/health | jq .`
+- Run MCP handshake smoke test: `python3 ./domains/healthcare/scripts/mcp_smoke_test.py`
+- Contract tests in `domains/healthcare/rag-api/tests/test_contracts.py` validate MCP tool shapes.
+
 ## Related
 
+- [ADR-0004: Local-first LLM with provider routing](./0004-local-first-llm-provider-routing.md)
 - [Architecture](../architecture.md)
 - [MCP Layer Design](../mcp_layer_design.md)
 - [Skills Layer](../skills_layer.md)

@@ -7,12 +7,15 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 | # | Title | Layer | Status |
 | --- | --- | --- | --- |
 | [Template](0000-template.md) | ADR template | — | — |
-| [ADR-0001](0001-ontology-governance-and-seed-generation.md) | Ontology governance and seed generation | Semantic model governance and CI conformance | accepted |
-| [ADR-0002](0002-dual-persistence-qdrant-neo4j.md) | Use dual persistence (Qdrant + Neo4j) | Data architecture | accepted |
-| [ADR-0003](0003-qdrant-streaming-vector-store.md) | Qdrant as the streaming vector store for real-time RAG | Data — vector store | accepted |
-| [ADR-0004](0004-skills-layer-standardization-and-validation.md) | Skills layer standardization and validation | Agent orchestration and CI policy | accepted |
+| [ADR-0001](0001-dual-persistence-qdrant-neo4j.md) | Dual persistence (Qdrant + Neo4j) | Data architecture | accepted |
+| [ADR-0002](0002-qdrant-streaming-vector-store.md) | Qdrant as the streaming vector store for real-time RAG | Data — vector store | accepted |
+| [ADR-0003](0003-ontology-governance-and-seed-generation.md) | Ontology governance and seed generation | Semantic model governance | accepted |
+| [ADR-0004](0004-local-first-llm-provider-routing.md) | Local-first LLM with provider routing | AI generation | accepted (partial) |
 | [ADR-0005](0005-embed-fastmcp-in-rag-api.md) | Embed FastMCP in rag-api | API surface | accepted |
-| [ADR-0006](0006-local-first-llm-provider-routing.md) | Local-first LLM with provider routing | AI generation | accepted (partial) |
+| [ADR-0006](0006-skills-layer-standardization-and-validation.md) | Skills layer standardization and validation | Agent orchestration and CI policy | accepted |
+| [ADR-0007](0007-langgraph-multi-agent-orchestration.md) | LangGraph multi-agent query orchestration | Agent orchestration | accepted |
+| [ADR-0008](0008-mlflow-tracing-and-evaluation.md) | MLflow tracing and evaluation for agent pipelines | Observability | accepted |
+| [ADR-0009](0009-domain-module-extraction.md) | Domain module extraction for rag-api | Code architecture | accepted |
 
 ## Conventions
 

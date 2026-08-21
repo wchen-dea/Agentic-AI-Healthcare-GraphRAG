@@ -2,7 +2,7 @@
 
 ## 1. Container Inventory
 
-All services are defined in `docker-compose.infra.yml` and `docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
+All services are defined in `container/docker-compose.infra.yml` and `container/docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
 
 | Container | Image | Version | Host Ports | Role |
 |-----------|-------|---------|-----------|------|
@@ -28,11 +28,12 @@ All services are defined in `docker-compose.infra.yml` and `docker-compose.healt
 | `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
 | `infra-blackbox-exporter` | prom/blackbox-exporter | latest | 9115 | HTTP probe exporter |
 | `infra-grafana` | grafana/grafana | latest | 3000 | Metrics dashboards |
+| `infra-mlflow` | ghcr.io/mlflow/mlflow | v2.21.3 | 5000 | Agent tracing and evaluation |
 | `localstack` | localstack/localstack | 3.8.0 | 4566, 4510–4559 | Local AWS-compatible services |
 
 ### Supply Chain Domain Containers (optional overlay)
 
-Launched via `docker compose -f docker-compose.yml -f docker-compose.supply-chain.yml up -d`.
+Launched via `docker compose -f container/docker-compose.infra.yml -f container/docker-compose.supply-chain.yml up -d`.
 
 | Container | Image | Version | Host Ports | Role |
 |-----------|-------|---------|-----------|------|
@@ -61,6 +62,10 @@ Launched via `docker compose -f docker-compose.yml -f docker-compose.supply-chai
 | httpx | 0.27.2 | Async HTTP (MCP transport) |
 | email-validator | ≥2.2.0 | Pydantic email field support |
 | prometheus-client | 0.23.1 | Metrics exposition |
+| langgraph | ≥0.4.1,<1.0.0 | Multi-agent StateGraph orchestration |
+| langchain-core | ≥0.3.0,<1.0.0 | Tool abstractions for LangGraph agents |
+| langsmith | ≥0.3.0,<1.0.0 | LangSmith tracing integration |
+| mlflow | ≥2.21.0,<3.0.0 | Agent tracing spans and evaluation harness |
 
 > **Note:** `pydantic` is pinned with a range (`>=2.11.7,<3.0.0`) rather than an exact version because `mcp==1.28.0` requires `pydantic>=2.12.0` on Python 3.14. The range allows pip to resolve on Python 3.11 (CI/Docker target) and 3.14+ without conflict.
 
@@ -446,6 +451,29 @@ Launched via `docker compose -f docker-compose.yml -f docker-compose.supply-chai
 | `rag_api_tool_execution_duration_seconds` | Histogram | `tool`, `outcome` |
 | `rag_api_tool_execution_total` | Counter | `tool`, `outcome` |
 
+### MLflow tracing metrics
+
+When `MLFLOW_TRACKING_URI` is set, MLflow traces every query pipeline as a nested span hierarchy:
+
+| Span | Type | Attributes |
+|------|------|------------|
+| `healthcare_query_{mode}` | CHAIN | `mode`, `request_type`, `patient_count`, `vector_hits`, `graph_hits`, `answer_length`, `latency_ms` |
+| `agent:{name}` | AGENT | `agent`, `action`, `latency_ms` |
+| `llm_generate` | LLM | `answer_length`, `is_error`, `latency_ms` |
+| `vector_search` | RETRIEVER | `result_count`, `latency_ms` |
+| `graph_lookup` | RETRIEVER | `result_count`, `latency_ms` |
+
+### MLflow evaluation scorers
+
+| Scorer | What it measures |
+|--------|------------------|
+| `routing_accuracy` | Triage agent classified to expected request type |
+| `agent_coverage` | All expected specialist agents activated |
+| `evidence_completeness` | Both vector and graph channels contributed |
+| `answer_quality` | Non-empty, non-error, reasonable-length answer |
+| `safety_caveat` | Answer includes clinical disclaimer |
+| `latency` | Pipeline completed within threshold |
+
 ---
 
 ## 11. CI / CD Pipeline
@@ -511,3 +539,9 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `RAG_API_DEFAULT_CALLER_ROLE` | `generation` | rag-api | Role when no header present |
 | `RAG_API_AUDIT_LOG_PATH` | `logs/rag_api_audit.log` | rag-api | Audit JSONL output path |
 | `RAG_API_SKILLS_LAYER_PATH` | `config/skills_layer.json` | rag-api | Skills layer source for plan resolution |
+| `RAG_API_LANGGRAPH_ENABLED` | `false` | rag-api | Enable LangGraph multi-agent orchestration |
+| `LANGGRAPH_MAX_ITERATIONS` | `3` | rag-api | Max confidence re-retrieval loops in LangGraph mode |
+| `MLFLOW_TRACKING_URI` | (unset) | rag-api | MLflow server URL; enables tracing when set |
+| `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | rag-api | MLflow experiment name for traces and evaluation runs |
+| `LANGSMITH_API_KEY` | (unset) | rag-api | LangSmith API key; enables LangSmith tracing when set |
+| `LANGSMITH_PROJECT` | `healthcare-graphrag` | rag-api | LangSmith project name |

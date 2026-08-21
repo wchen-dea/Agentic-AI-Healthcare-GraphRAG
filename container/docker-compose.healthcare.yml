@@ -1,5 +1,5 @@
 # Healthcare domain overlay.
-# Usage: docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d
+# Usage: docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d
 
 services:
   kafka-init:
@@ -44,7 +44,7 @@ services:
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data
-      - ./domains/healthcare/neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
+      - ../domains/healthcare/neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
 
   neo4j-init:
     image: neo4j:5.26.2
@@ -54,9 +54,9 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: /bin/sh /bootstrap.sh
     volumes:
-      - ./domains/healthcare/neo4j/init.cypher:/init.cypher
-      - ./domains/healthcare/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
-      - ./domains/healthcare/neo4j/bootstrap.sh:/bootstrap.sh
+      - ../domains/healthcare/neo4j/init.cypher:/init.cypher
+      - ../domains/healthcare/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
+      - ../domains/healthcare/neo4j/bootstrap.sh:/bootstrap.sh
 
   neodash:
     image: neo4jlabs/neodash:latest
@@ -79,7 +79,7 @@ services:
 
   flink-jobmanager:
     build:
-      context: .
+      context: ..
       dockerfile: domains/healthcare/flink-app/Dockerfile
     container_name: healthcare-flink-jobmanager
     ports:
@@ -96,7 +96,7 @@ services:
 
   flink-taskmanager:
     build:
-      context: .
+      context: ..
       dockerfile: domains/healthcare/flink-app/Dockerfile
     container_name: healthcare-flink-taskmanager
     depends_on:
@@ -111,14 +111,14 @@ services:
 
   producer:
     build:
-      context: .
+      context: ..
       dockerfile: domains/healthcare/producer/Dockerfile
     container_name: healthcare-producer
     depends_on:
       kafka-init:
         condition: service_completed_successfully
     env_file:
-      - path: ./.env
+      - path: ../.env
         required: false
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29093,kafka3:29094
@@ -127,7 +127,7 @@ services:
 
   flink-app:
     build:
-      context: .
+      context: ..
       dockerfile: domains/healthcare/flink-app/Dockerfile
     container_name: healthcare-flink-app
     depends_on:
@@ -144,7 +144,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     env_file:
-      - path: ./.env
+      - path: ../.env
         required: false
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29093,kafka3:29094
@@ -161,7 +161,7 @@ services:
 
   rag-api:
     build:
-      context: .
+      context: ..
       dockerfile: domains/healthcare/rag-api/Dockerfile
     container_name: healthcare-rag-api
     depends_on:
@@ -170,7 +170,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - path: ./.env
+      - path: ../.env
         required: false
     environment:
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
@@ -181,10 +181,12 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
       MCP_SERVER_NAME: HealthcareGraphRAG MCP
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-healthcare-graphrag}
 
   provider-web:
     build:
-      context: .
+      context: ..
       dockerfile: domains/healthcare/webapp/Dockerfile
     container_name: healthcare-webapp
     depends_on:

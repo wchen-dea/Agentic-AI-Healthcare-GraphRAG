@@ -1,5 +1,5 @@
 # Supply Chain domain overlay.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.supply-chain.yml up -d
+# Usage: docker compose -f container/docker-compose.infra.yml -f container/docker-compose.supply-chain.yml up -d
 
 services:
   neo4j-sc:
@@ -23,9 +23,9 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: /bin/sh /bootstrap.sh
     volumes:
-      - ./domains/supply-chain/neo4j/init.cypher:/init.cypher
-      - ./domains/supply-chain/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
-      - ./domains/supply-chain/neo4j/bootstrap.sh:/bootstrap.sh
+      - ../domains/supply-chain/neo4j/init.cypher:/init.cypher
+      - ../domains/supply-chain/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
+      - ../domains/supply-chain/neo4j/bootstrap.sh:/bootstrap.sh
 
   qdrant-sc:
     image: qdrant/qdrant:latest
@@ -57,7 +57,7 @@ services:
 
   sc-producer:
     build:
-      context: .
+      context: ..
       dockerfile: domains/supply-chain/producer/Dockerfile
     container_name: supplychain-producer
     depends_on:
@@ -70,11 +70,11 @@ services:
       TRANSACTION_EVENTS_PER_INTERVAL: "3"
       REFERENCE_EVENTS_PER_INTERVAL: "2"
     volumes:
-      - ./domains/supply-chain/schemas:/app/schemas
+      - ../domains/supply-chain/schemas:/app/schemas
 
   sc-webapp:
     build:
-      context: .
+      context: ..
       dockerfile: domains/supply-chain/webapp/Dockerfile
     container_name: supplychain-webapp
     depends_on:
@@ -84,7 +84,7 @@ services:
 
   sc-rag-api:
     build:
-      context: .
+      context: ..
       dockerfile: domains/supply-chain/rag-api/Dockerfile
     container_name: supplychain-rag-api
     depends_on:
@@ -104,7 +104,7 @@ services:
 
   sc-flink-processor:
     build:
-      context: .
+      context: ..
       dockerfile: domains/supply-chain/flink-app/Dockerfile
     container_name: supplychain-flink-processor
     depends_on:

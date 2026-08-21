@@ -36,6 +36,18 @@
             <textarea id="question" rows="4" placeholder="Enter a clinical evidence question..." required></textarea>
           </label>
 
+          <details class="example-queries">
+            <summary>Example queries (multi-agent scenarios)</summary>
+            <ul>
+              <li><a href="#" class="example-query" data-question="Review medication safety: are there dangerous interactions or contraindications for this patient given their current labs and conditions?" data-patient="patient-0001">Polypharmacy safety review (patient-0001)</a></li>
+              <li><a href="#" class="example-query" data-question="This patient has elevated potassium. Are any current medications contraindicated for hyperkalemia? Trace the causal chain from lab result to condition to contraindication rule." data-patient="patient-0001">Hyperkalemia contraindication chain (patient-0001)</a></li>
+              <li><a href="#" class="example-query" data-question="Is this patient on both an ACE inhibitor and a potassium-sparing diuretic? What is the interaction risk, severity, and mechanism?" data-patient="patient-0001">Dual RAAS blockade check (patient-0001)</a></li>
+              <li><a href="#" class="example-query" data-question="Provide a comprehensive safety assessment: interactions, contraindications, lab-confirmed risks, and adverse reaction history for this polypharmacy patient." data-patient="patient-0050">Multi-condition polypharmacy (patient-0050)</a></li>
+              <li><a href="#" class="example-query" data-question="The patient's clinical notes mention dizziness and nausea. Cross-reference these symptoms against known adverse reactions for all active medications." data-patient="patient-0003">Adverse reaction correlation (patient-0003)</a></li>
+              <li><a href="#" class="example-query" data-question="This patient is on both a corticosteroid and insulin. Does the graph show a hyperglycemia interaction risk? Confirm with lab glucose or HbA1c signals." data-patient="patient-0015">Steroid-insulin conflict (patient-0015)</a></li>
+            </ul>
+          </details>
+
           <button id="submitBtn" type="submit">Run Query</button>
         </form>
       </section>

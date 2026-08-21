@@ -6,12 +6,13 @@ This project now includes an explicit Skills layer that operationalizes the flow
 
 Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools
 
-The standardization and CI validation policy for this layer is formalized in [ADR-0004](adrs/0004-skills-layer-standardization-and-validation.md).
+The standardization and CI validation policy for this layer is formalized in [ADR-0006](adrs/0006-skills-layer-standardization-and-validation.md).
 
 The layer is runtime-backed (not documentation-only):
 
 - Skill catalog and goal mappings are defined in [rag-api/config/skills_layer.json](../domains/healthcare/rag-api/config/skills_layer.json).
 - Resolution logic is implemented in [rag-api/skills_layer.py](../domains/healthcare/rag-api/skills_layer.py).
+- LangGraph multi-agent orchestration maps skills to specialized agent nodes in [rag-api/langgraph_agents/agents.py](../domains/healthcare/rag-api/langgraph_agents/agents.py).
 - Runtime access is exposed through:
   - REST: POST /skills/plan
   - MCP tool: skills_plan_get
@@ -34,6 +35,7 @@ Agent identity is a planner/runtime persona that orchestrates the skill sequence
 
 - Default agent comes from goal configuration.
 - Caller can override via optional agent field in skills_plan_get.
+- In LangGraph mode, the triage agent classifies requests and routes to specialist agents (`medication_safety_agent`, `lab_interpretation_agent`, `coding_review_agent`) based on request type.
 
 ### 3) Skills
 

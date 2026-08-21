@@ -1,7 +1,7 @@
-# ADR-0003: Qdrant as the Streaming Vector Store for Real-Time RAG
+# ADR-0002: Qdrant as the Streaming Vector Store for Real-Time RAG
 
 - Status: accepted
-- Date: 2026-06-26
+- Date: 2026-06-12
 - Deciders: platform team
 - Supersedes: none
 - Superseded by: none
@@ -82,7 +82,7 @@ Positive:
 
 Trade-offs:
 
-- Qdrant is the second data store alongside Neo4j (ADR-0002), adding operational surface area.
+- Qdrant is the second data store alongside Neo4j (ADR-0001), adding operational surface area.
 - Collection migration on model upgrade requires a dual-collection parallel-serve window and a backfill Flink job before cutting over.
 - Sparse vector indexing increases memory footprint; must be monitored for large clinical vocabularies.
 - gRPC batching introduces a small buffering delay (configurable); must be tuned against latency SLOs.
@@ -106,7 +106,22 @@ Trade-offs:
 
 ## Related
 
-- [ADR-0002: Dual Persistence (Qdrant + Neo4j)](./0002-dual-persistence-qdrant-neo4j.md)
+- [ADR-0001: Dual Persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
 - [Architecture](../architecture.md)
 - [Kafka Schema](../kafka_schema.md)
 - [Conduktor — Vector Embeddings in Streaming](https://www.conduktor.io/glossary/vector-embeddings-in-streaming)
+
+## Implementation Note (2026-08-21)
+
+The current deployment uses a simplified Qdrant configuration compared to the target schema above:
+
+| Aspect | ADR Target | Current Implementation |
+| --- | --- | --- |
+| Collection name | `medical_events_v1` | `healthcare_events` |
+| Vector dimensions | 1,536 (text-embedding-3-small) | 384 (sentence-transformers/all-MiniLM-L6-v2) |
+| Search mode | Dense + sparse hybrid | Dense only |
+| Client protocol | gRPC batched upserts | HTTP QdrantClient |
+| Payload indexes | Explicit `CreateFieldIndex` | Not explicitly created |
+| Lineage fields | `embedding_model`, `model_version`, `source_event_id`, `ingested_at` | `event_id`, `event_ts`, `event_type`, `patient_id` |
+
+The accepted architectural direction remains valid. The current implementation serves the local-first development stack with a lightweight embedding model. Migration to the full ADR-0002 schema is planned alongside neural embedding deployment and collection versioning.

@@ -320,8 +320,13 @@ dependency. This ensures:
 - Predictable inference costs (no per-token fees)
 - Model selection is operator-controlled via `OLLAMA_MODEL`
 
-Anthropic/OpenAI routing is documented as a roadmap extension (ADR-0006) but is not
+Anthropic/OpenAI routing is documented as a roadmap extension (ADR-0004) but is not
 active in the current implementation.
+
+Multi-agent orchestration is implemented via LangGraph with specialist agents for
+medication safety, lab interpretation, and coding review (feature-flagged via
+`RAG_API_LANGGRAPH_ENABLED`). Agent execution is traceable through MLflow spans and
+LangSmith traces when the respective tracking backends are configured.
 
 ### Guardrails enforced at the API layer
 
@@ -361,6 +366,9 @@ containing:
 | `latency_ms` | End-to-end latency |
 | `response_size_bytes` | Response payload size |
 | `error` | Error message (on failure only) |
+
+When MLflow tracing is enabled, `trace_id` values correlate with MLflow span hierarchies
+for end-to-end pipeline observability including per-agent latency and evaluation scores.
 
 ### Access control
 

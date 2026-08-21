@@ -1,15 +1,48 @@
 # Agentic AI Healthcare GraphRAG
 
-A multi-domain hybrid GraphRAG system built on Kafka, PyFlink, Qdrant, Neo4j, FastAPI, and Ollama.
+A production-grade, multi-agent healthcare intelligence platform that combines streaming event processing, hybrid GraphRAG retrieval, and agentic AI orchestration to deliver real-time clinical decision support.
+
+Built on Kafka, PyFlink, Qdrant, Neo4j, LangGraph, FastAPI, and Ollama — the system processes healthcare events in real time, builds a patient-centric knowledge graph with pharmacovigilance safety rules, and answers clinical questions using grounded evidence from both semantic search and graph traversal.
+
 The first domain is **Healthcare Provider**; a parallel **Supply Chain Resilience** domain ships alongside it under `domains/supply-chain/`.
+
+## Why This Platform
+
+Healthcare AI systems fail when they rely solely on LLM prompting without deterministic clinical evidence. This platform solves that by combining three capabilities that most AI prototypes lack:
+
+1. **Streaming-first evidence freshness** — events are queryable within seconds of arrival, not after overnight batch jobs.
+2. **Hybrid retrieval with deterministic safety rules** — drug interactions, contraindications, and lab-to-condition signals are graph edges with mechanism annotations, not probabilistic guesses.
+3. **Multi-agent specialist reasoning** — LangGraph routes medication safety, lab interpretation, and coding review queries to domain-specific agents that extract structured risk chains before LLM synthesis.
+
+### Practical Value
+
+| Stakeholder | What the platform delivers |
+| --- | --- |
+| Clinical teams | Real-time risk signals: drug interaction alerts with mechanism explanations, lab-confirmed contraindication chains, adverse event correlation across active medications |
+| Pharmacists | Polypharmacy safety review: 41 seeded interaction rules, 23 contraindication rules, and 46 adverse reaction rules evaluated against the patient's current medication orders and lab results |
+| Revenue cycle analysts | Coding gap detection: conditions present in the graph but missing ICD-10 mappings, flagged before claim submission |
+| Population health teams | Cohort risk stratification from cross-patient graph traversal and vector similarity |
+| Engineering teams | A reusable multi-domain blueprint: add a new domain by extending topic contracts, graph models, and enrichment rules without modifying the platform core |
+
+### AI Trends Alignment
+
+| Trend | How this platform implements it |
+| --- | --- |
+| Agentic AI | LangGraph StateGraph with 8 specialized agents, conditional routing, and confidence-gated re-retrieval loops |
+| GraphRAG | Hybrid vector + graph retrieval with deterministic evidence ranking before LLM synthesis |
+| Multi-modal retrieval | Qdrant semantic similarity + Neo4j relationship traversal combined in every query response |
+| Tool-use protocols | 10 MCP tools embedded in rag-api with role-based authorization and audit trails |
+| Evaluation-driven AI | MLflow tracing with 6 healthcare-specific scorers and cross-mode comparison |
+| Local-first AI | Ollama inference with zero API fees; provider abstraction ready for Anthropic/OpenAI routing |
+| Streaming AI pipelines | Kafka + PyFlink continuous enrichment with Avro schema governance |
 
 ## Summary
 
 This project provides a domain-agnostic AI platform blueprint across three dimensions:
 
-- Technical leadership: streaming-first ingestion, dual evidence stores (vector plus graph), and agent-ready APIs (REST + MCP) on shared reasoning logic.
-- Industry innovation: one reusable architecture for clinical, operational, financial, and supply chain AI workflows.
-- Implementation maturity: complete local development stack plus production-ready deployment configuration variants for AI deliverables.
+- **Technical depth**: streaming-first ingestion, dual evidence stores (vector + graph), multi-agent orchestration (LangGraph), and agent-ready APIs (REST + MCP) on shared domain modules.
+- **Industry applicability**: one reusable architecture for clinical, operational, financial, and supply chain AI workflows with domain-specific specialist agents.
+- **Implementation maturity**: complete local development stack with 97 tests, MLflow tracing, 48-medication safety knowledge graph, and production deployment configuration.
 
 Repository intent:
 
@@ -27,20 +60,29 @@ Production boundary in this repository:
 - Data Stores: Qdrant (vector), Neo4j (graph)
 - API and AI: FastAPI + embedded FastMCP, Ollama (local-first)
 - Frontend: Static provider web app (Nginx-served)
-- Observability: Prometheus, Grafana, Blackbox Exporter
+- Agent Orchestration: LangGraph multi-agent StateGraph, LangChain tools
+- Observability: Prometheus, Grafana, Blackbox Exporter, MLflow Tracing, LangSmith
 - Operations and Tooling: Docker Compose, Conduktor, NeoDash
 
 ## What This Repository Runs
 
-End-to-end healthcare intelligence pipeline:
+A complete healthcare intelligence pipeline — from synthetic event generation to grounded AI answers — running entirely on a laptop:
 
-- generates synthetic transactional and reference healthcare events,
-- streams events through Kafka and Schema Registry,
-- processes streams in a native PyFlink DataStream job,
-- enriches transactional events with master data,
-- writes dual sinks to Qdrant and Neo4j,
-- serves GraphRAG responses through a FastAPI API backed by Ollama,
-- exposes provider and observability surfaces for local exploration.
+```
+Synthetic events → Kafka → PyFlink enrichment → Qdrant + Neo4j dual sinks
+                                                        ↓
+Clinical question → Multi-agent triage → Vector + Graph retrieval
+                                                        ↓
+                    Specialist agents → Evidence ranking → LLM synthesis → Answer
+```
+
+Concrete capabilities out of the box:
+
+- Generates realistic clinical events (notes, labs, medications, claims, device telemetry) across 48 medications and 18 lab panels.
+- Streams and enriches events in real time through a native PyFlink DataStream job.
+- Builds a patient-centric knowledge graph with drug interactions, adverse reactions, contraindications, and lab-to-condition signals.
+- Answers clinical questions using multi-agent reasoning with explainable evidence from both vector similarity and graph relationships.
+- Provides a provider-facing web UI, MCP tool integration, and full observability stack.
 
 ## Healthcare Domain Readiness
 
@@ -71,9 +113,9 @@ The supply-chain domain runs in parallel using its own Neo4j instance, Qdrant co
 Launch supply-chain alongside healthcare:
 
 ```bash
-docker compose -f docker-compose.infra.yml \
-  -f docker-compose.healthcare.yml \
-  -f docker-compose.supply-chain.yml \
+docker compose -f container/docker-compose.infra.yml \
+  -f container/docker-compose.healthcare.yml \
+  -f container/docker-compose.supply-chain.yml \
   up -d
 ```
 
@@ -87,12 +129,17 @@ Supply-chain service endpoints:
 
 ## Innovation Highlights
 
-- Real-time healthcare intelligence stack: Kafka + Flink processing with Avro schema-governed event contracts.
-- Hybrid GraphRAG retrieval: Qdrant vector evidence plus Neo4j relationship context in one grounded answer flow.
-- Streaming enrichment pattern: reference/master data fused into transactional events before vector and graph persistence.
-- Local-first AI runtime with bounded generation controls and model fallback for resilient development workflows.
-- Explainability by design: API returns both vector_context and graph_context alongside generated responses.
-- Operations-first engineering: Prometheus, Grafana, Flink UI, and Conduktor integrated for full-stack observability.
+| Category | Capability |
+| --- | --- |
+| **Streaming intelligence** | Kafka + PyFlink continuous processing with Avro schema-governed contracts; events queryable in seconds |
+| **Hybrid GraphRAG** | Qdrant vector evidence + Neo4j relationship context in every answer; deterministic evidence ranking before LLM synthesis |
+| **Multi-agent orchestration** | LangGraph StateGraph with 8 nodes: triage → retrieval → specialist agents (medication safety, lab interpretation, coding review) → confidence evaluation → synthesis |
+| **Pharmacovigilance knowledge graph** | 41 drug interaction edges with mechanism annotations, 46 adverse reaction edges with MedDRA terms, 23 contraindication edges — all deterministic, not probabilistic |
+| **Explainability** | API returns `vector_context`, `graph_context`, `retrieval_plan`, `agent_trace`, and `confidence` alongside every answer |
+| **Tool protocol** | 10 MCP tools with role-based authorization, SHA-256 audit hashing, and response budget enforcement |
+| **Evaluation framework** | MLflow tracing with nested spans (CHAIN → AGENT → RETRIEVER → LLM) and 6 healthcare scorers for cross-mode comparison |
+| **Domain scalability** | Add new domains (supply chain, insurance, cybersecurity) by extending topic contracts, graph models, and enrichment rules — platform core stays stable |
+| **Local-first AI** | Full stack runs on a laptop with zero API fees; Ollama provider abstraction ready for managed providers |
 
 ## Runtime Summary
 
@@ -104,22 +151,27 @@ Producer
      -> Qdrant vector upserts
      -> Neo4j graph merges
   -> FastAPI GraphRAG API
-     -> Qdrant semantic context
-     -> Neo4j relationship context
-     -> Ollama answer generation
+     -> request classification + retrieval planning
+     -> vector retrieval (Qdrant) + graph retrieval (Neo4j)
+     -> evidence ranking + response policy
+     -> query mode dispatch:
+        single-pass (default) | ReAct loop | LangGraph multi-agent
+     -> LLM synthesis via provider abstraction (Ollama)
 
 Ops/UI
   -> Provider web app
   -> Flink dashboard
   -> Conduktor Console
   -> Prometheus + Grafana + Blackbox Exporter
+  -> MLflow Tracing UI
   -> Neo4j Browser + NeoDash
 ```
 
 ## LLM Strategy
 
 - Local default: Ollama using OLLAMA_URL and OLLAMA_MODEL.
-- Current implementation in `domains/healthcare/rag-api/app.py` uses Ollama `/api/generate` directly.
+- LLM calls are routed through a provider abstraction in `domains/healthcare/rag-api/llm_provider.py`; the default provider is `OllamaProvider`.
+- Prompt construction and synthesis logic are in `domains/healthcare/rag-api/domain/synthesis.py`.
 - Active latency and output controls: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
 - Temperature is currently fixed in code (`0.2`) and is not yet env-configurable.
 - Anthropic/OpenAI provider routing remains a documented extension path, not the active local runtime.
@@ -133,21 +185,65 @@ Ops/UI
 
 ## Key Capabilities
 
-- Hybrid retrieval that combines semantic nearest-neighbor evidence from Qdrant with patient-centric relationship context from Neo4j.
-- Reference-data enrichment for patients, providers, devices, medications, and payers before sink writes.
-- 14-rule lab signal engine: each lab result is evaluated against clinical thresholds at ingest time and `MAY_INDICATE` edges are written atomically to Neo4j (Hyperkalemia, AMI, CKD, Anemia, Hyperlipidemia, Hypothyroidism, and more).
-- FAERS-aligned pharmacovigilance: adverse event detection fires after every `CLINICAL_NOTE` event by matching the documented symptom against `HAS_KNOWN_REACTION` graph edges for the patient's currently ordered medications.
-- Drug safety knowledge graph: `INTERACTS_WITH` edges carry mechanism annotations; `HAS_KNOWN_REACTION` edges carry MedDRA terms and severity; `CONTRAINDICATED_FOR` edges encode clinical contraindication reasoning — all seeded at stack startup from `domains/healthcare/neo4j/init.cypher`.
-- ICD-10 coding: clinical note events carry an `icd10_code` field written as `(Condition)-[:CODED_AS]->(ICD10Code)` edges, enabling coding-gap queries across the graph.
-- Expanded synthetic event scope: 24-medication catalog with active ingredients, 18-lab-test panels with per-test abnormality thresholds, device alerts (tachycardia, hypoxia, hypertension), CPT procedure descriptions, and claims financial fields (billed/allowed amounts, service dates).
-- graph_context response includes `lab_signals`, `adverse_events`, `contraindications`, `icd10_codes`, and enriched `medications` / `vitals` / `claims` payloads visible in every API and MCP tool response.
-- Native Flink job visibility from the Flink dashboard.
-- Local observability for Kafka, Flink, Neo4j, and Qdrant.
-- Provider-facing UI for query workflows without curl.
-- Embedded MCP tool endpoint in rag-api for agent integration without a separate MCP service.
-- Runtime Skills layer planning endpoint and MCP tool (`/skills/plan`, `skills_plan_get`) to map business goals to executable tool chains.
-- Role-based API and MCP guardrails with caller-policy authorization, evidence redaction rules, and response budget metadata.
-- CI-backed rag-api contract checks plus container build validation for the hardened API surface.
+### Clinical Intelligence
+
+- **Hybrid retrieval**: semantic nearest-neighbor evidence from Qdrant combined with patient-centric relationship context from Neo4j — every answer is grounded in both similarity and explicit clinical relationships.
+- **14-rule lab signal engine**: each lab result is evaluated against clinical thresholds at ingest time (`MAY_INDICATE` edges written to Neo4j). Covers Hyperkalemia, AMI, CKD, Anemia, Hyperlipidemia, Hypothyroidism, and 8 more conditions.
+- **FAERS-aligned pharmacovigilance**: adverse event detection fires after every clinical note by matching symptoms against `HAS_KNOWN_REACTION` graph edges for the patient's active medications.
+- **Drug safety knowledge graph**: 41 `INTERACTS_WITH` edges with mechanism annotations, 46 `HAS_KNOWN_REACTION` edges with MedDRA terms, 23 `CONTRAINDICATED_FOR` edges — seeded at startup from `domains/healthcare/neo4j/generated_ontology_seeds.cypher`.
+
+### Agentic AI
+
+- **Three query orchestration modes**: single-pass (default), ReAct iterative loop, and LangGraph multi-agent — all coexisting behind feature flags.
+- **Specialist agents**: medication safety, lab interpretation, and coding review agents extract structured risk data that single-pass pipelines cannot.
+- **Confidence-gated retrieval**: low-confidence results trigger re-retrieval loops bounded by configurable iteration limits.
+- **Skills layer**: business goals map to agent → skill → tool chains through a runtime planning API.
+
+### Platform and Operations
+
+- **48-medication catalog** with active ingredients, 18 lab-test panels with per-test abnormality thresholds, device alerts, CPT procedures, and claims financial fields.
+- **10 MCP tools** with role-based authorization, evidence redaction, and response budget enforcement.
+- **MLflow tracing** with nested spans across all query modes and 6 healthcare-specific evaluation scorers.
+- **97 automated tests**: contract tests, planner evaluation, ReAct controller, LangGraph agent routing, MLflow integration, and polypharmacy scenario validation.
+- **ICD-10 coding gap detection**: conditions present in the graph but missing coded diagnoses, surfaced before claim submission.
+- **Full observability**: Prometheus metrics, Grafana dashboards, MLflow Tracing UI, Flink dashboard, Conduktor, and JSON audit logs.
+
+## Query Orchestration Modes
+
+The rag-api supports three query orchestration modes, selectable via environment variables:
+
+| Mode | Env Variable | Response Metadata | Description |
+| --- | --- | --- | --- |
+| Single-pass (default) | (none) | `retrieval_plan` | Classify → plan → vector + graph → rank → synthesize |
+| ReAct loop | `RAG_API_REACT_ENABLED=true` | `react` block | Iterative retrieval with confidence gating |
+| LangGraph multi-agent | `RAG_API_LANGGRAPH_ENABLED=true` | `langgraph` block | Specialist agents with conditional routing |
+
+LangGraph takes priority over ReAct when both are enabled. All three modes share the same retrieval (`domain/retrieval.py`), ranking (`domain/evidence.py`), synthesis (`domain/synthesis.py`), and response policy (`domain/response_policy.py`) modules.
+
+## Multi-Agent Use Case: Polypharmacy Medication Safety
+
+The primary multi-agent demonstration scenario is a polypharmacy medication safety review. This is where the LangGraph multi-agent mode delivers the most value over single-pass:
+
+**Scenario:** A patient on Warfarin + Aspirin + Lisinopril + Spironolactone with Chronic Kidney Disease and elevated Potassium (6.1 mmol/L).
+
+**Agent activation chain:**
+1. `triage_agent` classifies as `medication_safety`
+2. `vector_retrieval_agent` finds medication_order and lab_result events
+3. `graph_retrieval_agent` returns interactions, contraindications, lab signals, adverse events
+4. `medication_safety_agent` extracts the causal chain: Warfarin+Aspirin bleeding risk, dual potassium-sparing contraindication confirmed by lab
+5. `confidence_evaluator` confirms dual-channel evidence (1.0)
+6. `synthesis_agent` generates a grounded answer citing the mechanism chain
+
+```bash
+curl -s -X POST "http://localhost:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Review medication safety: are there dangerous interactions or contraindications for this patient given their current labs and conditions?",
+    "patient_id": "patient-0001"
+  }' | jq '{request_type, answer, interactions: [.graph_context[0].interactions[]?], contraindications: [.graph_context[0].contraindications[]?], lab_signals: [.graph_context[0].lab_signals[]?]}'
+```
+
+Additional multi-agent query examples are in `domains/healthcare/scripts/query_examples.sh` under the `MultiAgent-*` and `DualPath-MultiAgent-*` sections.
 
 ## Skills Layer And Agent Skills Packages
 
@@ -171,7 +267,7 @@ python scripts/validate_agent_skills.py
 
 ```bash
 curl -s http://localhost:8000/mcp/health | jq .
-python3 ./scripts/mcp_smoke_test.py
+python3 ./domains/healthcare/scripts/mcp_smoke_test.py
 ```
 
 ## Quick Start
@@ -197,7 +293,7 @@ make up          # or: make up-hc (healthcare only) / make up-sc (supply-chain o
 Or without the Makefile:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 ### Local Python Environment
@@ -218,13 +314,18 @@ make up          # Start infra + healthcare + supply-chain
 make up-hc       # Start infra + healthcare only
 make up-sc       # Start infra + supply-chain only
 make down-all    # Stop everything
+make build       # Build healthcare images (default)
+make build-all   # Build all images (healthcare + supply-chain)
 make ps          # Show running containers
 make neo4j-hc    # Open healthcare Neo4j shell
 make neo4j-sc    # Open supply-chain Neo4j shell
+make query-hc    # Run healthcare query examples
+make query-sc    # Run supply-chain query examples
 make test-hc     # Run healthcare validation tests
 make test-sc     # Run supply-chain validation tests
 make topics      # List all Kafka topics
 make logs        # Tail healthcare logs
+make pull-model  # Pull the Ollama LLM model
 make fresh       # Full clean restart with both domains
 ```
 
@@ -258,7 +359,7 @@ cp .env.example .env
 4. Recreate or restart affected services after changing secret-bearing values:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 The values in `.env.example` are development placeholders. Replace them in `.env` if you want non-default local credentials.
@@ -272,8 +373,8 @@ Local Kafka topology after startup:
 If your local stack was created before the move to three brokers, existing Kafka topics may still have replication factor `1` because topic creation is idempotent. To fully reprovision the local Kafka cluster with replication factor `3`, recreate the local Kafka state when it is safe to do so:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml down -v
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --build
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
 ```
 
 Pull the LLM model used by the API:
@@ -287,14 +388,14 @@ Optional one-shot validation:
 ```bash
 ./scripts/validate_docs.sh
 ./scripts/validate_stack.sh
-./scripts/query_examples.sh
-python3 ./scripts/mcp_smoke_test.py
+./domains/healthcare/scripts/query_examples.sh
+python3 ./domains/healthcare/scripts/mcp_smoke_test.py
 ```
 
 CI-safe ReAct/planner validation (without full contract suite):
 
 ```bash
-./scripts/test_react_planner.sh
+./domains/healthcare/scripts/test_react_planner.sh
 ```
 
 ### Optional: Enable ReAct Query Loop (Local)
@@ -312,12 +413,38 @@ RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
 Then rebuild/recreate the API service:
 
 ```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml build rag-api
-docker compose -f docker-compose.infra.yml -f docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
+docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 When enabled, `/query` responses include an optional `react` block with loop metadata
 (`iterations`, `final_reason`, `confidence`, and `actions`).
+
+### Optional: Enable LangGraph Multi-Agent Mode (Local)
+
+The LangGraph mode replaces the single-pass/ReAct pipeline with a multi-agent StateGraph that routes through specialized agents (triage, retrieval, medication safety, lab interpretation, coding review, confidence evaluation, synthesis).
+
+```bash
+RAG_API_LANGGRAPH_ENABLED=true
+LANGGRAPH_MAX_ITERATIONS=3
+```
+
+When enabled, `/query` responses include a `langgraph` block with agent trace metadata.
+LangGraph takes priority over ReAct when both are enabled.
+
+See [docs/langgraph_comparison.md](docs/langgraph_comparison.md) for architecture details.
+
+### Optional: Enable MLflow Tracing (Local)
+
+MLflow traces all query modes (single-pass, ReAct, LangGraph) with nested span hierarchies.
+
+```bash
+MLFLOW_TRACKING_URI=http://localhost:5000
+MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
+```
+
+MLflow UI is available at http://localhost:5000 when the infra stack is running.
+Tracing activates automatically and has zero overhead when `MLFLOW_TRACKING_URI` is unset.
 
 ## LocalStack
 
@@ -355,6 +482,7 @@ Use this service for local-only integration and smoke testing. It is separate fr
 | LocalStack edge endpoint | <http://localhost:4566> |
 | Prometheus | <http://localhost:9090> |
 | Grafana | <http://localhost:3000> |
+| MLflow UI | <http://localhost:5000> |
 
 ## Default Credentials
 
@@ -407,10 +535,12 @@ If value deserializer is set to `Bytes`, message rendering and masking rules wil
 
 ## Query Examples
 
-The script scripts/query_examples.sh runs representative GraphRAG queries:
+The script `domains/healthcare/scripts/query_examples.sh` runs representative GraphRAG queries including multi-agent polypharmacy safety scenarios:
 
 ```bash
-./scripts/query_examples.sh
+make query-hc
+# or directly:
+./domains/healthcare/scripts/query_examples.sh
 ```
 
 Direct API call example:
@@ -439,6 +569,8 @@ domains/        Domain implementations
     neo4j/      Constraints and seed graph relationships
     producer/   Synthetic event producer
     rag-api/    FastAPI GraphRAG API
+      domain/    Retrieval, synthesis, response policy, planner, evidence ranking
+      langgraph_agents/  LangGraph multi-agent orchestration and MLflow tracing
     schemas/    Avro envelope schema
     skills/     Generated Agent Skills packages
     scripts/    Domain-specific validation and query scripts
@@ -454,9 +586,9 @@ domains/        Domain implementations
     skills/     Agent Skills packages
     scripts/    Domain-specific validation and query scripts
     webapp/     Supply-chain query UI
-docker-compose.infra.yml        Shared infrastructure (Kafka, ZK, monitoring, Ollama)
-docker-compose.healthcare.yml   Healthcare domain services
-docker-compose.supply-chain.yml Supply-chain domain services
+container/docker-compose.infra.yml        Shared infrastructure (Kafka, ZK, monitoring, Ollama)
+container/docker-compose.healthcare.yml   Healthcare domain services
+container/docker-compose.supply-chain.yml Supply-chain domain services
 docs/           Architecture, Kafka contract, graph model, and runbook
 docs/adrs/      Architecture Decision Records (ADRs)
 scripts/        Cross-domain validation scripts
@@ -466,11 +598,19 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 
 ## Implementation Notes
 
+- `app.py` is the composition root: settings, client initialization, HTTP routes, and MCP tools. Business logic is extracted into `domain/` modules.
+- `domain/retrieval.py` contains embedding, vector search (Qdrant), and graph search (Neo4j Cypher).
+- `domain/synthesis.py` handles prompt construction and LLM synthesis via the provider abstraction.
+- `domain/response_policy.py` contains response sanitization, truncation, budget enforcement, and confidence estimation.
+- `domain/planner.py` and `domain/evidence.py` handle request classification and deterministic evidence ranking.
+- `langgraph_agents/` provides multi-agent orchestration (LangGraph StateGraph), MLflow tracing, and evaluation.
+- `llm_provider.py` provides the provider abstraction; only `OllamaProvider` is implemented at runtime.
 - flink-app submits a native PyFlink DataStream job (healthcare_graph_rag_pyflink_job.py) to Flink JobManager.
 - healthcare_graph_rag_job.py is retained as a fallback processing implementation and provides reusable sink/enrichment logic consumed by the PyFlink job.
 - Schema Registry stores MedicalEvent Avro schemas and Kafka payloads are published with Confluent Avro serialization (schema ID on wire).
 - healthcare.dlq.events is created but not actively written by the processor yet.
 - API model resolution falls back to available Ollama tags (for example llama3.1:latest) when needed.
+- Docker Compose files live under `container/`; build contexts and volume mounts use `../` to resolve paths relative to the repository root.
 
 ## Documentation
 
@@ -484,6 +624,7 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 | [docs/neo4j_model.md](docs/neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
 | [docs/mcp_layer_design.md](docs/mcp_layer_design.md) | MCP tool contracts, schemas, rollout phases |
 | [docs/skills_layer.md](docs/skills_layer.md) | Skills layer flow, generated packages, and validation |
+| [docs/langgraph_comparison.md](docs/langgraph_comparison.md) | Multi-agent architecture comparison (single-pass vs ReAct vs LangGraph) |
 | [docs/runbook.md](docs/runbook.md) | Operations runbook, health checks, failure modes |
 | [docs/ai_qa.md](docs/ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
 | [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |
@@ -494,4 +635,4 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 
 ## Safety Disclaimer
 
-This project uses synthetic demo data only. It is not clinical software, not a medical device, and not intended for diagnosis, treatment, or patient care.
+**This project uses synthetic demo data only.** It is not clinical software, not a medical device, and not intended for diagnosis, treatment, or patient care. All LLM-generated answers carry an advisory-only safety caveat and must not be acted upon as clinical directives without independent clinical review.

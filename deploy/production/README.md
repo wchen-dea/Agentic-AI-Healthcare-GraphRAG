@@ -130,8 +130,10 @@ kubectl apply -f k8s/optional-mcp/mcp-secret.yaml
 
 - Ship application logs, audit logs, and platform logs to a centralized log store.
 - Keep Prometheus and Grafana configs aligned with the deployed topology and ingress names.
+- When MLflow is deployed for agent tracing, configure `MLFLOW_TRACKING_URI` on the rag-api service. Use a persistent backend store (PostgreSQL recommended over SQLite for production). Set artifact storage to a shared volume or object store.
 - Alert on health failures, elevated latency, error rate, and audit anomalies rather than relying on manual endpoint checks.
 - Retain audit data according to your environment's compliance and investigation requirements.
+- MLflow traces and audit log `trace_id` values can be correlated for end-to-end query observability.", "oldString": "### 7. Observability And Audit\n\n- Ship application logs, audit logs, and platform logs to a centralized log store.\n- Keep Prometheus and Grafana configs aligned with the deployed topology and ingress names.\n- Alert on health failures, elevated latency, error rate, and audit anomalies rather than relying on manual endpoint checks.\n- Retain audit data according to your environment's compliance and investigation requirements.
 
 ### 8. Promotion And Change Control
 

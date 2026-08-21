@@ -1,6 +1,6 @@
 # Shared infrastructure — Kafka cluster, Schema Registry, monitoring, Ollama, LocalStack.
 # Domain services are in domain-specific overlay files.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.healthcare.yml up -d
+# Usage: docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d
 
 services:
   zookeeper:
@@ -103,7 +103,7 @@ services:
     image: postgres:14
     container_name: infra-conduktor-postgres
     env_file:
-      - path: ./.env
+      - path: ../.env
         required: false
     environment:
       POSTGRES_DB: conduktor
@@ -125,7 +125,7 @@ services:
     volumes:
       - conduktor_data:/var/conduktor
     env_file:
-      - path: ./.env
+      - path: ../.env
         required: false
     environment:
       CDK_DATABASE_URL: postgresql://conduktor:${CONDUKTOR_POSTGRES_PASSWORD:-change_me}@conduktor-postgres:5432/conduktor
@@ -151,8 +151,8 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/prometheus-alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus-alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
 
   blackbox-exporter:
@@ -161,7 +161,7 @@ services:
     ports:
       - "9115:9115"
     volumes:
-      - ./monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+      - ../monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
 
   grafana:
     image: grafana/grafana:latest
@@ -174,8 +174,8 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin123
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
 
   localstack:
@@ -193,8 +193,25 @@ services:
       retries: 12
       start_period: 20s
     volumes:
-      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "${LOCALSTACK_VOLUME_DIR:-../volume}:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.21.3
+    container_name: infra-mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_HOST: "0.0.0.0"
+    command: ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "sqlite:///mlflow/mlflow.db", "--default-artifact-root", "/mlflow/artifacts"]
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   ollama_models:
@@ -202,6 +219,7 @@ volumes:
   conduktor_data:
   prometheus_data:
   grafana_data:
+  mlflow_data:
 
 networks:
   default:

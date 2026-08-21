@@ -131,7 +131,7 @@ Source file: `domains/supply-chain/schemas/supply_chain_event.avsc`. Uses entity
 
 ## Topic Creation And Lifecycle
 
-Topics are explicitly created by kafka-init in docker-compose.healthcare.yml with auto-create disabled on the broker.
+Topics are explicitly created by kafka-init in container/docker-compose.healthcare.yml with auto-create disabled on the broker.
 
 This ensures deterministic local topology and avoids accidental topic drift.
 

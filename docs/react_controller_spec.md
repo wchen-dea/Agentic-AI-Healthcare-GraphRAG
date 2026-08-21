@@ -4,6 +4,8 @@
 
 This specification defines a concrete ReAct-style controller for the current GraphRAG runtime.
 
+Note: The ReAct controller is one of three query orchestration modes. See [langgraph_comparison.md](langgraph_comparison.md) for the comparison between single-pass, ReAct, and LangGraph multi-agent modes. The LangGraph multi-agent mode provides a more capable alternative with specialist agents and MLflow tracing.
+
 Design intent:
 
 - keep existing planner, retrieval, and guardrails behavior,
@@ -32,10 +34,13 @@ Primary implementation and integration touchpoints:
 
 - `domains/healthcare/rag-api/app.py`
   - request handling and `POST /query`
-  - core retrieval path (`run_query`, `vector_context`, `graph_context`)
-  - answer synthesis (`ask_ollama`)
-  - policy shaping and response budget enforcement
-  - audit logging and tool metrics
+  - composition root: settings, clients, audit logging, tool metrics
+- `domains/healthcare/rag-api/domain/retrieval.py`
+  - embedding, vector search, graph search (Cypher query)
+- `domains/healthcare/rag-api/domain/synthesis.py`
+  - prompt construction and LLM synthesis
+- `domains/healthcare/rag-api/domain/response_policy.py`
+  - truncation, sanitization, budget enforcement, confidence estimation
 - `domains/healthcare/rag-api/domain/planner.py`
   - request classification and retrieval plan selection
 - `domains/healthcare/rag-api/domain/evidence.py`

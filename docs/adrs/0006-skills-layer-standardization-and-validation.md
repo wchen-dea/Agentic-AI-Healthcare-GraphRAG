@@ -1,4 +1,4 @@
-# ADR-0004: Skills Layer Standardization and Validation
+# ADR-0006: Skills Layer Standardization and Validation
 
 - Status: accepted
 - Date: 2026-06-12

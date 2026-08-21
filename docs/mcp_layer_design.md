@@ -13,7 +13,7 @@ Goals:
 ## ADR References
 
 - [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
-- [ADR-0006: Local-first LLM with provider routing](adrs/0006-local-first-llm-provider-routing.md)
+- [ADR-0004: Local-first LLM with provider routing](adrs/0004-local-first-llm-provider-routing.md)
 
 Skill composition roadmap strategy is described in [target_architecture.md](target_architecture.md), with actionable backlog sequencing in [future_improvements.md](future_improvements.md).
 
@@ -421,4 +421,8 @@ Exit criteria:
 
 ## Current Implementation Note
 
-The embedded MCP layer in `domains/healthcare/rag-api/app.py` already ships all five tools and shares the same retrieval + guardrail core used by `POST /query`.
+The embedded MCP layer in `domains/healthcare/rag-api/app.py` ships ten tools and shares the same retrieval + guardrail core used by `POST /query`.
+
+When LangGraph mode is enabled (`RAG_API_LANGGRAPH_ENABLED=true`), MCP tool calls route through the multi-agent StateGraph with specialist agents for medication safety, lab interpretation, and coding review.
+
+When MLflow tracing is enabled (`MLFLOW_TRACKING_URI`), every MCP tool execution is traced as a nested span hierarchy visible in the MLflow Tracing UI. Trace IDs from the audit log can be correlated with MLflow spans for end-to-end observability.
