@@ -8,7 +8,7 @@ DC_INFRA := docker compose -f $(INFRA) -p infra
 DC_HC    := docker compose -f $(HC) -p healthcare
 DC_SC    := docker compose -f $(SC) -p supplychain
 
-.PHONY: help up up-hc up-sc down-all \
+.PHONY: help up up-hc up-sc down \
         build build-hc build-sc build-all restart restart-sc \
         clean ps logs logs-sc \
         neo4j-hc neo4j-sc qdrant-hc qdrant-sc \
@@ -34,7 +34,7 @@ up-sc: ## Start infra + supply-chain
 	@docker network create $(NET) 2>/dev/null || true
 	$(DC_INFRA) up -d && $(DC_SC) up -d
 
-down-all: ## Stop everything, remove network
+down: ## Stop everything, remove network
 	$(DC_SC) down --remove-orphans; $(DC_HC) down --remove-orphans; $(DC_INFRA) down --remove-orphans
 	docker network rm $(NET) 2>/dev/null || true
 

@@ -145,27 +145,25 @@ Supply-chain service endpoints:
 ## Runtime Summary
 
 ```text
-Producer
-  -> Kafka topics
-  -> Native PyFlink DataStream job (HealthcareGraphRagPyFlinkJob)
-     -> reference-store enrichment
-     -> Qdrant vector upserts
-     -> Neo4j graph merges
-  -> FastAPI GraphRAG API
-     -> request classification + retrieval planning
-     -> vector retrieval (Qdrant) + graph retrieval (Neo4j)
-     -> evidence ranking + response policy
-     -> query mode dispatch:
-        single-pass (default) | ReAct loop | LangGraph multi-agent
-     -> LLM synthesis via provider abstraction (Ollama)
+Shared Infrastructure
+  Kafka cluster (3 brokers) + Schema Registry
+  Flink cluster (shared JobManager + TaskManager)
+  Ollama LLM | Prometheus + Grafana | MLflow
+
+Data Platform (per domain)
+  Producer -> Kafka -> Flink job -> Qdrant + Neo4j
+
+AI Agents (per domain)
+  FastAPI agents service
+    -> request classification + retrieval planning
+    -> vector retrieval (Qdrant) + graph retrieval (Neo4j)
+    -> evidence ranking + harness guards
+    -> query mode: single-pass | ReAct | LangGraph multi-agent
+    -> LLM synthesis (Ollama) + embedded MCP (/mcp)
 
 Ops/UI
-  -> Provider web app
-  -> Flink dashboard
-  -> Conduktor Console
-  -> Prometheus + Grafana + Blackbox Exporter
-  -> MLflow Tracing UI
-  -> Neo4j Browser + NeoDash
+  Flink dashboard | Conduktor | Prometheus + Grafana
+  MLflow Tracing UI | Neo4j Browser + NeoDash | Provider Web
 ```
 
 ## LLM Strategy

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-jobmanager
+  namespace: healthcare-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink-jobmanager
+  template:
+    metadata:
+      labels:
+        app: flink-jobmanager
+        component: data-platform
+    spec:
+      containers:
+      - name: jobmanager
+        image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-flink-cluster:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/docker-entrypoint.sh", "jobmanager"]
+        ports:
+        - containerPort: 8081
+          name: web
+        - containerPort: 6123
+          name: rpc
+        env:
+        - name: FLINK_PROPERTIES
+          value: |
+            jobmanager.rpc.address: flink-jobmanager
+            parallelism.default: 2
+            state.backend: hashmap
+            execution.checkpointing.interval: 10000
+            execution.checkpointing.mode: EXACTLY_ONCE
+            python.executable: /usr/bin/python3
+        readinessProbe:
+          httpGet:
+            path: /overview
+            port: web
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"

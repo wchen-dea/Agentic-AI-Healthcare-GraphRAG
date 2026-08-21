@@ -21,8 +21,8 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
 | `healthcare-neodash` | neo4jlabs/neodash | latest | 5005 | Neo4j dashboard UI |
 | `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
-| `healthcare-flink-jobmanager` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | 8082 | Flink JobManager |
-| `healthcare-flink-taskmanager` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | — | Flink TaskManager |
+| `infra-flink-jobmanager` | custom (data-platform/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
+| `infra-flink-taskmanager` | custom (data-platform/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
 | `healthcare-flink-app` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
 | `healthcare-producer` | custom (data-platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
 | `healthcare-rag-api` | custom (domains/healthcare/agents/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |

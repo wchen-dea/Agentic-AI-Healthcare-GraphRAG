@@ -77,38 +77,6 @@ services:
       standalonePasswordWarningHidden: "true"
       customHeader: Healthcare Neo4j GUI
 
-  flink-jobmanager:
-    build:
-      context: ..
-      dockerfile: data-platform/healthcare/flink-app/Dockerfile
-    container_name: healthcare-flink-jobmanager
-    ports:
-      - "8082:8081"
-    command: jobmanager
-    environment:
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: flink-jobmanager
-        parallelism.default: 2
-        state.backend: hashmap
-        execution.checkpointing.interval: 10000
-        execution.checkpointing.mode: EXACTLY_ONCE
-        python.executable: /usr/bin/python3
-
-  flink-taskmanager:
-    build:
-      context: ..
-      dockerfile: data-platform/healthcare/flink-app/Dockerfile
-    container_name: healthcare-flink-taskmanager
-    depends_on:
-      - flink-jobmanager
-    command: taskmanager
-    environment:
-      FLINK_PROPERTIES: |
-        jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 4
-        parallelism.default: 2
-        python.executable: /usr/bin/python3
-
   producer:
     build:
       context: ..
@@ -131,10 +99,6 @@ services:
       dockerfile: data-platform/healthcare/flink-app/Dockerfile
     container_name: healthcare-flink-app
     depends_on:
-      flink-jobmanager:
-        condition: service_started
-      flink-taskmanager:
-        condition: service_started
       qdrant:
         condition: service_started
       neo4j:

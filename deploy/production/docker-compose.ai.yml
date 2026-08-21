@@ -16,15 +16,3 @@ services:
     ports:
       - "8088:80"
     restart: unless-stopped
-
-  mcp-server:
-    profiles: ["standalone-mcp"]
-    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-mcp-server:latest
-    container_name: healthcare-mcp-server
-    env_file:
-      - ./mcp-server.env
-    depends_on:
-      - rag-api
-    ports:
-      - "8010:8010"
-    restart: unless-stopped

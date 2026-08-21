@@ -491,8 +491,8 @@ Symptom:
 Checks:
 
 ```bash
-docker exec healthcare-flink-taskmanager which python
-docker exec healthcare-flink-taskmanager which python3
+docker exec infra-flink-taskmanager which python
+docker exec infra-flink-taskmanager which python3
 ```
 
 Expected:
@@ -515,7 +515,7 @@ Symptom:
 Checks:
 
 ```bash
-docker exec healthcare-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-connector-kafka|kafka-clients'
+docker exec infra-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-connector-kafka|kafka-clients'
 ```
 
 Recovery:
@@ -600,7 +600,7 @@ For persistent stream failures, capture and share:
 
 - docker compose ps
 - docker logs --tail=400 healthcare-flink-app
-- docker logs --tail=400 healthcare-flink-taskmanager
+- docker logs --tail=400 infra-flink-taskmanager
 - `curl -s http://localhost:8082/jobs/overview | jq .`
 - `curl -s http://localhost:8082/jobs/JOB_ID/exceptions | jq .`
 

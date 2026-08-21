@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-flink-cluster
+  namespace: healthcare-ai
+spec:
+  podSelector:
+    matchLabels:
+      app: flink-jobmanager
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: flink-taskmanager
+    - podSelector:
+        matchLabels:
+          app: healthcare-flink-job
+    ports:
+    - port: 8081
+    - port: 6123
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mlflow
+  namespace: healthcare-ai
+spec:
+  podSelector:
+    matchLabels:
+      app: mlflow
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: rag-api
+    ports:
+    - port: 5000

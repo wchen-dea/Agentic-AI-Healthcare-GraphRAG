@@ -226,27 +226,29 @@ Sprint tracking note:
 ## Architecture At A Glance
 
 ```text
-Synthetic Producer
-  -> Kafka topics + Schema Registry
-  -> Native PyFlink DataStream job
-    -> ontology loader + normalization + rules
-     -> Qdrant upsert (semantic evidence)
-     -> Neo4j merge (relationship evidence)
-  -> FastAPI GraphRAG API
+Shared Infrastructure (docker-compose.infra.yml)
+  Kafka cluster (3 brokers) + Schema Registry
+  Flink cluster (JobManager + TaskManager) — shared across domains
+  Ollama (LLM inference)
+  Prometheus + Grafana + Blackbox Exporter
+  MLflow Tracing
+  Conduktor Console
+
+Data Platform (data-platform/)
+  Per-domain: Producer -> Kafka -> Flink job submission -> Qdrant + Neo4j
+
+Domain AI Agents (domains/)
+  Per-domain: FastAPI agents service
     -> request classification + retrieval planning
-    -> vector and graph retrieval + evidence ranking
-    -> optional LangGraph multi-agent routing (specialist agents)
-    -> provider-adapter generation (current runtime: Ollama)
-      -> embedded MCP endpoint (/mcp)
+    -> vector + graph retrieval (domain/retrieval.py)
+    -> evidence ranking + harness guards (domain/)
+    -> optional LangGraph multi-agent routing (langgraph_agents/)
+    -> LLM synthesis via provider abstraction (domain/synthesis.py)
+    -> embedded MCP endpoint (/mcp)
 
 Operational Plane
-  -> Flink UI
-  -> Conduktor
-  -> Prometheus + Blackbox Exporter
-  -> Grafana dashboards + alerts
-  -> MLflow Tracing UI
-  -> Neo4j Browser + NeoDash
-  -> Provider Web UI
+  Flink UI, Conduktor, Prometheus, Grafana, MLflow UI
+  Neo4j Browser + NeoDash, Provider Web UI
 ```
 
 ## Overall Architecture Diagram
@@ -485,15 +487,14 @@ Schema Registry stores the MedicalEvent envelope under topic-value subjects for 
 
 ### Flink Runtime
 
-container/docker-compose.healthcare.yml starts:
+The Flink cluster (JobManager + TaskManager) is shared infrastructure defined in container/docker-compose.infra.yml using a domain-neutral image (data-platform/flink-cluster/Dockerfile).
 
-- flink-jobmanager
-- flink-taskmanager
-- flink-app
+Domain-specific job submitters are defined in each domain's compose overlay:
 
-flink-app submits healthcare_graph_rag_pyflink_job.py using flink run -py with explicit Python executable settings.
+- Healthcare: `healthcare-flink-app` submits `healthcare_graph_rag_pyflink_job.py`
+- Supply-chain: `supplychain-sc-flink-app` submits `supplychain_graph_rag_job.py`
 
-There is no demo auto-submit service in the current implementation.
+Each job submitter uses `flink run -m flink-jobmanager:8081` to submit to the shared cluster.
 
 ### Native PyFlink Job
 
