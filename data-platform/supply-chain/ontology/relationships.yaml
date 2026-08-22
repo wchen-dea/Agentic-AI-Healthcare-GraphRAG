@@ -1,0 +1,72 @@
+version: 0.1.0
+status: accepted
+owner: supply-chain-team
+purpose: Relationship definitions for supply chain knowledge graph.
+extends: shared/provenance_base
+relationships:
+- type: SUPPLIES
+  from: Supplier
+  to: Part
+  cardinality: many_to_many
+  optional_properties: [exclusive, contract_start, contract_end]
+- type: LOCATED_AT
+  from: Supplier
+  to: Facility
+  cardinality: many_to_one
+- type: SHIPPED_FROM
+  from: Shipment
+  to: Facility
+  cardinality: many_to_one
+- type: SHIPPED_TO
+  from: Shipment
+  to: Facility
+  cardinality: many_to_one
+- type: CONTAINS_PART
+  from: Shipment
+  to: Part
+  cardinality: many_to_many
+  optional_properties: [quantity]
+- type: ORDERED_FROM
+  from: PurchaseOrder
+  to: Supplier
+  cardinality: many_to_one
+- type: ORDERS_PART
+  from: PurchaseOrder
+  to: Part
+  cardinality: many_to_many
+  optional_properties: [quantity, unit_price]
+- type: INSPECTED_PART
+  from: QualityInspection
+  to: Part
+  cardinality: many_to_one
+- type: INSPECTED_FROM
+  from: QualityInspection
+  to: Supplier
+  cardinality: many_to_one
+- type: AFFECTS_FACILITY
+  from: DisruptionEvent
+  to: Facility
+  cardinality: many_to_one
+- type: AFFECTS_PART
+  from: DisruptionEvent
+  to: Part
+  cardinality: many_to_many
+- type: HAS_RISK_SIGNAL
+  from: Supplier
+  to: RiskSignal
+  cardinality: many_to_many
+  optional_properties: [detected_ts, severity]
+- type: DEPENDS_ON
+  from: Part
+  to: Part
+  cardinality: many_to_many
+  optional_properties: [bom_level]
+  description: Bill-of-materials dependency between parts.
+- type: FROM_SOURCE
+  from: Shipment
+  to: SourceSystem
+  cardinality: many_to_one
+- type: FULFILLS_ORDER
+  from: Shipment
+  to: PurchaseOrder
+  cardinality: many_to_one

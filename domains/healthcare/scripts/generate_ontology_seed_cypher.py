@@ -17,7 +17,7 @@ def build_seed_cypher(bundle: dict) -> str:
     graph_seeds = bundle["graph_seeds"]
     drug_safety = bundle["rule_packs"]["drug_safety"]
     lines: list[str] = []
-    lines.append("// Generated from config/ontology/graph_seeds.yaml")
+    lines.append("// Generated from ontology/graph_seeds.yaml")
     lines.append("")
     lines.append("// Adverse outcomes")
     for item in drug_safety.get("adverse_outcomes", []):

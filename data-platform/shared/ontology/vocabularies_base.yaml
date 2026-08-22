@@ -1,0 +1,11 @@
+version: 0.1.0
+status: accepted
+owner: platform-team
+purpose: Base vocabulary infrastructure shared across domains.
+mapping_policies:
+  default_match_strategy: exact_then_prefix
+  unresolved_code_behavior: pass_through
+  versioned_mappings_required: false
+local_mapping_schema:
+  required_fields: [local_name, standard_system]
+  optional_fields: [standard_code, display, category]

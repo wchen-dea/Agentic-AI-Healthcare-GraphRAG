@@ -107,6 +107,21 @@ Services exposed via NodePort:
 |---------|----------|-----|
 | RAG API | 30800 | `http://$(minikube ip):30800` |
 
+On macOS with Docker driver, NodePorts aren't directly accessible. Use port-forwards:
+
+```bash
+make helm-ports       # start all port-forwards
+make helm-ports-stop  # kill them
+```
+
+| Service | Port-forward URL |
+|---------|-----------------|
+| RAG API | `http://localhost:8000` |
+| Web UI | `http://localhost:8088` |
+| Neo4j | `http://localhost:7474` |
+| Qdrant | `http://localhost:6333/dashboard` |
+| Conduktor | `http://localhost:9080` |
+
 Dev differences from production:
 - All deployments scaled to 1 replica
 - LLM provider: local Ollama (no external API keys needed)
@@ -114,6 +129,7 @@ Dev differences from production:
 - `RAG_API_ALLOW_ROLE_HEADER: true` for testing
 - No NetworkPolicy enforcement
 - No HPA (autoscaling disabled)
+- Default model: `qwen2.5:1.5b` (fits in 16GB minikube)
 
 Tear down:
 

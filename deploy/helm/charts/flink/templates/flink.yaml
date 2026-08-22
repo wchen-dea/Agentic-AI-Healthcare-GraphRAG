@@ -15,6 +15,7 @@ spec:
       labels:
         app: flink-jobmanager
     spec:
+      enableServiceLinks: false
       containers:
       - name: jobmanager
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -25,10 +26,17 @@ spec:
           name: web
         - containerPort: 6123
           name: rpc
+        - containerPort: 6124
+          name: blob
         env:
         - name: FLINK_PROPERTIES
           value: |
             jobmanager.rpc.address: flink-jobmanager
+            blob.server.port: 6124
+        {{- range $key, $value := .Values.config }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
         resources:
           {{- toYaml .Values.jobmanager.resources | nindent 10 }}
 ---
@@ -49,6 +57,7 @@ spec:
       labels:
         app: flink-taskmanager
     spec:
+      enableServiceLinks: false
       containers:
       - name: taskmanager
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -59,6 +68,10 @@ spec:
           value: |
             jobmanager.rpc.address: flink-jobmanager
             taskmanager.numberOfTaskSlots: 2
+        {{- range $key, $value := .Values.config }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
         resources:
           {{- toYaml .Values.taskmanager.resources | nindent 10 }}
 ---
@@ -78,3 +91,6 @@ spec:
   - name: rpc
     port: 6123
     targetPort: 6123
+  - name: blob
+    port: 6124
+    targetPort: 6124

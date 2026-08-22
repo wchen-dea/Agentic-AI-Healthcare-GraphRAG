@@ -78,7 +78,7 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `data-platform/healthcare/config/ontology/`
+- `data-platform/healthcare/ontology/`
 - `domains/healthcare/scripts/generate_ontology_seed_cypher.py`
 - `domains/healthcare/scripts/validate_ontology.py`
 - `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`
@@ -213,7 +213,7 @@ The `domains/supply-chain/` scaffold is in place with producer, graph_writes, pi
 To add a third domain (e.g., Insurance Claims, Cybersecurity SOC):
 
 1. Create `domains/<name>/` with: `agents/`, `scripts/`, `skills/`, `webapp/`
-2. Create `data-platform/<name>/` with: `config/ontology/`, `producer/`, `flink-app/app/`, `neo4j/`, `schemas/`
+2. Create `data-platform/<name>/` with: `ontology/`, `producer/`, `flink-app/app/`, `neo4j/`, `schemas/`
 3. Define Avro envelope schema with domain-specific ID fields
 4. Write docker-compose overlay with isolated Neo4j + Qdrant + topic init
 5. Add Helm sub-charts or enable existing infra charts for the new domain

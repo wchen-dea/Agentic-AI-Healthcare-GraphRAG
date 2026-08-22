@@ -17,7 +17,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         topics shell-kafka validate validate-docs \
         validate-skills generate-skills validate-ontology \
         test-hc test-sc pull-model fresh \
-        helm-dev helm-dev-down helm-prd helm-lint
+        helm-dev helm-dev-down helm-ports helm-ports-stop helm-prd helm-lint
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -141,6 +141,25 @@ helm-dev: ## Deploy to minikube via Helm (dev values)
 
 helm-dev-down: ## Tear down minikube dev release
 	helm uninstall healthcare-dev -n healthcare-ai-dev || true
+
+helm-ports: ## Start all port-forwards for minikube dev
+	@pkill -f "port-forward" 2>/dev/null || true
+	@kubectl -n healthcare-ai-dev port-forward svc/rag-api 8000:8000 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/provider-web 8088:80 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/neo4j 7474:7474 7687:7687 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/qdrant 6333:6333 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/conduktor-console 9080:8080 &>/dev/null &
+	@sleep 2
+	@echo "Port-forwards active:"
+	@echo "  RAG API:   http://localhost:8000"
+	@echo "  Web UI:    http://localhost:8088"
+	@echo "  Neo4j:     http://localhost:7474"
+	@echo "  Qdrant:    http://localhost:6333/dashboard"
+	@echo "  Conduktor: http://localhost:9080"
+
+helm-ports-stop: ## Kill all port-forwards
+	@pkill -f "port-forward" 2>/dev/null || true
+	@echo "Port-forwards stopped."
 
 helm-prd: ## Template production Helm chart (dry-run)
 	helm template healthcare deploy/helm -f deploy/helm/values-production.yaml

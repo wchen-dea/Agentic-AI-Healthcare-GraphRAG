@@ -565,15 +565,16 @@ Makefile        Local development shortcuts (make up, make test-hc, etc.)
 .python-version Python 3.11 pin (used by uv and Docker images)
 data-platform/  Data platform: shared libraries and per-domain streaming infrastructure
   shared/       Shared modules (embedding, storage, runner, rules engine, ontology loader)
+    ontology/   Shared ontology primitives (meta schema, source system, provenance base)
     webapp/     Shared webapp assets (styles, query-helpers.js, nginx config)
   healthcare/   Healthcare data sourcing
-    config/     Ontology YAML, rules, vocabulary mappings
+    ontology/   Ontology YAML, rules/, mappings/
     flink-app/  PyFlink job, processor logic, graph writes
     neo4j/      Constraints and seed graph relationships
     producer/   Synthetic event producer
     schemas/    Avro envelope schema
   supply-chain/ Supply-chain data sourcing
-    config/     Ontology YAML, risk signal rules
+    ontology/   Ontology YAML, rules/, relationships, provenance
     flink-app/  Stream processor and graph writes
     neo4j/      Constraints and seed data
     producer/   Synthetic event producer

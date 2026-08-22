@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate supply-chain Neo4j ontology seed Cypher from config/ontology YAML."""
+"""Generate supply-chain Neo4j ontology seed Cypher from ontology YAML."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +11,7 @@ import yaml
 
 
 DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "supply-chain"
-CONFIG_DIR = DATA_PLATFORM_DIR / "config" / "ontology"
+CONFIG_DIR = DATA_PLATFORM_DIR / "ontology"
 TARGET_FILE = DATA_PLATFORM_DIR / "neo4j" / "generated_ontology_seeds.cypher"
 
 # Mapping from risk category name to (id-suffix, description)

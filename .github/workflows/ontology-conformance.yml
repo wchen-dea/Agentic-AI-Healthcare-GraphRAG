@@ -6,7 +6,7 @@ on:
       - dev
     paths:
       - .github/workflows/ontology-conformance.yml
-      - data-platform/healthcare/config/ontology/**
+      - data-platform/healthcare/ontology/**
       - data-platform/healthcare/producer/produce_events.py
       - data-platform/healthcare/flink-app/**
       - data-platform/healthcare/neo4j/init.cypher
@@ -16,7 +16,7 @@ on:
       - domains/healthcare/scripts/validate_ontology.py
       - domains/healthcare/scripts/validate_terminology_coverage.py
       - domains/healthcare/scripts/test_neo4j_bootstrap.py
-      - data-platform/supply-chain/config/ontology/**
+      - data-platform/supply-chain/ontology/**
       - data-platform/supply-chain/neo4j/**
       - domains/supply-chain/scripts/validate_ontology.py
       - domains/supply-chain/scripts/test_neo4j_bootstrap.py
@@ -26,7 +26,7 @@ on:
       - dev
     paths:
       - .github/workflows/ontology-conformance.yml
-      - data-platform/healthcare/config/ontology/**
+      - data-platform/healthcare/ontology/**
       - data-platform/healthcare/producer/produce_events.py
       - data-platform/healthcare/flink-app/**
       - data-platform/healthcare/neo4j/init.cypher
@@ -36,7 +36,7 @@ on:
       - domains/healthcare/scripts/validate_ontology.py
       - domains/healthcare/scripts/validate_terminology_coverage.py
       - domains/healthcare/scripts/test_neo4j_bootstrap.py
-      - data-platform/supply-chain/config/ontology/**
+      - data-platform/supply-chain/ontology/**
       - data-platform/supply-chain/neo4j/**
       - domains/supply-chain/scripts/validate_ontology.py
       - domains/supply-chain/scripts/test_neo4j_bootstrap.py

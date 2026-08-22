@@ -19,9 +19,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "healthcare"
 PRODUCER_FILE = DATA_PLATFORM_DIR / "producer" / "produce_events.py"
 
-LAB_MAPPINGS_FILE = DATA_PLATFORM_DIR / "config" / "ontology" / "lab_mappings.yaml"
-CPT_MAPPINGS_FILE = DATA_PLATFORM_DIR / "config" / "ontology" / "cpt_mappings.yaml"
-ICD10_MAPPINGS_FILE = DATA_PLATFORM_DIR / "config" / "ontology" / "icd10_mappings.yaml"
+LAB_MAPPINGS_FILE = DATA_PLATFORM_DIR / "ontology" / "mappings" / "lab_mappings.yaml"
+CPT_MAPPINGS_FILE = DATA_PLATFORM_DIR / "ontology" / "mappings" / "cpt_mappings.yaml"
+ICD10_MAPPINGS_FILE = DATA_PLATFORM_DIR / "ontology" / "mappings" / "icd10_mappings.yaml"
 
 LAB_THRESHOLD = float(os.getenv("TERMINOLOGY_COVERAGE_THRESHOLD_LABS", "0.95"))
 CPT_THRESHOLD = float(os.getenv("TERMINOLOGY_COVERAGE_THRESHOLD_CPT", "0.95"))

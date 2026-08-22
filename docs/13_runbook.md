@@ -44,6 +44,8 @@ make generate-skills  # Regenerate skill packages
 make validate-ontology # Validate ontology configs
 make helm-dev    # Deploy to minikube via Helm
 make helm-dev-down # Tear down minikube release
+make helm-ports  # Start all port-forwards
+make helm-ports-stop # Kill all port-forwards
 make helm-lint   # Lint Helm chart + template both envs
 make helm-prd    # Render production Helm templates (dry-run)
 make help        # Show all targets
@@ -670,9 +672,44 @@ kubectl -n healthcare-ai-dev exec deploy/rag-api -- curl -s localhost:8000/healt
 ### Tear down dev
 
 ```bash
-helm uninstall healthcare-dev -n healthcare-ai-dev
+make helm-dev-down
 minikube delete
 ```
+
+### Port-forwards (macOS Docker driver)
+
+On macOS with Docker driver, NodePorts are not directly accessible. Use port-forwards:
+
+```bash
+make helm-ports       # start all port-forwards
+make helm-ports-stop  # kill all port-forwards
+```
+
+Services:
+- RAG API: `http://localhost:8000`
+- Web UI: `http://localhost:8088`
+- Neo4j: `http://localhost:7474`
+- Qdrant: `http://localhost:6333/dashboard`
+- Conduktor: `http://localhost:9080`
+
+### Minikube Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `K8S_APISERVER_MISSING` on start | Stale cluster state | `minikube delete && make helm-dev` |
+| Confluent pods crash: "PORT is deprecated" | Kubernetes service-linked env vars | `enableServiceLinks: false` on pod spec (already set in charts) |
+| Neo4j crash: "Unrecognized setting PORT" | Same service-link env var injection | Same fix |
+| Ollama OOM killed | Not enough memory for model | Default is 16GB; use `MINIKUBE_MEMORY=20480 make helm-dev` for llama3.1 |
+| `ImagePullBackOff` | Image not built in minikube's Docker | `eval $(minikube docker-env) && docker build ...` (setup-minikube.sh does this automatically) |
+| Flink blob transfer timeout | Missing port 6124 on jobmanager service | Already fixed in chart |
+| Query takes 2-3 minutes | CPU-only LLM inference | Expected for qwen2.5:1.5b; use Docker Compose for GPU/Metal acceleration |
+| Port-forward dies mid-request | kubectl limitation with long connections | Re-run `make helm-ports` |
+
+### Minimum Requirements (Minikube)
+
+- Docker Desktop: allocate at least 16GB RAM to Docker engine
+- `minikube start --cpus=4 --memory=16384`
+- Disk: ~10GB for images + model weights
 
 ## LLM Provider Troubleshooting
 

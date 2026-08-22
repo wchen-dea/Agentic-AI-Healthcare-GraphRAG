@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "supply-chain"
-CONFIG_DIR = DATA_PLATFORM_DIR / "config" / "ontology"
+CONFIG_DIR = DATA_PLATFORM_DIR / "ontology"
 
 try:
     import yaml

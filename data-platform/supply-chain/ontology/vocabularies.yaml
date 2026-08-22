@@ -1,7 +1,8 @@
 version: 0.1.0
-status: draft
+status: accepted
 owner: supply-chain-team
 purpose: Standard terminology bindings for supply chain domain.
+extends: shared/vocabularies_base
 standard_systems:
 - id: GS1
   canonical_uri: https://www.gs1.org
@@ -15,3 +16,8 @@ standard_systems:
 - id: INCOTERMS
   canonical_uri: https://iccwbo.org/business-solutions/incoterms-rules/
   scope: trade_terms
+mapping_policies:
+  default_match_strategy: exact_then_prefix
+  unresolved_code_behavior: pass_through
+  versioned_mappings_required: false
+local_mappings: []
