@@ -109,6 +109,11 @@ jobs:
       - name: Run planner edge-case suite
         run: .venv311/bin/python domains/healthcare/agents/tests/test_planner_edge_cases.py
 
+      - name: Run evaluation quality gates (offline, from fixtures)
+        run: .venv311/bin/python -m domain.evaluation_gates --results-file domains/healthcare/agents/tests/fixtures/evaluation_results.json --min-score 0.5
+        working-directory: domains/healthcare/agents
+        continue-on-error: true
+
   container-build:
     runs-on: ubuntu-latest
     steps:

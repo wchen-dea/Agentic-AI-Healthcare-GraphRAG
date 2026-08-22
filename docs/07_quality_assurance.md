@@ -426,4 +426,4 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 | Contraindication alert end-to-end | Inject known condition + medication order, assert contraindication in `graph_context` |
 | Response style regression | Add contract test variant for `response_style: audit` verifying `trace_id` in answer |
 | LangGraph agent integration tests | Add end-to-end tests for specialist agent routing with live infrastructure |
-| MLflow evaluation gate | Add CI job that runs `run_mlflow_evaluation()` and fails when aggregate scores drop below threshold |
+| MLflow evaluation gate | CI job runs `domain/evaluation_gates.py` against fixture data; fails when aggregate scores drop below threshold (routing ≥ 0.6, evidence ≥ 0.5, answer ≥ 0.5, overall ≥ 0.55). Currently soft gate (`continue-on-error`); promote to hard gate when baseline stabilizes. |

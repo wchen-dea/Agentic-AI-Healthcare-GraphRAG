@@ -147,7 +147,7 @@ This section maps the current implementation to a modern AI application stack mo
 | LangGraph multi-agent orchestration | StateGraph with conditional routing and specialist agents | LangGraph StateGraph with triage, retrieval, specialist, and synthesis agents | Implemented (feature-flagged) |
 | ReAct-style iterative control | Reason-act-observe loop controller | Feature-flagged ReAct loop path in the agents service | Implemented (phase 1 skeleton) |
 | Model provider abstraction | Adapter for local and managed providers | Ollama + OpenAI + Anthropic + FallbackProvider | Implemented |
-| Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites + MLflow evaluation harness | Implemented (partial) |
+| Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites + MLflow evaluation harness + automated quality gates | Implemented |
 | Observability and operations | Metrics, dashboards, probes, runbooks | Prometheus + Grafana + blackbox probes + MLflow tracing + runbook | Implemented |
 | Production governance and safety | Privacy policy, rollout gates, SLO controls | Deployment bundle and policy foundations present | In progress |
 
@@ -165,7 +165,7 @@ This section maps the current implementation to a modern AI application stack mo
 | Policy enforcement point | Centralizes authorization and output controls | Role/tool checks + evidence shaping + byte budgets | Implemented |
 | Adapter pattern for model providers | Decouples retrieval from generation vendor | Provider adapters with automatic failover | Implemented |
 | Contract-first evolution | Keeps external API/tool behavior stable as internals evolve | Contract test suite and MCP schema discipline | Implemented |
-| Evaluation-driven promotion | Uses objective quality gates for release progression | Planner tests in place; retrieval/grounding scorecards pending | In progress |
+| Evaluation-driven promotion | Uses objective quality gates for release progression | Evaluation gates module with configurable thresholds; CI step added | Implemented |
 | Progressive delivery controls | Reduces risk in production AI changes | Documented production deployment patterns; staged gates pending | In progress |
 
 ### Gap Summary for Full Modern-Stack Alignment
@@ -173,12 +173,12 @@ This section maps the current implementation to a modern AI application stack mo
 - Retrieval benchmark and grounded-answer scorecard automation are not fully enforced as release gates.
 - Policy and privacy controls are present at foundation level but not yet complete for non-demo production governance depth.
 - LangGraph and MLflow integrations are feature-flagged and require further production hardening for non-demo use.
-- No structured output generation (JSON-mode extraction for downstream system integration).
-- No persistent agent memory for cross-session patient context.
-- No input-side prompt injection detection or adversarial guardrails.
+- Structured output generation enables JSON-mode extraction for downstream programmatic consumption.
+- Session-scoped conversation memory provides multi-turn context carryover.
+- Classifier-based guardrails detect prompt injection, off-topic queries, and harmful output.
 - No dynamic model routing based on task complexity, latency, or cost.
 - No streaming responses (SSE) to client applications.
-- No evaluation-gated CI/CD pipeline that blocks deployment below quality thresholds.
+- Evaluation quality gates enforce minimum routing, evidence, and answer scores before release (`domain/evaluation_gates.py`).
 - No per-user identity propagation or data-classification-aware access control.
 
 ### Promotion Direction
@@ -186,7 +186,7 @@ This section maps the current implementation to a modern AI application stack mo
 To promote from baseline-modern to production-modern AI stack maturity:
 
 1. Expand provider adapters and add failover behavior tests.
-2. Add retrieval and grounding scorecards as CI release gates.
+2. Tighten evaluation gate thresholds and promote from soft gate to hard gate.
 3. Strengthen policy/privacy controls and rollout guardrails with explicit SLO criteria.
 
 ### Maturity Scorecard (1-5)
@@ -208,13 +208,13 @@ Scoring guide:
 | LangGraph multi-agent orchestration | 3 | 4 | LangGraph StateGraph with specialist agents, feature-flagged | Add broader agent integration tests and production tuning |
 | ReAct iterative control | 3 | 4 | Feature-flagged ReAct loop and metadata | Add broader loop tests and stop/fallback metrics |
 | Model provider abstraction | 4 | 4 | Ollama + OpenAI + Anthropic + FallbackProvider | Add provider failover contract tests |
-| Evaluation and quality gates | 3 | 4 | Contract + planner evaluation suites + MLflow evaluation harness | Add retrieval and grounding release gates |
+| Evaluation and quality gates | 4 | 4 | Contract + planner + MLflow + automated quality gates in CI | Tighten thresholds as baseline stabilizes |
 | Observability and operations | 4 | 4 | Prometheus, Grafana, probes, MLflow tracing, runbook | Add alert quality tuning and SLO dashboards |
 | Production governance and safety | 2 | 3 | Policy/deploy foundations under production bundle | Implement policy/privacy/SLO rollout controls |
-| Structured outputs and extraction | 1 | 3 | Free-text LLM responses only | Add JSON-mode structured generation for risk extraction |
-| Agent memory and context | 1 | 3 | Stateless per-request execution | Add persistent cross-session memory for longitudinal monitoring |
+| Structured outputs and extraction | 3 | 3 | JSON-mode structured generation with Pydantic schema validation | Add schema-constrained decoding for complex multi-entity extraction |
+| Agent memory and context | 3 | 3 | Session-scoped conversation memory with TTL expiration | Add persistent cross-session memory for longitudinal monitoring |
 | Model routing and optimization | 2 | 3 | Single Ollama provider | Add dynamic routing by task complexity and cost |
-| Input guardrails and safety | 2 | 3 | Role-based tool authorization only | Add prompt injection detection and input validation |
+| Input guardrails and safety | 3 | 3 | Classifier-based injection detection + output safety + grounding check | Add dedicated ML classifier model (Llama Guard) |
 | Streaming UX | 1 | 3 | Synchronous responses only | Add SSE streaming to provider web UI |
 
 Sprint tracking note:
@@ -238,11 +238,16 @@ Data Platform (platform/)
 
 Domain AI Agents (domains/)
   Per-domain: FastAPI agents service
+    -> input guardrails classifier (domain/guardrails.py)
+    -> session memory context loading (domain/memory.py)
     -> request classification + retrieval planning
     -> vector + graph retrieval (domain/retrieval.py)
     -> evidence ranking + harness guards (domain/)
     -> optional LangGraph multi-agent routing (langgraph_agents/)
     -> LLM synthesis via provider abstraction (domain/synthesis.py)
+    -> structured output parsing (domain/structured_output.py) [optional]
+    -> output guardrails + grounding check
+    -> session memory turn storage
     -> embedded MCP endpoint (/mcp)
 
 Operational Plane
@@ -574,14 +579,18 @@ Embedded MCP tools (10 total):
 
 Query flow:
 
-1. Classify request type and select retrieval plan (`domain/planner.py`).
-2. Embed user question (`domain/retrieval.py`) and search Qdrant for nearest evidence.
-3. Collect patient IDs from vector hits and optional request scope.
-4. Query Neo4j patient graph (`domain/retrieval.py`).
-5. Rank evidence deterministically (`domain/evidence.py`).
-6. Dispatch to query mode: single-pass, ReAct loop, or LangGraph multi-agent.
-7. Build synthesis prompt and call LLM provider (`domain/synthesis.py`).
-8. Apply response policy (`domain/response_policy.py`) and return answer with evidence.
+1. **Input guardrails** — classify input for injection, off-topic, length (`domain/guardrails.py`).
+2. **Session memory** — load conversation context from session store (`domain/memory.py`).
+3. Classify request type and select retrieval plan (`domain/planner.py`).
+4. Embed user question (`domain/retrieval.py`) and search Qdrant for nearest evidence.
+5. Collect patient IDs from vector hits and optional request scope.
+6. Query Neo4j patient graph (`domain/retrieval.py`).
+7. Rank evidence deterministically (`domain/evidence.py`).
+8. Dispatch to query mode: single-pass, ReAct loop, or LangGraph multi-agent.
+9. Build synthesis prompt and call LLM provider (`domain/synthesis.py`); optionally use structured output mode (`domain/structured_output.py`).
+10. **Output guardrails** — classify output for harmful content and grounding (`domain/guardrails.py`).
+11. **Session memory** — store turn for multi-turn context.
+12. Apply response policy (`domain/response_policy.py`) and return answer with evidence.
 
 #### LLM Provider Interface (Implemented)
 

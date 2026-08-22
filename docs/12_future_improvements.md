@@ -229,12 +229,12 @@ The following backlog items are derived from industry trends analysis comparing 
 
 | # | Item | Industry trend | Effort | Priority |
 |---|------|---------------|--------|----------|
-| 1 | **Structured output generation** — JSON-mode or schema-constrained decoding for deterministic extraction of interactions, contraindications, and risk assessments | Instructor, OpenAI JSON mode, Pydantic-constrained generation | Low | High |
+| 1 | **Structured output generation** — JSON-mode or schema-constrained decoding for deterministic extraction of interactions, contraindications, and risk assessments | Instructor, OpenAI JSON mode, Pydantic-constrained generation | Low | High | **Implemented**: `domain/structured_output.py` with Pydantic models, JSON-mode prompt, structured response parsing. Activated via `structured: true` in query request. |
 | 2 | **Dynamic model routing** — route to different models based on query complexity, latency target, or cost budget | Martian, Unify, LiteLLM router | Medium | High |
-| 3 | **Persistent agent memory** — cross-session context retention for longitudinal patient monitoring and escalation tracking | Mem0, Zep, Letta | Medium | High |
-| 4 | **Input-side guardrails** — prompt injection detection and input validation before agent execution | Lakera Guard, NeMo Guardrails, Rebuff | Low-Medium | High |
+| 3 | **Persistent agent memory** — cross-session context retention for longitudinal patient monitoring and escalation tracking | Mem0, Zep, Letta | Medium | High | **Partially implemented**: `domain/memory.py` provides session-scoped TTL memory. Remaining: persistent storage (Redis/Postgres) for cross-session and patient-scoped memory. |
+| 4 | **Input-side guardrails** — prompt injection detection and input validation before agent execution | Lakera Guard, NeMo Guardrails, Rebuff | Low-Medium | High | **Implemented**: `domain/guardrails.py` with classifier-based injection detection, off-topic filtering, output safety checks, and grounding validation. Remaining: dedicated ML model (Llama Guard). |
 | 5 | **Streaming responses (SSE)** — server-sent events for real-time answer streaming to the provider web UI | FastAPI StreamingResponse, LangGraph streaming | Low | Medium |
-| 6 | **Evaluation-gated CI/CD** — MLflow evaluation scores as release gates that block deployment below thresholds | Mosaic AI Agent Evaluation, KPI-gated pipelines | Medium | High |
+| 6 | **Evaluation-gated CI/CD** — MLflow evaluation scores as release gates that block deployment below thresholds | Mosaic AI Agent Evaluation, KPI-gated pipelines | Medium | High | **Implemented**: `domain/evaluation_gates.py` with `GateThresholds`, CI step in `rag-api-contracts.yml`. Currently `continue-on-error: true`; promote to hard gate when baseline is stable. |
 | 7 | **Adversarial evaluation (red-teaming)** — automated probing for hallucination, safety violations, and edge-case failures | Garak, promptfoo, DeepEval adversarial | Medium | Medium |
 | 8 | **Confidence calibration** — selective abstention when evidence is insufficient rather than generating low-confidence answers | Conformal prediction, uncertainty quantification | Medium | Medium |
 

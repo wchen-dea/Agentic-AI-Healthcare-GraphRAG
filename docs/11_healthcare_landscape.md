@@ -66,7 +66,7 @@ Microsoft's Healthcare Agent Orchestrator demonstrates production-grade multi-ag
 | **Conversational Interface** | Provider web UI + FastAPI `/query` + MCP tools | Functional but synchronous; no medical NER, intent classification, or empathy modulation |
 | **Interaction** | LangGraph conditional routing with specialist agents; MCP tool protocol | Agent-to-orchestrator flow implemented; no inter-agent communication or clinician feedback capture |
 | **Tool Integration** | 10 MCP tools with role-based authorization; Qdrant vector search + Neo4j graph traversal | Strong retrieval tool coverage; no integration with external clinical systems (EHR, pharmacy, imaging) |
-| **Memory and Learning** | Stateless per-request execution; no persistent agent memory | Gap: no short-term session context, no longitudinal patient tracking, no learning from outcomes |
+| **Memory and Learning** | Session-scoped conversation memory with TTL; in-memory store for multi-turn context | Partial: session memory implemented; no longitudinal patient tracking or outcome learning yet |
 | **Reasoning** | Deterministic graph rules (interactions, contraindications, lab signals) + LLM synthesis | Strong deterministic reasoning; no uncertainty quantification, no multi-path probabilistic inference |
 
 ### Agent Type Mapping

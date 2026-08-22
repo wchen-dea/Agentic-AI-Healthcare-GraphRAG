@@ -21,9 +21,12 @@ from domain import (
     truncate_text,
     vector_text_mode,
 )
+from domain.guardrails import classify_grounding, classify_input, classify_output
+from domain.memory import get_session_store
 from domain.react_controller import ReactLoopSettings, run_react_query_loop
 from domain.retrieval import graph_search, vector_search
-from domain.synthesis import synthesize_answer
+from domain.structured_output import build_structured_prompt, compact_graph_context as struct_graph, compact_vector_context as struct_vector, parse_structured_response
+from domain.synthesis import compact_graph_context, compact_vector_context, synthesize_answer
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
@@ -224,6 +227,8 @@ class QueryRequest(BaseModel):
 
     question: str = Field(min_length=3, max_length=settings.max_question_chars)
     patient_id: str | None = Field(default=None, min_length=1, max_length=128)
+    structured: bool = Field(default=False, description="Return structured JSON response")
+    session_id: str | None = Field(default=None, max_length=64)
 
 
 class PatientContextGetRequest(BaseModel):
@@ -401,25 +406,56 @@ def ask_ollama(question: str, vector_ctx: list[dict[str, Any]], graph_ctx: list[
     )
 
 
-def run_query(question: str, patient_id: str | None = None, top_k: int | None = None) -> dict[str, Any]:
+def run_query(question: str, patient_id: str | None = None, top_k: int | None = None, structured: bool = False, session_id: str | None = None) -> dict[str, Any]:
+    # Guardrails: input classification
+    input_check = classify_input(question)
+    if not input_check.passed:
+        return {
+            "question": question,
+            "answer": f"Request blocked: {input_check.category} — {', '.join(input_check.reasons)}",
+            "guardrails": {"input_blocked": True, "category": input_check.category},
+        }
+
+    # Memory: load session context
+    session_context = ""
+    if session_id:
+        session = get_session_store().get_or_create(session_id)
+        session_context = session.get_context_summary()
+
     context_limit = min(top_k or settings.max_context_items, max(settings.max_context_items, 8))
 
     # LangGraph multi-agent path (takes priority when enabled)
     if _to_bool(os.getenv("RAG_API_LANGGRAPH_ENABLED"), default=False):
         from langgraph_agents import run_langgraph_query
-        return run_langgraph_query(question=question, patient_id=patient_id)
-
-    # MLflow tracing for single-pass / ReAct when MLFLOW_TRACKING_URI is set
-    if os.getenv("MLFLOW_TRACKING_URI"):
+        result = run_langgraph_query(question=question, patient_id=patient_id)
+    elif os.getenv("MLFLOW_TRACKING_URI"):
         from langgraph_agents.mlflow_tracing import trace_query
         mode = "react" if settings.react_enabled else "single_pass"
-        return trace_query(question, patient_id, mode, _run_query_core, top_k=top_k)
+        result = trace_query(question, patient_id, mode, _run_query_core, top_k=top_k)
+    else:
+        result = _run_query_core(question, patient_id, top_k, structured=structured, session_context=session_context)
 
-    return _run_query_core(question, patient_id, top_k)
+    # Guardrails: output classification
+    answer = result.get("answer", "")
+    output_check = classify_output(answer)
+    if not output_check.passed:
+        result["answer"] = "Response withheld due to safety review."
+        result.setdefault("guardrails", {})["output_blocked"] = True
+        result["guardrails"]["category"] = output_check.category
+
+    # Memory: store turn
+    if session_id:
+        session = get_session_store().get_or_create(session_id)
+        session.add_turn(question=question, answer=result.get("answer", ""), patient_id=patient_id)
+
+    return result
 
 
-def _run_query_core(question: str, patient_id: str | None = None, top_k: int | None = None) -> dict[str, Any]:
+def _run_query_core(question: str, patient_id: str | None = None, top_k: int | None = None, structured: bool = False, session_context: str = "") -> dict[str, Any]:
     context_limit = min(top_k or settings.max_context_items, max(settings.max_context_items, 8))
+
+    # Prepend conversation context if available
+    effective_question = f"{session_context}\n\nCurrent question: {question}" if session_context else question
 
     if settings.react_enabled:
         loop_settings = ReactLoopSettings(
@@ -441,7 +477,7 @@ def _run_query_core(question: str, patient_id: str | None = None, top_k: int | N
             synthesize_answer_fn=ask_ollama,
         )
 
-    return _run_query_single_pass(question=question, patient_id=patient_id, context_limit=context_limit)
+    return _run_query_single_pass(question=question, patient_id=patient_id, context_limit=context_limit, structured=structured)
 
 
 def _run_query_single_pass(
@@ -449,6 +485,7 @@ def _run_query_single_pass(
     question: str,
     patient_id: str | None,
     context_limit: int,
+    structured: bool = False,
 ) -> dict[str, Any]:
     request_type = classify_request_type(question, patient_id)
     plan = select_retrieval_plan(request_type, question, patient_id, context_limit)
@@ -460,6 +497,24 @@ def _run_query_single_pass(
         patient_ids = list(set(patient_ids + [patient_id]))
     graph_items_raw = graph_context(patient_ids) if patient_ids else []
     graph_items = rank_graph_context(graph_items_raw, request_type)
+
+    if structured:
+        vector_summary = struct_vector(vector_items, max_items=context_limit)
+        graph_summary = struct_graph(graph_items, max_items=context_limit)
+        prompt = build_structured_prompt(question, vector_summary, graph_summary)
+        raw = llm_provider.generate(prompt=prompt, timeout_seconds=settings.llm_timeout_seconds, max_tokens=settings.llm_max_tokens, temperature=0.1)
+        parsed = parse_structured_response(raw)
+        return {
+            "question": question,
+            "request_type": request_type,
+            "retrieval_plan": {"name": plan.name, "top_k": plan.top_k, "reason": plan.reason},
+            "patients": patient_ids,
+            "vector_context": vector_items,
+            "graph_context": graph_items,
+            "answer": parsed.summary,
+            "structured_response": parsed.model_dump(),
+        }
+
     answer = ask_ollama(question, vector_items, graph_items)
     return {
         "question": question,
@@ -678,7 +733,7 @@ def query(
             request_payload=request_payload,
             patient_scope=_patient_scope(req.patient_id),
             fn=lambda trace_id: _build_query_response(
-                run_query(req.question, req.patient_id),
+                run_query(req.question, req.patient_id, structured=req.structured, session_id=req.session_id),
                 trace_id,
                 caller_role=caller_role,
             ),

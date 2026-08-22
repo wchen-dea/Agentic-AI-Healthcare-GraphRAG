@@ -60,12 +60,12 @@ Current gaps to close:
 
 AI-trends-driven gaps (see [12_future_improvements.md](12_future_improvements.md) for detailed backlog):
 
-- no structured output generation (JSON-mode or schema-constrained extraction),
+- structured output generation implemented (`domain/structured_output.py`); schema-constrained decoding pending,
 - no dynamic model routing based on task complexity or cost targets,
-- no persistent agent memory for cross-session patient monitoring,
-- no input-side prompt injection detection or adversarial guardrails,
+- session-scoped conversation memory implemented (`domain/memory.py`); persistent cross-session store pending,
+- classifier-based guardrails implemented (`domain/guardrails.py`); dedicated ML model pending,
 - no streaming responses to client UIs,
-- no evaluation-gated CI/CD that blocks deployment below quality thresholds,
+- evaluation-gated CI implemented (`domain/evaluation_gates.py` + CI workflow step); hard gate promotion pending,
 - no per-user identity propagation or fine-grained data access governance,
 - no neural reranking between retrieval and synthesis,
 - no multimodal clinical image or document understanding.
