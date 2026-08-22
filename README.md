@@ -252,14 +252,18 @@ This repository includes a runtime Skills layer plus generated Agent Skills pack
 - Runtime resolver: `domains/healthcare/agents/skills_layer.py`
 - REST endpoint: `POST /skills/plan`
 - MCP tool: `skills_plan_get`
-- Generated Agent Skills packages: `domains/healthcare/skills/`
+- Generated Agent Skills packages: `domains/healthcare/skills/`, `domains/supply-chain/skills/`
 
 Generate and validate skill packages:
 
 ```bash
-python scripts/generate_agent_skills.py
-python scripts/generate_agent_skills.py --check
-python scripts/validate_agent_skills.py
+python domains/healthcare/scripts/generate_agent_skills.py
+python domains/healthcare/scripts/generate_agent_skills.py --check
+python domains/healthcare/scripts/validate_agent_skills.py
+
+python domains/supply-chain/scripts/generate_agent_skills.py
+python domains/supply-chain/scripts/generate_agent_skills.py --check
+python domains/supply-chain/scripts/validate_agent_skills.py
 ```
 
 ## MCP Quick Verify
@@ -386,7 +390,7 @@ Optional one-shot validation:
 
 ```bash
 ./scripts/validate_docs.sh
-./scripts/validate_stack.sh
+./scripts/validate_all_stacks.sh
 ./domains/healthcare/scripts/query_examples.sh
 python3 ./domains/healthcare/scripts/mcp_smoke_test.py
 ```

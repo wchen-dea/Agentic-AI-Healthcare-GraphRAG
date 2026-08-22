@@ -179,7 +179,7 @@ The ontology layer is implemented under `data-platform/healthcare/config/ontolog
 
 | Package | File(s) | Status |
 | --- | --- | --- |
-| Clinical entity ontology | `entities.yaml` | Implemented — defines canonical concepts (Patient, Encounter, ClinicalEvent, Observation, Condition, Medication, etc.) |
+| Clinical entity ontology | `entities.yaml` | Implemented — defines canonical concepts (Patient, Encounter, ClinicalEvent, Observation, Condition, Medication, SourceSystem, etc.) |
 | Relationship ontology | `relationships.yaml` | Implemented — defines allowed edges (HAS_CONDITION, INTERACTS_WITH, MAY_INDICATE, CONTRAINDICATED_FOR, etc.) |
 | Terminology mappings | `vocabularies.yaml`, `icd10_mappings.yaml`, `cpt_mappings.yaml`, `lab_mappings.yaml`, `medication_mappings.yaml`, `patient_mappings.yaml`, `provider_mappings.yaml`, `device_mappings.yaml`, `payer_mappings.yaml` | Implemented — partial vocabulary coverage; broader mapping governance is a backlog item |
 | Provenance and policy | `provenance.yaml` | Implemented — defines source trust, PHI class, and retention class |
@@ -270,7 +270,7 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 | Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agents/app.py` |
 | MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/07_mcp_layer_design.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
 | Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
-| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `scripts/validate_ontology.py`, `docs/12_ai_qa.md` |
+| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `domains/healthcare/scripts/validate_ontology.py`, `docs/12_ai_qa.md` |
 
 ## Execution Backlog
 

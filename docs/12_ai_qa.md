@@ -392,8 +392,8 @@ Expected output:
 git push → dev branch
   │
   ├── skills-layer-validation job
-  │     ├── python scripts/generate_agent_skills.py --check
-  │     ├── python scripts/validate_agent_skills.py
+  │     ├── python domains/healthcare/scripts/generate_agent_skills.py --check
+  │     ├── python domains/healthcare/scripts/validate_agent_skills.py
   │     └── optional skills-ref validate (best-effort install, non-blocking if unavailable)
   │
   ├── contract-tests job

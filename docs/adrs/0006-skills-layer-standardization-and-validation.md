@@ -30,8 +30,9 @@ Adopt a standardized Skills layer with generator-plus-validator enforcement.
 2. Runtime resolution remains in `domains/healthcare/agents/skills_layer.py` and is exposed by:
    - `POST /skills/plan`
    - `skills_plan_get`
-3. Generated skill package artifacts under `domains/healthcare/skills/` are maintained by `scripts/generate_agent_skills.py`.
-4. Structural validation is enforced by `scripts/validate_agent_skills.py`.
+3. Generated skill package artifacts under `domains/healthcare/skills/` are maintained by `domains/healthcare/scripts/generate_agent_skills.py`.
+4. Structural validation is enforced by `domains/healthcare/scripts/validate_agent_skills.py`.
+5. Both domains (healthcare and supply-chain) share generator/validator logic via `scripts/lib/`.
 5. CI enforces both checks in a dedicated skills validation job.
 6. Upstream `skills-ref validate` is optional and non-blocking:
    - use it when available,
@@ -65,8 +66,8 @@ Trade-offs:
 ## Rollout and Verification
 
 1. Maintain planner source in `domains/healthcare/agents/config/skills_layer.json`.
-2. Generate artifacts with `python scripts/generate_agent_skills.py`.
-3. Validate artifacts with `python scripts/validate_agent_skills.py`.
+2. Generate artifacts with `python domains/healthcare/scripts/generate_agent_skills.py`.
+3. Validate artifacts with `python domains/healthcare/scripts/validate_agent_skills.py`.
 4. Enforce generator `--check` plus validator in CI.
 5. Run optional upstream `skills-ref validate` with best-effort install and graceful skip.
 6. Verify contract behavior through `domains/healthcare/agents/tests/test_contracts.py` coverage for skills plan resolution.

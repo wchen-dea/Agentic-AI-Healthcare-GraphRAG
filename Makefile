@@ -15,6 +15,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         query-hc query-sc api-hc api-sc \
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
+        validate-skills generate-skills validate-ontology \
         test-hc test-sc pull-model fresh
 
 help: ## Show this help
@@ -104,9 +105,23 @@ shell-kafka: ## Kafka broker shell
 # ── Validate & test ───────────────────────────────────────────────────────────
 
 validate: ## Cross-domain stack validation
-	./scripts/validate_stack.sh
+	./scripts/validate_all_stacks.sh
 validate-docs: ## Markdown lint
 	./scripts/validate_docs.sh
+
+validate-skills: ## Check generated skill packages are in sync
+	python domains/healthcare/scripts/generate_agent_skills.py --check
+	python domains/healthcare/scripts/validate_agent_skills.py
+	python domains/supply-chain/scripts/generate_agent_skills.py --check
+	python domains/supply-chain/scripts/validate_agent_skills.py
+
+generate-skills: ## Regenerate skill packages for both domains
+	python domains/healthcare/scripts/generate_agent_skills.py
+	python domains/supply-chain/scripts/generate_agent_skills.py
+
+validate-ontology: ## Validate ontology configs for both domains
+	python domains/healthcare/scripts/validate_ontology.py
+	python domains/supply-chain/scripts/validate_ontology.py
 
 test-hc: ## Healthcare agent + domain tests
 	cd domains/healthcare/agents && python -m pytest tests/ --tb=short

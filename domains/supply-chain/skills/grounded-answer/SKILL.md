@@ -1,32 +1,32 @@
 ---
-name: quality-supplier-scorecard
-description: Aggregate quality inspection results by supplier with defect rate trends and corrective action history. Use when handling workflows related to: quality_trend_review.
+name: grounded-answer
+description: Generate a grounded answer with bounded guardrails from vector and graph evidence. Use when handling workflows related to: supplier_risk_assessment, disruption_impact_analysis, inventory_reorder_planning.
 license: Apache-2.0
 compatibility: Designed for Agent Skills-compatible coding agents with MCP support
 metadata:
-  source_skill_id: quality_supplier_scorecard
+  source_skill_id: grounded_answer
   source_config: agents/config/skills_layer.json
   generator: scripts/generate_agent_skills.py
 ---
 
 ## Overview
-Aggregate quality inspection results by supplier with defect rate trends and corrective action history.
+Generate a grounded answer with bounded guardrails from vector and graph evidence.
 
 ## When To Use
-Use when handling workflows related to: quality_trend_review.
+Use when handling workflows related to: supplier_risk_assessment, disruption_impact_analysis, inventory_reorder_planning.
 
 ## Required Context
-- entity_id
+- question
 
 ## Ontology Dependencies
-- entities
+- provenance
 
 ## MCP Tools
-- supplier_context_get
-- quality_trend_summarize
+- graphrag_answer_generate
 
 ## Runtime Tools
-- neo4j
+- rag_api
+- ollama
 
 ## Procedure
 1. Validate required context inputs are present.

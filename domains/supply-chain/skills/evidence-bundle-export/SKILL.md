@@ -1,32 +1,31 @@
 ---
-name: quality-supplier-scorecard
-description: Aggregate quality inspection results by supplier with defect rate trends and corrective action history. Use when handling workflows related to: quality_trend_review.
+name: evidence-bundle-export
+description: Export evidence bundle for traceability, review, and audit workflows. Use when handling workflows related to: quality_trend_review.
 license: Apache-2.0
 compatibility: Designed for Agent Skills-compatible coding agents with MCP support
 metadata:
-  source_skill_id: quality_supplier_scorecard
+  source_skill_id: evidence_bundle_export
   source_config: agents/config/skills_layer.json
   generator: scripts/generate_agent_skills.py
 ---
 
 ## Overview
-Aggregate quality inspection results by supplier with defect rate trends and corrective action history.
+Export evidence bundle for traceability, review, and audit workflows.
 
 ## When To Use
 Use when handling workflows related to: quality_trend_review.
 
 ## Required Context
-- entity_id
+- question
 
 ## Ontology Dependencies
-- entities
+- provenance
 
 ## MCP Tools
-- supplier_context_get
-- quality_trend_summarize
+- evidence_bundle_export
 
 ## Runtime Tools
-- neo4j
+- rag_api
 
 ## Procedure
 1. Validate required context inputs are present.

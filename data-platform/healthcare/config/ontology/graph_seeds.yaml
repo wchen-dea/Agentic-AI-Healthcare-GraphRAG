@@ -114,3 +114,9 @@ medication_metadata:
 - name: Amoxicillin
   active_ingredient: Amoxicillin trihydrate
   is_validated_trade_name_used: false
+- name: Aspirin
+  active_ingredient: Acetylsalicylic acid
+  is_validated_trade_name_used: false
+- name: Fluconazole
+  active_ingredient: Fluconazole
+  is_validated_trade_name_used: false

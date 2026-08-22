@@ -79,8 +79,8 @@ Target outcomes:
 Suggested repo touchpoints:
 
 - `data-platform/healthcare/config/ontology/`
-- `scripts/generate_ontology_seed_cypher.py`
-- `scripts/validate_ontology.py`
+- `domains/healthcare/scripts/generate_ontology_seed_cypher.py`
+- `domains/healthcare/scripts/validate_ontology.py`
 - `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`
 
 ### 4. Production controls for non-demo readiness (Stage 5)
@@ -173,7 +173,7 @@ CI checks: Extend `domains/healthcare/agents/tests/test_contracts.py` with provi
 - [ ] 6. Ontology governance depth
 Scope: Increase vocabulary mapping coverage and drift checks.
 Acceptance criteria: Mapping coverage report generated; generator output parity enforced; ontology drift fails CI.
-CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python scripts/validate_ontology.py` and fail on parity/drift mismatch.
+CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python domains/healthcare/scripts/validate_ontology.py` and fail on parity/drift mismatch.
 
 - [ ] 7. Policy-as-code and PHI boundaries
 Scope: Encode policy classes, redaction rules, and retention constraints as testable rules.

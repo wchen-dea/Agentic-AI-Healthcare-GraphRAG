@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FLINK_APP_DIR = REPO_ROOT / "flink-app"
+FLINK_APP_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "healthcare" / "flink-app"
 if str(FLINK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLINK_APP_DIR))
 

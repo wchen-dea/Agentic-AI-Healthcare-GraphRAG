@@ -1,32 +1,34 @@
 ---
-name: quality-supplier-scorecard
-description: Aggregate quality inspection results by supplier with defect rate trends and corrective action history. Use when handling workflows related to: quality_trend_review.
+name: disruption-impact-assessment
+description: Trace disruption events through facility and BOM dependency chains to identify affected parts and assemblies. Use when handling workflows related to: disruption_impact_analysis.
 license: Apache-2.0
 compatibility: Designed for Agent Skills-compatible coding agents with MCP support
 metadata:
-  source_skill_id: quality_supplier_scorecard
+  source_skill_id: disruption_impact_assessment
   source_config: agents/config/skills_layer.json
   generator: scripts/generate_agent_skills.py
 ---
 
 ## Overview
-Aggregate quality inspection results by supplier with defect rate trends and corrective action history.
+Trace disruption events through facility and BOM dependency chains to identify affected parts and assemblies.
 
 ## When To Use
-Use when handling workflows related to: quality_trend_review.
+Use when handling workflows related to: disruption_impact_analysis.
 
 ## Required Context
-- entity_id
+- question
 
 ## Ontology Dependencies
 - entities
+- risk_signals
 
 ## MCP Tools
-- supplier_context_get
-- quality_trend_summarize
+- disruption_impact_analyze
+- vector_evidence_search
 
 ## Runtime Tools
 - neo4j
+- qdrant
 
 ## Procedure
 1. Validate required context inputs are present.

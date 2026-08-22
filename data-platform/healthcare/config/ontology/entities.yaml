@@ -105,3 +105,9 @@ entities:
   source_types: [EHR, CLAIMS]
   required_properties: [code]
   optional_properties: [display]
+- id: source_system
+  canonical_name: SourceSystem
+  aliases: [originating_system, data_source]
+  source_types: [REFERENCE]
+  required_properties: [name]
+  optional_properties: [system_type, version]

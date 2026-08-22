@@ -13,7 +13,7 @@ The repository now uses explicit ontology artifacts to drive ingestion semantics
 - Ontology configuration under `data-platform/healthcare/config/ontology/`
 - Generated seed artifact `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`
 - Bootstrap runner `data-platform/healthcare/neo4j/bootstrap.sh`
-- Validation checks in `scripts/validate_ontology.py`
+- Validation checks in `domains/healthcare/scripts/validate_ontology.py`
 
 Without a formal governance decision, the stack can drift in several ways:
 
@@ -30,8 +30,8 @@ Adopt ontology-first governance with generated seed artifacts and conformance va
 1. `data-platform/healthcare/config/ontology/` is the canonical source of truth for ontology and rule semantics.
 2. `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher` is a generated artifact and must be regenerated from ontology config when ontology changes.
 3. `data-platform/healthcare/neo4j/init.cypher` remains focused on constraints and bootstrap orchestration, not hand-maintained semantic seed content.
-4. Seed generation is performed by `scripts/generate_ontology_seed_cypher.py`.
-5. Conformance validation is enforced by `scripts/validate_ontology.py`, including:
+4. Seed generation is performed by `domains/healthcare/scripts/generate_ontology_seed_cypher.py`.
+5. Conformance validation is enforced by `domains/healthcare/scripts/validate_ontology.py`, including:
    - generated seed freshness checks,
    - bootstrap verification,
    - focused ontology/runtime unit test suites.
@@ -64,9 +64,9 @@ Trade-offs:
 ## Rollout and Verification
 
 1. Modify ontology and rule configs under `data-platform/healthcare/config/ontology/`.
-2. Regenerate seed artifact with `python scripts/generate_ontology_seed_cypher.py`.
-3. Run conformance checks with `python scripts/validate_ontology.py`.
-4. Confirm bootstrap behavior using `python scripts/test_neo4j_bootstrap.py` when ontology-affecting changes are made.
+2. Regenerate seed artifact with `python domains/healthcare/scripts/generate_ontology_seed_cypher.py`.
+3. Run conformance checks with `python domains/healthcare/scripts/validate_ontology.py`.
+4. Confirm bootstrap behavior using `python domains/healthcare/scripts/test_neo4j_bootstrap.py` when ontology-affecting changes are made.
 5. Enforce CI conformance gate in `.github/workflows/ontology-conformance.yml`.
 
 ## Related

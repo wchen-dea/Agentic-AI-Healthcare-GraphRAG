@@ -427,19 +427,22 @@ Expected line after successful submission:
 Generate Agent Skills package files from the runtime skills layer config:
 
 ```bash
-python scripts/generate_agent_skills.py
+python domains/healthcare/scripts/generate_agent_skills.py
+python domains/supply-chain/scripts/generate_agent_skills.py
 ```
 
 Check for drift without modifying files:
 
 ```bash
-python scripts/generate_agent_skills.py --check
+python domains/healthcare/scripts/generate_agent_skills.py --check
+python domains/supply-chain/scripts/generate_agent_skills.py --check
 ```
 
 Validate generated skill folders and SKILL.md frontmatter:
 
 ```bash
-python scripts/validate_agent_skills.py
+python domains/healthcare/scripts/validate_agent_skills.py
+python domains/supply-chain/scripts/validate_agent_skills.py
 ```
 
 ## Common Failure Modes And Fixes
@@ -584,7 +587,7 @@ After changing compose, streaming code, or docs:
 
 ```bash
 ./scripts/validate_docs.sh
-./scripts/validate_stack.sh
+./scripts/validate_all_stacks.sh
 curl -s http://localhost:8082/jobs/overview | jq .
 ```
 

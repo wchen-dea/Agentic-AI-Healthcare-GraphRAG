@@ -8,10 +8,11 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "healthcare"
 
 
 def main() -> int:
-    bootstrap = REPO_ROOT / "neo4j" / "bootstrap.sh"
+    bootstrap = DATA_PLATFORM_DIR / "neo4j" / "bootstrap.sh"
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
         init_file = tmp_path / "init.cypher"

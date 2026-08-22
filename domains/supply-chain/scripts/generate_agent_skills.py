@@ -22,9 +22,9 @@ def main() -> int:
         skills_root=SKILLS_ROOT,
         domain_root=DOMAIN_ROOT,
         check=args.check,
-        source_config_path="rag-api/config/skills_layer.json",
-        planner_path="rag-api/skills_layer.py",
-        endpoint_path="rag-api/app.py (/skills/plan and skills_plan_get)",
+        source_config_path="agents/config/skills_layer.json",
+        planner_path="agents/skills_layer.py",
+        endpoint_path="agents/app.py (/skills/plan and skills_plan_get)",
     )
 
 

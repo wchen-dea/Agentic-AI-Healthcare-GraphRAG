@@ -488,7 +488,7 @@ When `MLFLOW_TRACKING_URI` is set, MLflow traces every query pipeline as a neste
 
 | Job | Runner | Steps |
 |-----|--------|-------|
-| `skills-layer-validation` | ubuntu-latest | Checkout → Python 3.11 → `python scripts/generate_agent_skills.py --check` → `python scripts/validate_agent_skills.py` → optional `skills-ref validate` pass (best-effort install, skip on unavailable binary) |
+| `skills-layer-validation` | ubuntu-latest | Checkout → Python 3.11 → `python domains/healthcare/scripts/generate_agent_skills.py --check` → `python domains/healthcare/scripts/validate_agent_skills.py` → optional `skills-ref validate` pass (best-effort install, skip on unavailable binary) |
 | `contract-tests` | ubuntu-latest | Checkout → Python 3.11 + pip cache → install `domains/healthcare/agents/requirements.txt` → `python domains/healthcare/agents/tests/test_contracts.py` (10 tests, ~1-3 s) → `python domains/healthcare/agents/tests/test_planner_evaluation.py` (fixture-driven route/plan assertions) |
 | `container-build` | ubuntu-latest | Checkout → `docker build -f domains/healthcare/agents/Dockerfile` |
 
