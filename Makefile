@@ -15,7 +15,9 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         query-hc query-sc api-hc api-sc \
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
-        test-hc test-sc pull-model fresh
+        validate-skills generate-skills validate-ontology \
+        test-hc test-sc pull-model fresh \
+        helm-dev helm-dev-down helm-ports helm-ports-stop helm-prd helm-lint
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -104,9 +106,23 @@ shell-kafka: ## Kafka broker shell
 # ── Validate & test ───────────────────────────────────────────────────────────
 
 validate: ## Cross-domain stack validation
-	./scripts/validate_stack.sh
+	./scripts/validate_all_stacks.sh
 validate-docs: ## Markdown lint
 	./scripts/validate_docs.sh
+
+validate-skills: ## Check generated skill packages are in sync
+	python domains/healthcare/scripts/generate_agent_skills.py --check
+	python domains/healthcare/scripts/validate_agent_skills.py
+	python domains/supply-chain/scripts/generate_agent_skills.py --check
+	python domains/supply-chain/scripts/validate_agent_skills.py
+
+generate-skills: ## Regenerate skill packages for both domains
+	python domains/healthcare/scripts/generate_agent_skills.py
+	python domains/supply-chain/scripts/generate_agent_skills.py
+
+validate-ontology: ## Validate ontology configs for both domains
+	python domains/healthcare/scripts/validate_ontology.py
+	python domains/supply-chain/scripts/validate_ontology.py
 
 test-hc: ## Healthcare agent + domain tests
 	cd domains/healthcare/agents && python -m pytest tests/ --tb=short
@@ -117,3 +133,39 @@ pull-model: ## Pull Ollama LLM model
 	docker exec infra-ollama ollama pull llama3.1
 
 fresh: clean up pull-model ## Full fresh start with both domains
+
+# ── Helm / Minikube ───────────────────────────────────────────────────────────
+
+helm-dev: ## Deploy to minikube via Helm (dev values)
+	./deploy/dev/setup-minikube.sh
+
+helm-dev-down: ## Tear down minikube dev release
+	helm uninstall healthcare-dev -n healthcare-ai-dev || true
+
+helm-ports: ## Start all port-forwards for minikube dev
+	@pkill -f "port-forward" 2>/dev/null || true
+	@kubectl -n healthcare-ai-dev port-forward svc/rag-api 8000:8000 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/provider-web 8088:80 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/neo4j 7474:7474 7687:7687 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/qdrant 6333:6333 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/conduktor-console 9080:8080 &>/dev/null &
+	@sleep 2
+	@echo "Port-forwards active:"
+	@echo "  RAG API:   http://localhost:8000"
+	@echo "  Web UI:    http://localhost:8088"
+	@echo "  Neo4j:     http://localhost:7474"
+	@echo "  Qdrant:    http://localhost:6333/dashboard"
+	@echo "  Conduktor: http://localhost:9080"
+
+helm-ports-stop: ## Kill all port-forwards
+	@pkill -f "port-forward" 2>/dev/null || true
+	@echo "Port-forwards stopped."
+
+helm-prd: ## Template production Helm chart (dry-run)
+	helm template healthcare deploy/helm -f deploy/helm/values-production.yaml
+
+helm-lint: ## Lint Helm chart and template both envs
+	helm lint deploy/helm
+	helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null
+	helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null
+	@echo "Helm lint: OK"

@@ -1,6 +1,6 @@
 # ADR-0004: Local-First LLM with Provider Routing
 
-- Status: accepted (partial)
+- Status: accepted
 - Date: 2026-06-12
 - Deciders: platform team
 - Supersedes: none
@@ -15,14 +15,16 @@ Local development should run without external dependencies, while production sho
 Adopt local-first generation with provider abstraction:
 
 - Default local provider: Ollama.
-- Production-ready routing path: Anthropic or OpenAI adapters.
+- Production providers: OpenAI (primary) with Anthropic (fallback).
 - Keep retrieval orchestration stable and swap provider client behind adapter.
 
 Implementation status:
 
-- Implemented: `OllamaProvider` in `domains/healthcare/agents/llm_provider.py` with `create_provider()` factory.
+- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider` in `domains/healthcare/agents/llm_provider.py`.
+- Factory: `create_provider()` routes by `LLM_PROVIDER` env var.
+- Fallback: `FallbackProvider` wraps primary + fallback; triggered by `LLM_FALLBACK_PROVIDER` env var.
 - Prompt construction and synthesis extracted into `domains/healthcare/agents/domain/synthesis.py`.
-- Roadmap: additional provider adapters and environment-based routing for Anthropic/OpenAI.
+- Helm values: dev uses Ollama, production uses OpenAI + Anthropic fallback.
 
 ## Consequences
 
@@ -36,7 +38,7 @@ Trade-offs:
 
 - Provider behavior differences require adapter and testing discipline.
 - Model/version drift can affect output consistency.
-- Only Ollama is implemented at runtime today; `create_provider()` rejects other provider names.
+- Fallback adds latency on primary failure.
 
 ## Alternatives Considered
 

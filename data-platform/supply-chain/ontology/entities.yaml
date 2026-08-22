@@ -1,0 +1,59 @@
+version: 0.1.0
+status: accepted
+owner: supply-chain-team
+purpose: Canonical supply chain entity definitions.
+entities:
+- id: supplier
+  canonical_name: Supplier
+  aliases: [vendor, partner]
+  source_types: [ERP, REFERENCE]
+  required_properties: [id]
+  optional_properties: [name, country, tier, geopolitical_risk]
+- id: part
+  canonical_name: Part
+  aliases: [component, material, sku]
+  source_types: [ERP, REFERENCE]
+  required_properties: [id]
+  optional_properties: [name, commodity_category, criticality]
+- id: facility
+  canonical_name: Facility
+  aliases: [warehouse, factory, site]
+  source_types: [ERP, WMS, REFERENCE]
+  required_properties: [id]
+  optional_properties: [name, facility_type, country, region]
+- id: shipment
+  canonical_name: Shipment
+  aliases: [transport, delivery]
+  source_types: [TMS, WMS]
+  required_properties: [id]
+  optional_properties: [status, expected_delivery, actual_delivery, carrier]
+- id: purchase_order
+  canonical_name: PurchaseOrder
+  aliases: [order, po]
+  source_types: [ERP]
+  required_properties: [id]
+  optional_properties: [status, order_date, delivery_date, total_value]
+- id: quality_inspection
+  canonical_name: QualityInspection
+  aliases: [inspection, qc_result]
+  source_types: [ERP, IoT]
+  required_properties: [id]
+  optional_properties: [result, defect_rate, inspection_date, lot_size]
+- id: disruption_event
+  canonical_name: DisruptionEvent
+  aliases: [disruption, incident]
+  source_types: [ERP, REFERENCE]
+  required_properties: [id]
+  optional_properties: [disruption_type, severity, start_ts, end_ts, mitigation_status]
+- id: risk_signal
+  canonical_name: RiskSignal
+  aliases: [risk_indicator, alert]
+  source_types: [ERP, REFERENCE]
+  required_properties: [id]
+  optional_properties: [category, description, severity]
+- id: source_system
+  canonical_name: SourceSystem
+  aliases: [originating_system, data_source]
+  source_types: [REFERENCE]
+  required_properties: [name]
+  optional_properties: [system_type, version]

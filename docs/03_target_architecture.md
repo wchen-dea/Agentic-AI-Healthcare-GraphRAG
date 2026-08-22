@@ -10,7 +10,7 @@ This document defines the strategic target for the healthcare intelligence platf
 
 **For engineers:** This is the delivery backlog with acceptance criteria, file touchpoints, and staged execution order.
 
-Current ontology files live under `data-platform/healthcare/config/ontology/`. Implementation status details are in [06_technical_specs.md](06_technical_specs.md), [13_runbook.md](13_runbook.md), [08_skills_layer.md](08_skills_layer.md), and [14_future_improvements.md](14_future_improvements.md).
+Current ontology files live under `data-platform/healthcare/ontology/`. Implementation status details are in [06_technical_specs.md](06_technical_specs.md), [13_runbook.md](13_runbook.md), [08_skills_layer.md](08_skills_layer.md), and [14_future_improvements.md](14_future_improvements.md).
 
 ## Target Outcome
 
@@ -54,7 +54,7 @@ Current gaps to close:
 
 - terminology mappings are still partial and need broader vocabulary coverage and stronger governance workflows,
 - planner logic is currently heuristic and requires benchmark-driven route quality evaluation,
-- provider abstraction exists but only Ollama is implemented at runtime today,
+- provider abstraction is implemented with Ollama, OpenAI, Anthropic, and FallbackProvider; production contract testing is pending,
 - quality validation now covers planner behavior and contracts, but retrieval benchmarks and grounded-answer scorecards remain limited,
 - production controls (policy classes, privacy posture, staged rollout controls) remain incomplete for non-demo workloads.
 
@@ -173,15 +173,15 @@ flowchart LR
 
 ## Ontology Model
 
-The ontology layer is implemented under `data-platform/healthcare/config/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
+The ontology layer is implemented under `data-platform/healthcare/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
 
 ### Implemented ontology packages
 
 | Package | File(s) | Status |
 | --- | --- | --- |
-| Clinical entity ontology | `entities.yaml` | Implemented — defines canonical concepts (Patient, Encounter, ClinicalEvent, Observation, Condition, Medication, etc.) |
+| Clinical entity ontology | `entities.yaml` | Implemented — defines canonical concepts (Patient, Encounter, ClinicalEvent, Observation, Condition, Medication, SourceSystem, etc.) |
 | Relationship ontology | `relationships.yaml` | Implemented — defines allowed edges (HAS_CONDITION, INTERACTS_WITH, MAY_INDICATE, CONTRAINDICATED_FOR, etc.) |
-| Terminology mappings | `vocabularies.yaml`, `icd10_mappings.yaml`, `cpt_mappings.yaml`, `lab_mappings.yaml`, `medication_mappings.yaml`, `patient_mappings.yaml`, `provider_mappings.yaml`, `device_mappings.yaml`, `payer_mappings.yaml` | Implemented — partial vocabulary coverage; broader mapping governance is a backlog item |
+| Terminology mappings | `mappings/*.yaml` | Implemented — partial vocabulary coverage; broader mapping governance is a backlog item |
 | Provenance and policy | `provenance.yaml` | Implemented — defines source trust, PHI class, and retention class |
 | Graph seeds | `graph_seeds.yaml` | Implemented — drug safety relationships generated into `generated_ontology_seeds.cypher` |
 | Domain rules | `rules/lab_signals.yaml`, `rules/drug_safety.yaml`, `rules/claims_outcomes.yaml` | Implemented — 14 lab rules, drug interaction/reaction/contraindication rules, 6 claims outcome rules |
@@ -189,20 +189,21 @@ The ontology layer is implemented under `data-platform/healthcare/config/ontolog
 ### Repository shape
 
 ```text
-data-platform/healthcare/config/ontology/
+data-platform/healthcare/ontology/
   entities.yaml
   relationships.yaml
   vocabularies.yaml
   provenance.yaml
   graph_seeds.yaml
-  patient_mappings.yaml
-  medication_mappings.yaml
-  provider_mappings.yaml
-  device_mappings.yaml
-  payer_mappings.yaml
-  icd10_mappings.yaml
-  cpt_mappings.yaml
-  lab_mappings.yaml
+  mappings/
+    patient_mappings.yaml
+    medication_mappings.yaml
+    provider_mappings.yaml
+    device_mappings.yaml
+    payer_mappings.yaml
+    icd10_mappings.yaml
+    cpt_mappings.yaml
+    lab_mappings.yaml
   rules/
     lab_signals.yaml
     drug_safety.yaml
@@ -261,7 +262,7 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 | --- | --- | --- | --- |
 | Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `data-platform/healthcare/schemas/medical_event.avsc`, `docs/04_kafka_schema.md`, `data-platform/healthcare/producer/produce_events.py` |
 | Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `data-platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `data-platform/healthcare/flink-app/app/` |
-| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `data-platform/healthcare/config/ontology/vocabularies.yaml` and mapping files |
+| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `data-platform/healthcare/ontology/vocabularies.yaml` and mapping files |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
 | Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/05_neo4j_model.md`, `data-platform/healthcare/neo4j/init.cypher`, Flink graph writes |
 | Vector retrieval | stable embedding (MiniLM-L6-v2) with deterministic top-k similarity via `domain/retrieval.py` | neural reranking, richer filters, optional cross-encoder | `domains/healthcare/agents/domain/retrieval.py`, `data-platform/healthcare/flink-app/app/text_processing.py` |
@@ -270,7 +271,7 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 | Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agents/app.py` |
 | MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/07_mcp_layer_design.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
 | Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
-| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `scripts/validate_ontology.py`, `docs/12_ai_qa.md` |
+| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, and polypharmacy scenario tests (97 tests total) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `domains/healthcare/scripts/validate_ontology.py`, `docs/12_ai_qa.md` |
 
 ## Execution Backlog
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FLINK_APP_DIR = REPO_ROOT / "flink-app"
+FLINK_APP_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "healthcare" / "flink-app"
 if str(FLINK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLINK_APP_DIR))
 
@@ -17,7 +17,7 @@ def build_seed_cypher(bundle: dict) -> str:
     graph_seeds = bundle["graph_seeds"]
     drug_safety = bundle["rule_packs"]["drug_safety"]
     lines: list[str] = []
-    lines.append("// Generated from config/ontology/graph_seeds.yaml")
+    lines.append("// Generated from ontology/graph_seeds.yaml")
     lines.append("")
     lines.append("// Adverse outcomes")
     for item in drug_safety.get("adverse_outcomes", []):

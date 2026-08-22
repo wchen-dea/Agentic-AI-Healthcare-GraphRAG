@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 
-def _find_config_root(marker: str = "config/ontology") -> Path:
+def _find_config_root(marker: str = "ontology") -> Path:
     for candidate in Path(__file__).resolve().parents:
         if (candidate / marker).is_dir():
             return candidate

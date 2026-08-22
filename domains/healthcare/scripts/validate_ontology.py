@@ -8,7 +8,8 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FLINK_APP_DIR = REPO_ROOT / "flink-app"
+DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "healthcare"
+FLINK_APP_DIR = DATA_PLATFORM_DIR / "flink-app"
 if str(FLINK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLINK_APP_DIR))
 
@@ -28,7 +29,7 @@ load_ontology_bundle = _load_generator().load_ontology_bundle
 def main() -> int:
     bundle = load_ontology_bundle()
     generated = _load_generator().build_seed_cypher(bundle)
-    target = REPO_ROOT / "neo4j" / "generated_ontology_seeds.cypher"
+    target = DATA_PLATFORM_DIR / "neo4j" / "generated_ontology_seeds.cypher"
     current = target.read_text(encoding="utf-8")
     if generated != current:
         print("generated ontology seed cypher is out of date:", target, file=sys.stderr)

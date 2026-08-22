@@ -1,0 +1,122 @@
+version: 0.1.0
+status: draft
+owner: platform-team
+source_of_truth:
+- neo4j/init.cypher
+purpose: Structured parity inventory for graph seed facts that are still operationally maintained in Cypher.
+condition_seeds:
+- Hyperkalemia
+- Hyperglycemia
+- Diabetes Mellitus
+- Chronic Kidney Disease
+- Acute Myocardial Infarction
+- Anemia
+- Hyperlipidemia
+- Hypothyroidism
+- Hyperthyroidism
+- Hyponatremia
+- Hypernatremia
+- Infection
+- Anticoagulation Concern
+- Hypertension
+- Heart Failure
+- Asthma
+- Atrial Fibrillation
+- Hypoglycemia
+- COPD
+- Pancreatitis
+symptom_seeds:
+- palpitations
+- confusion
+- cough
+- dizziness
+- fatigue
+- leg cramps
+- swelling
+- shortness of breath
+- nausea
+- vomiting
+- chest pain
+- weight loss
+- headache
+- blurred vision
+- night sweats
+medication_metadata:
+- name: Warfarin
+  active_ingredient: Warfarin sodium
+  is_validated_trade_name_used: false
+- name: Metformin
+  active_ingredient: Metformin hydrochloride
+  is_validated_trade_name_used: false
+- name: Atorvastatin
+  active_ingredient: Atorvastatin calcium
+  is_validated_trade_name_used: false
+- name: Levothyroxine
+  active_ingredient: Levothyroxine sodium
+  is_validated_trade_name_used: false
+- name: Sertraline
+  active_ingredient: Sertraline hydrochloride
+  is_validated_trade_name_used: false
+- name: Metoprolol
+  active_ingredient: Metoprolol tartrate
+  is_validated_trade_name_used: false
+- name: Lisinopril
+  active_ingredient: Lisinopril
+  is_validated_trade_name_used: false
+- name: Amlodipine
+  active_ingredient: Amlodipine besylate
+  is_validated_trade_name_used: false
+- name: Omeprazole
+  active_ingredient: Omeprazole
+  is_validated_trade_name_used: false
+- name: Clopidogrel
+  active_ingredient: Clopidogrel bisulfate
+  is_validated_trade_name_used: false
+- name: Furosemide
+  active_ingredient: Furosemide
+  is_validated_trade_name_used: false
+- name: Gabapentin
+  active_ingredient: Gabapentin
+  is_validated_trade_name_used: false
+- name: Losartan
+  active_ingredient: Losartan potassium
+  is_validated_trade_name_used: false
+- name: Hydrochlorothiazide
+  active_ingredient: Hydrochlorothiazide
+  is_validated_trade_name_used: false
+- name: Spironolactone
+  active_ingredient: Spironolactone
+  is_validated_trade_name_used: false
+- name: Azithromycin
+  active_ingredient: Azithromycin
+  is_validated_trade_name_used: false
+- name: Albuterol
+  active_ingredient: Albuterol sulfate
+  is_validated_trade_name_used: false
+- name: Prednisone
+  active_ingredient: Prednisone
+  is_validated_trade_name_used: false
+- name: Morphine
+  active_ingredient: Morphine sulfate
+  is_validated_trade_name_used: false
+- name: Heparin
+  active_ingredient: Heparin sodium
+  is_validated_trade_name_used: false
+- name: Insulin Glargine
+  active_ingredient: Insulin glargine
+  is_validated_trade_name_used: true
+- name: Vancomycin
+  active_ingredient: Vancomycin hydrochloride
+  is_validated_trade_name_used: false
+- name: Dexamethasone
+  active_ingredient: Dexamethasone
+  is_validated_trade_name_used: false
+- name: Amoxicillin
+  active_ingredient: Amoxicillin trihydrate
+  is_validated_trade_name_used: false
+- name: Aspirin
+  active_ingredient: Acetylsalicylic acid
+  is_validated_trade_name_used: false
+- name: Fluconazole
+  active_ingredient: Fluconazole
+  is_validated_trade_name_used: false

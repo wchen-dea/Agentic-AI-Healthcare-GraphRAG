@@ -10,7 +10,7 @@ This document is the actionable execution backlog for the platform. It tracks wh
 
 **For engineers:** Sprint-level work items with acceptance criteria, file touchpoints, and CI integration points.
 
-Use [target_02_architecture.md](target_02_architecture.md) for strategic architecture and capability intent.
+Use [03_target_architecture.md](03_target_architecture.md) for strategic architecture and capability intent.
 
 ## Current Status Summary
 
@@ -32,7 +32,7 @@ Partially implemented:
 
 - terminology governance breadth and mapping coverage,
 - ontology conformance and retrieval quality benchmark depth,
-- provider abstraction breadth (single provider implementation today),
+- provider abstraction production test coverage (adapters implemented, failover contract tests pending),
 - production privacy, policy, and rollout controls,
 - LangGraph and MLflow production hardening for non-demo use.
 
@@ -78,9 +78,9 @@ Target outcomes:
 
 Suggested repo touchpoints:
 
-- `data-platform/healthcare/config/ontology/`
-- `scripts/generate_ontology_seed_cypher.py`
-- `scripts/validate_ontology.py`
+- `data-platform/healthcare/ontology/`
+- `domains/healthcare/scripts/generate_ontology_seed_cypher.py`
+- `domains/healthcare/scripts/validate_ontology.py`
 - `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`
 
 ### 4. Production controls for non-demo readiness (Stage 5)
@@ -165,15 +165,15 @@ CI checks: New unit suite in `domains/healthcare/agents/tests/` and benchmark de
 
 ### Sprint 2: Runtime Resilience and Governance Promotion
 
-- [ ] 5. Multi-provider runtime + failover
-Scope: Add second provider adapter and deterministic failover policy.
+- [x] 5. Multi-provider runtime + failover
+Scope: Provider adapters and FallbackProvider implemented. Remaining: failover contract tests.
 Acceptance criteria: Adapter switch by env works; timeout/5xx failover tested; retrieval orchestration unchanged.
-CI checks: Extend `domains/healthcare/agents/tests/test_contracts.py` with provider/failover cases; add matrix job in `.github/workflows/rag-api-contracts.yml`.
+CI checks: Extend `domains/healthcare/agents/tests/test_contracts.py` with provider/failover cases.
 
 - [ ] 6. Ontology governance depth
 Scope: Increase vocabulary mapping coverage and drift checks.
 Acceptance criteria: Mapping coverage report generated; generator output parity enforced; ontology drift fails CI.
-CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python scripts/validate_ontology.py` and fail on parity/drift mismatch.
+CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python domains/healthcare/scripts/validate_ontology.py` and fail on parity/drift mismatch.
 
 - [ ] 7. Policy-as-code and PHI boundaries
 Scope: Encode policy classes, redaction rules, and retention constraints as testable rules.
@@ -212,11 +212,14 @@ The `domains/supply-chain/` scaffold is in place with producer, graph_writes, pi
 
 To add a third domain (e.g., Insurance Claims, Cybersecurity SOC):
 
-1. Create `domains/<name>/` with: `config/ontology/`, `producer/`, `flink-app/app/`, `rag-api/domain/`, `neo4j/`, `schemas/`
-2. Define Avro envelope schema with domain-specific ID fields
-3. Write docker-compose overlay with isolated Neo4j + Qdrant + topic init
-4. Implement graph_writes and pipeline_service for the domain's entity model
-5. Add planner classifier and retrieval plan for domain request types
+1. Create `domains/<name>/` with: `agents/`, `scripts/`, `skills/`, `webapp/`
+2. Create `data-platform/<name>/` with: `ontology/`, `producer/`, `flink-app/app/`, `neo4j/`, `schemas/`
+3. Define Avro envelope schema with domain-specific ID fields
+4. Write docker-compose overlay with isolated Neo4j + Qdrant + topic init
+5. Add Helm sub-charts or enable existing infra charts for the new domain
+6. Implement graph_writes and pipeline_service for the domain's entity model
+7. Add planner classifier and retrieval plan for domain request types
+8. Create `generate_agent_skills.py` and `validate_agent_skills.py` in `domains/<name>/scripts/`
 
 ## AI Trends Gap Backlog
 

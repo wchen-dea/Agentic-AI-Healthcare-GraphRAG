@@ -1,47 +1,38 @@
 ---
 name: quality-supplier-scorecard
-description: Aggregate quality inspection results by supplier with defect rate trends, failure counts, and corrective action tracking.
-domain: supply-chain
-version: 0.1.0
+description: Aggregate quality inspection results by supplier with defect rate trends and corrective action history. Use when handling workflows related to: quality_trend_review.
+license: Apache-2.0
+compatibility: Designed for Agent Skills-compatible coding agents with MCP support
+metadata:
+  source_skill_id: quality_supplier_scorecard
+  source_config: agents/config/skills_layer.json
+  generator: scripts/generate_agent_skills.py
 ---
 
-# Quality Supplier Scorecard
+## Overview
+Aggregate quality inspection results by supplier with defect rate trends and corrective action history.
 
-## Purpose
+## When To Use
+Use when handling workflows related to: quality_trend_review.
 
-Build a quality scorecard for suppliers by aggregating inspection results, defect rates, and corrective action requirements over time.
+## Required Context
+- entity_id
 
-## When to Use
-
-- Quarterly supplier performance reviews
-- Evaluating whether to qualify or disqualify a supplier
-- Investigating a spike in defect rates for a specific part
-- Audit preparation for incoming quality metrics
-
-## Context Requirements
-
-- `entity_id` — Supplier ID or Part ID
-
-## Graph Traversals
-
-- `(QualityInspection)-[:SUPPLIED_BY]->(Supplier)` — inspections per supplier
-- `(QualityInspection)-[:INSPECTED_PART]->(Part)` — inspections per part
-- `(QualityInspection)-[:INSPECTED_AT]->(Facility)` — inspection location
-
-## Key Metrics
-
-- Average defect rate per supplier
-- Pass/conditional-pass/fail distribution
-- Corrective action required count
-- Defect category breakdown (dimensional, cosmetic, functional, material)
+## Ontology Dependencies
+- entities
 
 ## MCP Tools
+- supplier_context_get
+- quality_trend_summarize
 
-- `supplier_context_get` — supplier graph context with quality history
-- `quality_trend_summarize` — narrative summary of quality trends
+## Runtime Tools
+- neo4j
 
-## Example Queries
+## Procedure
+1. Validate required context inputs are present.
+2. Resolve ontology prerequisites before tool invocation.
+3. Invoke listed MCP tools in the order that best fits the user request.
+4. Return an evidence-grounded response and capture guardrail metadata.
 
-- "What is the defect rate trend for supplier-0001?"
-- "Which suppliers have the most inspection failures in the last 30 days?"
-- "Show corrective action history for parts supplied by Taiwan Semi Components"
+## References
+See references/REFERENCE.md for source mapping and runtime notes.

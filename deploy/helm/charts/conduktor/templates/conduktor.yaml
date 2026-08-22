@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conduktor-postgres
+  labels:
+    app: conduktor-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: conduktor-postgres
+  template:
+    metadata:
+      labels:
+        app: conduktor-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+        ports:
+        - containerPort: 5432
+          name: pg
+        env:
+        - name: POSTGRES_DB
+          value: "conduktor"
+        - name: POSTGRES_USER
+          value: "conduktor"
+        - name: POSTGRES_PASSWORD
+          value: {{ .Values.postgres.password | quote }}
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: conduktor-postgres
+spec:
+  selector:
+    app: conduktor-postgres
+  ports:
+  - name: pg
+    port: 5432
+    targetPort: pg
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conduktor-console
+  labels:
+    app: conduktor-console
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: conduktor-console
+  template:
+    metadata:
+      labels:
+        app: conduktor-console
+    spec:
+      containers:
+      - name: console
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: CDK_DATABASE_URL
+          value: "postgresql://conduktor:{{ .Values.postgres.password }}@conduktor-postgres:5432/conduktor"
+        - name: CDK_CLUSTERS_0_ID
+          value: "local-kafka"
+        - name: CDK_CLUSTERS_0_NAME
+          value: "Local Kafka"
+        - name: CDK_CLUSTERS_0_BOOTSTRAPSERVERS
+          value: "kafka:29092"
+        - name: CDK_CLUSTERS_0_SCHEMAREGISTRY_ID
+          value: "local-sr"
+        - name: CDK_CLUSTERS_0_SCHEMAREGISTRY_URL
+          value: "http://schema-registry:8081"
+        - name: CDK_SCHEMAREGISTRIES_0_ID
+          value: "local-sr"
+        - name: CDK_SCHEMAREGISTRIES_0_URL
+          value: "http://schema-registry:8081"
+        - name: CDK_ADMIN_EMAIL
+          value: {{ .Values.admin.email | quote }}
+        - name: CDK_ADMIN_PASSWORD
+          value: {{ .Values.admin.password | quote }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: conduktor-console
+  labels:
+    app: conduktor-console
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: conduktor-console
+  ports:
+  - name: http
+    port: {{ .Values.service.port }}
+    targetPort: http
+    {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}

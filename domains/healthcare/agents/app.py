@@ -27,7 +27,7 @@ from domain.synthesis import synthesize_answer
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
-from llm_provider import create_provider
+from llm_provider import FallbackProvider, create_provider
 from mcp.server.fastmcp import FastMCP
 from neo4j import GraphDatabase
 from pydantic import BaseModel, ConfigDict, Field
@@ -204,6 +204,15 @@ llm_provider = create_provider(
     base_url=settings.ollama_url,
     configured_model=settings.ollama_model,
 )
+
+_fallback_provider_name = os.getenv("LLM_FALLBACK_PROVIDER", "")
+if _fallback_provider_name:
+    _fallback = create_provider(
+        _fallback_provider_name,
+        base_url=settings.ollama_url,
+        configured_model=os.getenv("LLM_FALLBACK_MODEL", ""),
+    )
+    llm_provider = FallbackProvider(llm_provider, _fallback)
 
 
 class AuthorizationError(RuntimeError):

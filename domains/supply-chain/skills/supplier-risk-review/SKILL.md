@@ -1,41 +1,39 @@
 ---
 name: supplier-risk-review
-description: Evaluate supplier risk signals including single-source dependency, geopolitical exposure, and financial instability indicators.
-domain: supply-chain
-version: 0.1.0
+description: Evaluate supplier risk signals including single-source dependency, geopolitical exposure, and financial instability. Use when handling workflows related to: supplier_risk_assessment.
+license: Apache-2.0
+compatibility: Designed for Agent Skills-compatible coding agents with MCP support
+metadata:
+  source_skill_id: supplier_risk_review
+  source_config: agents/config/skills_layer.json
+  generator: scripts/generate_agent_skills.py
 ---
 
-# Supplier Risk Review
+## Overview
+Evaluate supplier risk signals including single-source dependency, geopolitical exposure, and financial instability.
 
-## Purpose
+## When To Use
+Use when handling workflows related to: supplier_risk_assessment.
 
-Assess supplier-level risk across concentration, geopolitical, quality, and financial dimensions using graph relationship traversal and vector evidence.
+## Required Context
+- entity_id
 
-## When to Use
-
-- Evaluating a specific supplier's risk profile before contract renewal
-- Identifying single-source dependencies across the supply base
-- Screening suppliers in geopolitically sensitive regions
-- Reviewing risk signal history for a supplier
-
-## Context Requirements
-
-- `entity_id` — Supplier ID (e.g., `supplier-0001`) or Part ID to find associated suppliers
-
-## Graph Traversals
-
-- `(Supplier)-[:SUPPLIES]->(Part)` — supplier-part coverage
-- `(Supplier)-[:HAS_RISK_SIGNAL]->(RiskSignal)` — active risk indicators
-- `(Part)-[:DEPENDS_ON*]->(Part)` — BOM cascade for single-source exposure
-- `(Supplier)-[:LOCATED_AT]->(Facility)` — geographic risk
+## Ontology Dependencies
+- entities
+- risk_signals
 
 ## MCP Tools
+- supplier_context_get
+- risk_summary_generate
 
-- `supplier_context_get` — retrieve supplier graph context
-- `risk_summary_generate` — generate risk narrative from graph + vector evidence
+## Runtime Tools
+- neo4j
 
-## Example Queries
+## Procedure
+1. Validate required context inputs are present.
+2. Resolve ontology prerequisites before tool invocation.
+3. Invoke listed MCP tools in the order that best fits the user request.
+4. Return an evidence-grounded response and capture guardrail metadata.
 
-- "Which suppliers are single-source for critical parts?"
-- "What is the geopolitical risk profile for supplier-0001?"
-- "List all tier-1 suppliers with risk scores above 70"
+## References
+See references/REFERENCE.md for source mapping and runtime notes.

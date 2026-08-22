@@ -7,7 +7,7 @@ across its three evidence paths: vector retrieval (Qdrant), graph traversal (Neo
 LLM answer generation (Ollama). Each path has distinct failure modes and requires a
 different validation technique.
 
-Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [target_02_architecture.md](target_02_architecture.md), [14_future_improvements.md](14_future_improvements.md), [08_skills_layer.md](08_skills_layer.md), and [06_technical_specs.md](06_technical_specs.md).
+Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [03_target_architecture.md](03_target_architecture.md), [14_future_improvements.md](14_future_improvements.md), [08_skills_layer.md](08_skills_layer.md), and [06_technical_specs.md](06_technical_specs.md).
 
 Multi-agent architecture comparison and evaluation framework details are in [10_langgraph_comparison.md](10_langgraph_comparison.md).
 
@@ -392,8 +392,8 @@ Expected output:
 git push → dev branch
   │
   ├── skills-layer-validation job
-  │     ├── python scripts/generate_agent_skills.py --check
-  │     ├── python scripts/validate_agent_skills.py
+  │     ├── python domains/healthcare/scripts/generate_agent_skills.py --check
+  │     ├── python domains/healthcare/scripts/validate_agent_skills.py
   │     └── optional skills-ref validate (best-effort install, non-blocking if unavailable)
   │
   ├── contract-tests job
@@ -418,7 +418,7 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 
 | Gap | Recommended next step |
 |-----|-----------------------|
-| Ontology and rule-pack conformance | Validate `data-platform/healthcare/config/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
+| Ontology and rule-pack conformance | Validate `data-platform/healthcare/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
 | Graph integration tests after event injection | Add `domains/healthcare/agents/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
 | Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
 | Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |

@@ -1,0 +1,20 @@
+version: 0.1.0
+status: accepted
+owner: platform-team
+purpose: Ontology file metadata contract shared across all domains.
+header_fields:
+  required:
+  - version
+  - status
+  - owner
+  - purpose
+  allowed_status:
+  - draft
+  - accepted
+  - deprecated
+entity_schema:
+  required_fields: [id, canonical_name]
+  optional_fields: [aliases, source_types, required_properties, optional_properties, description]
+relationship_schema:
+  required_fields: [type, from, to]
+  optional_fields: [cardinality, required_properties, optional_properties, description]

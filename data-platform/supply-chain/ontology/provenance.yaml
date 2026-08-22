@@ -1,0 +1,36 @@
+version: 0.1.0
+status: accepted
+owner: supply-chain-team
+purpose: Provenance and data classification for supply chain domain.
+extends: shared/provenance_base
+source_system_classes:
+- source_type: ERP
+  trust_level: authoritative
+  data_classification: business_confidential
+  retention_class: regulatory_minimum
+- source_type: WMS
+  trust_level: authoritative
+  data_classification: operational
+  retention_class: operational
+- source_type: TMS
+  trust_level: authoritative
+  data_classification: operational
+  retention_class: operational
+- source_type: IoT
+  trust_level: derived
+  data_classification: operational
+  retention_class: ephemeral
+- source_type: REFERENCE
+  trust_level: authoritative
+  data_classification: internal
+  retention_class: permanent
+evidence_classes:
+- id: vector_event_text
+  description: Rendered supply chain event text from vector store.
+  source: qdrant
+- id: graph_fact
+  description: Structured supply chain fact from Neo4j graph traversal.
+  source: neo4j
+- id: llm_summary
+  description: Generated risk/disruption analysis from LLM provider.
+  source: llm_provider

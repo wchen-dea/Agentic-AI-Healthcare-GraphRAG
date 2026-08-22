@@ -11,12 +11,12 @@ import yaml
 def _repo_root() -> Path:
     # Directory depth from this file to the repo root differs between local
     # checkouts (flink-app/app/...) and the container image (/app/app/...),
-    # so walk up until we find the config/ontology directory.
+    # so walk up until we find the ontology directory.
     for candidate in Path(__file__).resolve().parents:
         if (candidate / "config" / "ontology").is_dir():
             return candidate
     raise FileNotFoundError(
-        "Could not locate 'config/ontology' relative to "
+        "Could not locate 'ontology' relative to "
         f"{__file__}; set ONTOLOGY_CONFIG_DIR to override."
     )
 
@@ -66,11 +66,11 @@ def load_ontology_bundle(base_dir: str | None = None) -> dict[str, Any]:
     entities = _read_yaml(root / "entities.yaml")
     relationships = _read_yaml(root / "relationships.yaml")
     vocabularies = _read_yaml(root / "vocabularies.yaml")
-    patient_mappings = _read_yaml(root / "patient_mappings.yaml")
-    medication_mappings = _read_yaml(root / "medication_mappings.yaml")
-    provider_mappings = _read_yaml(root / "provider_mappings.yaml")
-    device_mappings = _read_yaml(root / "device_mappings.yaml")
-    payer_mappings = _read_yaml(root / "payer_mappings.yaml")
+    patient_mappings = _read_yaml(root / "mappings" / "patient_mappings.yaml")
+    medication_mappings = _read_yaml(root / "mappings" / "medication_mappings.yaml")
+    provider_mappings = _read_yaml(root / "mappings" / "provider_mappings.yaml")
+    device_mappings = _read_yaml(root / "mappings" / "device_mappings.yaml")
+    payer_mappings = _read_yaml(root / "mappings" / "payer_mappings.yaml")
     provenance = _read_yaml(root / "provenance.yaml")
     graph_seeds = _read_yaml(root / "graph_seeds.yaml")
     rule_packs = _load_rule_packs(root)

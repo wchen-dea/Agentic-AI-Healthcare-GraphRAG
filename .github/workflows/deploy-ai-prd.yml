@@ -6,10 +6,9 @@ on:
       - prd
     paths:
       - .github/workflows/deploy-ai-prd.yml
-      - deploy/production/k8s/**
-      - domains/healthcare/rag-api/**
+      - deploy/helm/**
+      - domains/healthcare/agents/**
       - domains/healthcare/webapp/**
-      - shared_lib/**
   workflow_dispatch:
 
 permissions:
@@ -34,6 +33,11 @@ jobs:
         with:
           version: latest
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
       - name: Configure kubeconfig for EKS
         run: |
           aws eks update-kubeconfig \
@@ -43,24 +47,19 @@ jobs:
           AWS_REGION: ${{ vars['AWS_REGION'] }}
           EKS_CLUSTER_NAME: ${{ vars['EKS_CLUSTER_NAME'] }}
 
-      - name: Ensure namespace exists
-        run: kubectl apply -f deploy/production/k8s/base/namespace.yaml
-
-      - name: Apply rag-api secrets
+      - name: Deploy with Helm
         run: |
-          kubectl create secret generic rag-api-secrets \
-            --namespace healthcare-ai \
-            --from-literal=NEO4J_PASSWORD="$NEO4J_PASSWORD" \
-            --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
-            --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
-            --dry-run=client -o yaml | kubectl apply -f -
+          helm upgrade --install healthcare deploy/helm \
+            -f deploy/helm/values-production.yaml \
+            -n healthcare-ai --create-namespace \
+            --set rag-api.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
+            --set rag-api.secrets.OPENAI_API_KEY="$OPENAI_API_KEY" \
+            --set rag-api.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+            --wait --timeout 5m
         env:
           NEO4J_PASSWORD: ${{ secrets['NEO4J_PASSWORD'] }}
           OPENAI_API_KEY: ${{ secrets['OPENAI_API_KEY'] }}
           ANTHROPIC_API_KEY: ${{ secrets['ANTHROPIC_API_KEY'] }}
-
-      - name: Deploy AI app base
-        run: kubectl apply -k deploy/production/k8s/base
 
       - name: Wait for rollouts
         run: |

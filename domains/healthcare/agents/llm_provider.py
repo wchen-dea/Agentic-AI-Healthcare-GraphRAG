@@ -1,5 +1,7 @@
 from typing import Any
 
+import os
+
 import requests
 
 
@@ -99,7 +101,111 @@ class OllamaProvider:
             return "LLM error: invalid response format from inference endpoint."
 
 
+class OpenAIProvider:
+    def __init__(self, *, configured_model: str) -> None:
+        self.model = configured_model or "gpt-4.1-mini"
+        self.api_key = os.getenv("OPENAI_API_KEY", "")
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        timeout_seconds: int,
+        max_tokens: int,
+        temperature: float = 0.2,
+    ) -> str:
+        if not self.api_key:
+            return "LLM error: OPENAI_API_KEY not set."
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                },
+                timeout=timeout_seconds,
+            )
+        except requests.Timeout:
+            return f"LLM error: OpenAI request timed out after {timeout_seconds} seconds."
+        except requests.RequestException:
+            return "LLM error: unable to reach the OpenAI API."
+
+        if response.status_code != 200:
+            return f"LLM error: OpenAI returned status {response.status_code}."
+
+        try:
+            return response.json()["choices"][0]["message"]["content"]
+        except (ValueError, KeyError, IndexError):
+            return "LLM error: invalid response format from OpenAI."
+
+
+class AnthropicProvider:
+    def __init__(self, *, configured_model: str) -> None:
+        self.model = configured_model or "claude-sonnet-4-20250514"
+        self.api_key = os.getenv("ANTHROPIC_API_KEY", "")
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        timeout_seconds: int,
+        max_tokens: int,
+        temperature: float = 0.2,
+    ) -> str:
+        if not self.api_key:
+            return "LLM error: ANTHROPIC_API_KEY not set."
+        try:
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "max_tokens": max_tokens,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": temperature,
+                },
+                timeout=timeout_seconds,
+            )
+        except requests.Timeout:
+            return f"LLM error: Anthropic request timed out after {timeout_seconds} seconds."
+        except requests.RequestException:
+            return "LLM error: unable to reach the Anthropic API."
+
+        if response.status_code != 200:
+            return f"LLM error: Anthropic returned status {response.status_code}."
+
+        try:
+            return response.json()["content"][0]["text"]
+        except (ValueError, KeyError, IndexError):
+            return "LLM error: invalid response format from Anthropic."
+
+
+class FallbackProvider:
+    """Wraps a primary and fallback provider; falls back on error responses."""
+
+    def __init__(self, primary: Any, fallback: Any) -> None:
+        self.primary = primary
+        self.fallback = fallback
+
+    def generate(self, **kwargs: Any) -> str:
+        result = self.primary.generate(**kwargs)
+        if result.startswith("LLM error:"):
+            return self.fallback.generate(**kwargs)
+        return result
+
+
 def create_provider(provider_name: str, *, base_url: str, configured_model: str) -> Any:
     if provider_name == "ollama":
         return OllamaProvider(base_url=base_url, configured_model=configured_model)
+    if provider_name == "openai":
+        return OpenAIProvider(configured_model=configured_model)
+    if provider_name == "anthropic":
+        return AnthropicProvider(configured_model=configured_model)
     raise LLMProviderError(f"Unsupported LLM provider '{provider_name}'")

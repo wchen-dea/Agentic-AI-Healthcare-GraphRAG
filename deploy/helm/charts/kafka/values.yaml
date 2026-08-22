@@ -1,0 +1,59 @@
+enabled: false
+zookeeper:
+  image:
+    repository: confluentinc/cp-zookeeper
+    tag: "7.6.0"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+broker:
+  image:
+    repository: confluentinc/cp-kafka
+    tag: "7.6.0"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+schemaRegistry:
+  image:
+    repository: confluentinc/cp-schema-registry
+    tag: "7.6.0"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+topicInit:
+  enabled: true
+  topics:
+  - name: healthcare.ehr.events
+    partitions: 3
+  - name: healthcare.lab.results
+    partitions: 3
+  - name: healthcare.device.telemetry
+    partitions: 3
+  - name: healthcare.pharmacy.orders
+    partitions: 3
+  - name: healthcare.claims.events
+    partitions: 3
+  - name: healthcare.master.patients
+    partitions: 1
+  - name: healthcare.master.providers
+    partitions: 1
+  - name: healthcare.master.devices
+    partitions: 1
+  - name: healthcare.master.medications
+    partitions: 1
+  - name: healthcare.master.payers
+    partitions: 1
+  - name: healthcare.dlq.events
+    partitions: 1

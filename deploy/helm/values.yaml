@@ -1,0 +1,22 @@
+networkPolicies:
+  enabled: true
+rag-api:
+  enabled: true
+provider-web:
+  enabled: true
+flink:
+  enabled: true
+mlflow:
+  enabled: true
+kafka:
+  enabled: false
+neo4j:
+  enabled: false
+qdrant:
+  enabled: false
+ollama:
+  enabled: false
+conduktor:
+  enabled: false
+producer:
+  enabled: false

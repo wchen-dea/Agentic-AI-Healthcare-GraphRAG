@@ -1,0 +1,26 @@
+version: 0.1.0
+status: accepted
+owner: platform-team
+purpose: Base provenance template for source trust, data classification, and evidence classes.
+source_system_classes:
+  description: Classify source systems by trust and data sensitivity.
+  fields:
+  - source_type
+  - trust_level
+  - data_classification
+  - retention_class
+  trust_levels: [authoritative, derived, self_reported, synthetic]
+  retention_classes: [permanent, regulatory_minimum, operational, ephemeral]
+evidence_classes:
+- id: vector_event_text
+  description: Rendered clinical/domain text from vector store similarity search.
+  source: qdrant
+- id: graph_fact
+  description: Structured fact from knowledge graph traversal.
+  source: neo4j
+- id: llm_summary
+  description: Generated synthesis from LLM provider.
+  source: llm_provider
+policy_defaults:
+  default_trust_level: derived
+  default_retention_class: operational

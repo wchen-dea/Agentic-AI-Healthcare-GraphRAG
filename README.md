@@ -169,11 +169,11 @@ Ops/UI
 ## LLM Strategy
 
 - Local default: Ollama using OLLAMA_URL and OLLAMA_MODEL.
-- LLM calls are routed through a provider abstraction in `domains/healthcare/agents/llm_provider.py`; the default provider is `OllamaProvider`.
+- Production: OpenAI (primary) with Anthropic (fallback) via `LLM_PROVIDER` and `LLM_FALLBACK_PROVIDER`.
+- LLM calls are routed through a provider abstraction in `domains/healthcare/agents/llm_provider.py` (`OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`).
 - Prompt construction and synthesis logic are in `domains/healthcare/agents/domain/synthesis.py`.
-- Active latency and output controls: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
-- Temperature is currently fixed in code (`0.2`) and is not yet env-configurable.
-- Anthropic/OpenAI provider routing remains a documented extension path, not the active local runtime.
+- Active latency and output controls: LLM_TIMEOUT_SECONDS, LLM_MAX_TOKENS, LLM_TEMPERATURE.
+- Production uses OpenAI (primary) with Anthropic (fallback); dev defaults to local Ollama.
 
 ### Ollama Cost Model (Local)
 
@@ -252,14 +252,18 @@ This repository includes a runtime Skills layer plus generated Agent Skills pack
 - Runtime resolver: `domains/healthcare/agents/skills_layer.py`
 - REST endpoint: `POST /skills/plan`
 - MCP tool: `skills_plan_get`
-- Generated Agent Skills packages: `domains/healthcare/skills/`
+- Generated Agent Skills packages: `domains/healthcare/skills/`, `domains/supply-chain/skills/`
 
 Generate and validate skill packages:
 
 ```bash
-python scripts/generate_agent_skills.py
-python scripts/generate_agent_skills.py --check
-python scripts/validate_agent_skills.py
+python domains/healthcare/scripts/generate_agent_skills.py
+python domains/healthcare/scripts/generate_agent_skills.py --check
+python domains/healthcare/scripts/validate_agent_skills.py
+
+python domains/supply-chain/scripts/generate_agent_skills.py
+python domains/supply-chain/scripts/generate_agent_skills.py --check
+python domains/supply-chain/scripts/validate_agent_skills.py
 ```
 
 ## MCP Quick Verify
@@ -386,7 +390,7 @@ Optional one-shot validation:
 
 ```bash
 ./scripts/validate_docs.sh
-./scripts/validate_stack.sh
+./scripts/validate_all_stacks.sh
 ./domains/healthcare/scripts/query_examples.sh
 python3 ./domains/healthcare/scripts/mcp_smoke_test.py
 ```
@@ -561,15 +565,16 @@ Makefile        Local development shortcuts (make up, make test-hc, etc.)
 .python-version Python 3.11 pin (used by uv and Docker images)
 data-platform/  Data platform: shared libraries and per-domain streaming infrastructure
   shared/       Shared modules (embedding, storage, runner, rules engine, ontology loader)
+    ontology/   Shared ontology primitives (meta schema, source system, provenance base)
     webapp/     Shared webapp assets (styles, query-helpers.js, nginx config)
   healthcare/   Healthcare data sourcing
-    config/     Ontology YAML, rules, vocabulary mappings
+    ontology/   Ontology YAML, rules/, mappings/
     flink-app/  PyFlink job, processor logic, graph writes
     neo4j/      Constraints and seed graph relationships
     producer/   Synthetic event producer
     schemas/    Avro envelope schema
   supply-chain/ Supply-chain data sourcing
-    config/     Ontology YAML, risk signal rules
+    ontology/   Ontology YAML, rules/, relationships, provenance
     flink-app/  Stream processor and graph writes
     neo4j/      Constraints and seed data
     producer/   Synthetic event producer
@@ -605,7 +610,7 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 - `domain/response_policy.py` contains response sanitization, truncation, budget enforcement, and confidence estimation.
 - `domain/planner.py` and `domain/evidence.py` handle request classification and deterministic evidence ranking.
 - `langgraph_agents/` provides multi-agent orchestration (LangGraph StateGraph), MLflow tracing, and evaluation.
-- `llm_provider.py` provides the provider abstraction; only `OllamaProvider` is implemented at runtime.
+- `llm_provider.py` provides the provider abstraction with `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, and `FallbackProvider`.
 - flink-app submits a native PyFlink DataStream job (healthcare_graph_rag_pyflink_job.py) to Flink JobManager.
 - healthcare_graph_rag_job.py is retained as a fallback processing implementation and provides reusable sink/enrichment logic consumed by the PyFlink job.
 - Schema Registry stores MedicalEvent Avro schemas and Kafka payloads are published with Confluent Avro serialization (schema ID on wire).
@@ -629,8 +634,7 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 | [docs/11_healthcare_ai_agent_landscape.md](docs/11_healthcare_ai_agent_landscape.md) | Industry AI agent landscape analysis and platform alignment |
 | [docs/13_runbook.md](docs/13_runbook.md) | Operations runbook, health checks, failure modes |
 | [docs/12_ai_qa.md](docs/12_ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
-| [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |
-| [deploy/production/k8s/README.md](deploy/production/k8s/README.md) | Kubernetes manifests |
+| [deploy/README.md](deploy/README.md) | Deployment: dev (minikube), production (k8s + compose) |
 | [domains/supply-chain/README.md](domains/supply-chain/README.md) | Supply Chain domain: graph model, events, quick start |
 | [Makefile](Makefile) | Local development shortcuts (make up, make test-hc, etc.) |
 | [pyproject.toml](pyproject.toml) | Unified Python project config (uv, dependencies, ruff) |

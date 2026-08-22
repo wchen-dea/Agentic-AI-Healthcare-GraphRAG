@@ -113,8 +113,9 @@ Contracts are tested in [agents/tests/test_contracts.py](../domains/healthcare/a
 
 Agent Skills package compliance is enforced with:
 
-- generator: [scripts/generate_agent_skills.py](../scripts/generate_agent_skills.py)
-- validator: [scripts/validate_agent_skills.py](../scripts/validate_agent_skills.py)
+- generator: [domains/healthcare/scripts/generate_agent_skills.py](../domains/healthcare/scripts/generate_agent_skills.py)
+- validator: [domains/healthcare/scripts/validate_agent_skills.py](../domains/healthcare/scripts/validate_agent_skills.py)
+- shared library: [scripts/lib/skill_generator.py](../scripts/lib/skill_generator.py), [scripts/lib/skill_validator.py](../scripts/lib/skill_validator.py)
 
 CI also includes an optional upstream validation pass using `skills-ref validate`.
 The workflow behavior is:
@@ -126,9 +127,17 @@ The workflow behavior is:
 Run locally:
 
 ```bash
-python scripts/generate_agent_skills.py
-python scripts/generate_agent_skills.py --check
-python scripts/validate_agent_skills.py
+python domains/healthcare/scripts/generate_agent_skills.py
+python domains/healthcare/scripts/generate_agent_skills.py --check
+python domains/healthcare/scripts/validate_agent_skills.py
 ```
 
-Generated skill packages are stored under [skills](../domains/healthcare/skills) and include one `SKILL.md` per skill folder plus supporting references.
+For supply-chain:
+
+```bash
+python domains/supply-chain/scripts/generate_agent_skills.py
+python domains/supply-chain/scripts/generate_agent_skills.py --check
+python domains/supply-chain/scripts/validate_agent_skills.py
+```
+
+Generated skill packages are stored under [healthcare/skills](../domains/healthcare/skills) and [supply-chain/skills](../domains/supply-chain/skills) and include one `SKILL.md` per skill folder plus supporting references.

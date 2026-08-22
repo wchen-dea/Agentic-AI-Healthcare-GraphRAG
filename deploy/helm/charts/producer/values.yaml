@@ -1,0 +1,19 @@
+enabled: false
+image:
+  repository: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-producer
+  tag: latest
+  pullPolicy: IfNotPresent
+config:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+  SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+  EVENT_INTERVAL_SECONDS: "1"
+  TRANSACTION_EVENTS_PER_INTERVAL: "3"
+  REFERENCE_EVENTS_PER_INTERVAL: "3"
+  PATIENT_POOL_SIZE: "1000"
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
