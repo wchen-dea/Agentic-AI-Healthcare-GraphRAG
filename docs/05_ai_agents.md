@@ -431,6 +431,7 @@ The embedded MCP layer in `domains/healthcare/agents/app.py` ships ten tools and
 When LangGraph mode is enabled (`RAG_API_LANGGRAPH_ENABLED=true`), MCP tool calls route through the multi-agent StateGraph with specialist agents for medication safety, lab interpretation, and coding review.
 
 When MLflow tracing is enabled (`MLFLOW_TRACKING_URI`), every MCP tool execution is traced as a nested span hierarchy visible in the MLflow Tracing UI. Trace IDs from the audit log can be correlated with MLflow spans for end-to-end observability.
+
 # Skills Layer
 
 ## Purpose
@@ -574,6 +575,7 @@ python domains/supply-chain/scripts/validate_agent_skills.py
 ```
 
 Generated skill packages are stored under [healthcare/skills](../domains/healthcare/skills) and [supply-chain/skills](../domains/supply-chain/skills) and include one `SKILL.md` per skill folder plus supporting references.
+
 # ReAct Controller Specification
 
 ## Purpose
@@ -889,23 +891,12 @@ Audit event additions:
 
 Core deterministic tests:
 
-1. `test_stops_on_confidence_after_dual_evidence`
-- Asserts stop reason `confidence_reached`.
-
-2. `test_stops_on_max_iterations`
-- Asserts capped loop and final reason.
-
-3. `test_no_progress_triggers_stop`
-- Simulates repeated empty observations.
-
-4. `test_unauthorized_action_causes_policy_block`
-- Uses role with restricted tools.
-
-5. `test_error_fallback_switches_action`
-- First action fails, second succeeds.
-
-6. `test_response_remains_within_budget_after_loop`
-- Verifies byte budget and truncation metadata.
+1. `test_stops_on_confidence_after_dual_evidence` — Asserts stop reason `confidence_reached`.
+1. `test_stops_on_max_iterations` — Asserts capped loop and final reason.
+1. `test_no_progress_triggers_stop` — Simulates repeated empty observations.
+1. `test_unauthorized_action_causes_policy_block` — Uses role with restricted tools.
+1. `test_error_fallback_switches_action` — First action fails, second succeeds.
+1. `test_response_remains_within_budget_after_loop` — Verifies byte budget and truncation metadata.
 
 ### 2. Contract tests: extend `domains/healthcare/agents/tests/test_contracts.py`
 
@@ -975,6 +966,7 @@ Operational:
 - No new required external dependencies.
 - No changes required to existing MCP transport contract.
 - Can be rolled back instantly by setting `RAG_API_REACT_ENABLED=false`.
+
 # Multi-Agent Architecture Comparison
 
 ## Overview
@@ -1073,6 +1065,7 @@ fields for automatic list merging.
 
 **LangGraph**: After graph retrieval, `_route_specialist()` dispatches to
 domain-specific agents based on `request_type`:
+
 - `medication_safety` → deep interaction/contraindication analysis
 - `lab_interpretation` → abnormal observation and lab signal extraction
 - `coding_review` → claims gap detection, ICD-10 mapping audit
@@ -1088,12 +1081,14 @@ domain-specific agents based on `request_type`:
 **LangGraph**: Two complementary tracing backends:
 
 **LangSmith** (when `LANGSMITH_API_KEY` is set):
+
 - Each agent node's execution time and I/O
 - State transitions and conditional edge decisions
 - Retry loops and confidence progression
 - Agent message trail (`messages` field in state)
 
 **MLflow** (when `MLFLOW_TRACKING_URI` is set):
+
 - Nested span hierarchy (`CHAIN` → `AGENT` → `RETRIEVER` / `LLM`)
 - Per-span latency, outcome, and healthcare-specific attributes
 - Cross-mode evaluation with six healthcare scorers
@@ -1103,6 +1098,7 @@ domain-specific agents based on `request_type`:
 MLflow tracing also works for single-pass and ReAct modes, wrapping the full pipeline in a `healthcare_query_{mode}` root span.
 
 Enable by setting:
+
 ```bash
 # LangSmith
 export LANGSMITH_API_KEY=<your-key>

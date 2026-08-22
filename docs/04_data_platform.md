@@ -148,6 +148,7 @@ Within each interval batch, the producer attempts to emit distinct `event_type` 
 Shift-handoff windows can introduce burst traffic (`BATCH_BURST_PROBABILITY`, `BATCH_BURST_MULTIPLIER`, `SHIFT_HANDOFF_HOURS`) to better emulate operational load spikes.
 
 Temporal and operational realism features:
+
 - Late-arriving events via backdated `event_ts` (`late_arrival_minutes` in payload)
 - Correction events via `is_correction` and `correction_of_event_id`
 - Correlated follow-up events from critical abnormal labs to medication administration actions
@@ -367,6 +368,7 @@ Recommended next steps:
 - Add explicit event lineage metadata (trace_id, tenant_id, producer_version).
 - Add replay governance for large topic retention scenarios.
 - Consider schema v2 with structured payload records (instead of `payload_json` string) for stronger validation and finer masking controls.
+
 # Neo4j Healthcare Graph Model
 
 ## Purpose
@@ -444,6 +446,7 @@ Drug safety seed data (FAERS-aligned, from `generated_ontology_seeds.cypher`):
 - 41 `INTERACTS_WITH` edges with `risk`, `severity`, and `mechanism` annotations (e.g. Warfarin+Aspirin additive_anticoagulation, Morphine+Gabapentin additive_CNS_depression)
 - 46 `HAS_KNOWN_REACTION` edges with MedDRA terms (e.g. Lisinopril→Cough, Atorvastatin→Myalgia, Insulin Glargine→Hypoglycaemia/Confusion)
 - 23 `CONTRAINDICATED_FOR` edges with reason and severity (e.g. Metformin→CKD lactic_acidosis_risk, Lisinopril→Hyperkalemia worsens_hyperkalemia, Ibuprofen→Heart Failure NSAID_fluid_retention)
+
 ## Base Lineage Pattern
 
 Every transactional event writes the base lineage:

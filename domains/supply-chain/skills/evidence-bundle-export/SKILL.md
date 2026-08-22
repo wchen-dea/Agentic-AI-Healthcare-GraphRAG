@@ -10,28 +10,36 @@ metadata:
 ---
 
 ## Overview
+
 Export evidence bundle for traceability, review, and audit workflows.
 
 ## When To Use
+
 Use when handling workflows related to: quality_trend_review.
 
 ## Required Context
+
 - question
 
 ## Ontology Dependencies
+
 - provenance
 
 ## MCP Tools
+
 - evidence_bundle_export
 
 ## Runtime Tools
+
 - rag_api
 
 ## Procedure
+
 1. Validate required context inputs are present.
 2. Resolve ontology prerequisites before tool invocation.
 3. Invoke listed MCP tools in the order that best fits the user request.
 4. Return an evidence-grounded response and capture guardrail metadata.
 
 ## References
+
 See references/REFERENCE.md for source mapping and runtime notes.

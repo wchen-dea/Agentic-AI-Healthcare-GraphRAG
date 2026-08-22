@@ -13,6 +13,7 @@ compatible with AI agent frameworks. The first domain is Healthcare Provider; a 
 Supply Chain Resilience domain demonstrates cross-industry reusability.
 
 **What this platform is not:**  
+
 - A regulated medical device or clinical decision support system approved for diagnostic use
 - A production Electronic Health Record (EHR) or Clinical Data Repository (CDR)
 - A replacement for clinician judgment
@@ -37,6 +38,7 @@ problems:
 | **Retrieval-generation gap** — Large language models generate fluent answers but hallucinate when facts are not grounded in evidence. Healthcare cannot tolerate unverified clinical assertions. | Eroded clinician trust; potential patient safety risk |
 
 This platform addresses all three by combining:
+
 - **Streaming ingestion** (events queryable within seconds of arrival)
 - **Hybrid evidence storage** (vector similarity + graph relationship reasoning)
 - **Grounded generation** (LLM answers cite the specific vector hits and graph context that supported them)

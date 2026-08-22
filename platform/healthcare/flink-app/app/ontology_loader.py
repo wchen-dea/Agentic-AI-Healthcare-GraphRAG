@@ -9,11 +9,12 @@ import yaml
 
 
 def _repo_root() -> Path:
-    # Directory depth from this file to the repo root differs between local
-    # checkouts (flink-app/app/...) and the container image (/app/app/...),
-    # so walk up until we find the ontology directory.
+    # Walk up until we find the ontology directory.
+    # Container: /app/config/ontology; local: platform/healthcare/ontology
     for candidate in Path(__file__).resolve().parents:
         if (candidate / "config" / "ontology").is_dir():
+            return candidate
+        if (candidate / "ontology").is_dir():
             return candidate
     raise FileNotFoundError(
         "Could not locate 'ontology' relative to "
@@ -25,7 +26,10 @@ def ontology_dir() -> Path:
     configured = os.getenv("ONTOLOGY_CONFIG_DIR")
     if configured:
         return Path(configured).expanduser().resolve()
-    return _repo_root() / "config" / "ontology"
+    root = _repo_root()
+    if (root / "config" / "ontology").is_dir():
+        return root / "config" / "ontology"
+    return root / "ontology"
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:

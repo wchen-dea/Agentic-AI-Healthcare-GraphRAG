@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unittest
+from pathlib import Path
 
 from helpers import REPO_ROOT, build_seed_cypher, load_ontology_bundle
 
@@ -15,7 +16,7 @@ class SeedGenerationTests(unittest.TestCase):
         cls.generated = cls.generated_path.read_text(encoding="utf-8")
         cls.drug_safety = cls.bundle["rule_packs"]["drug_safety"]
         cls.graph_seeds = cls.bundle["graph_seeds"]
-        cls.compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        cls.compose = (Path(__file__).resolve().parents[4] / "container" / "docker-compose.healthcare.yml").read_text(encoding="utf-8")
 
     def test_claims_rules_align_with_seeded_outcomes(self):
         outcome_codes = {item["code"] for item in self.drug_safety["adverse_outcomes"]}

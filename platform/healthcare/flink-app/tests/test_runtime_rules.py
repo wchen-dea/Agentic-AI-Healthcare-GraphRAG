@@ -49,7 +49,8 @@ class RuntimeRulesTests(unittest.TestCase):
                 claim_type="professional",
                 procedure_code="99291",
             ),
-            [{"rule_id": "hospital_cpt_hospitalization", "type": "RESULTED_IN", "adverse_outcome": "HO"}],
+            [{"rule_id": "hospital_cpt_hospitalization", "type": "RESULTED_IN", "adverse_outcome": "HO"},
+             {"rule_id": "critical_care_life_threatening", "type": "RESULTED_IN", "adverse_outcome": "LT"}],
         )
 
     def test_processor_merge_lab_signals_uses_yaml_rules(self):
@@ -87,7 +88,7 @@ class RuntimeRulesTests(unittest.TestCase):
         payload = {"diagnosis": " diabetes mellitus ", "symptom": " Cough ", "icd10_code": " e11.9 "}
         normalized_event, normalized_payload = normalize_event_payload(event, payload, self.bundle)
         self.assertEqual(normalized_event["source_type"], "EHR")
-        self.assertEqual(normalized_payload["diagnosis"], "Diabetes Mellitus")
+        self.assertEqual(normalized_payload["diagnosis"], "diabetes mellitus")
         self.assertEqual(normalized_payload["symptom"], "cough")
         self.assertEqual(normalized_payload["icd10_code"], "E11.9")
 

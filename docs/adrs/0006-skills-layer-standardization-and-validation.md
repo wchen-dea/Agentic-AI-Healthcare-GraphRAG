@@ -33,8 +33,8 @@ Adopt a standardized Skills layer with generator-plus-validator enforcement.
 3. Generated skill package artifacts under `domains/healthcare/skills/` are maintained by `domains/healthcare/scripts/generate_agent_skills.py`.
 4. Structural validation is enforced by `domains/healthcare/scripts/validate_agent_skills.py`.
 5. Both domains (healthcare and supply-chain) share generator/validator logic via `scripts/lib/`.
-5. CI enforces both checks in a dedicated skills validation job.
-6. Upstream `skills-ref validate` is optional and non-blocking:
+6. CI enforces both checks in a dedicated skills validation job.
+7. Upstream `skills-ref validate` is optional and non-blocking:
    - use it when available,
    - attempt best-effort install when missing,
    - skip gracefully when still unavailable.

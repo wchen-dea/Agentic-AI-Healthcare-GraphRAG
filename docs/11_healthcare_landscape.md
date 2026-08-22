@@ -12,7 +12,6 @@ This document provides a competitive landscape analysis of healthcare AI agent a
 
 Sources: Microsoft Research Healthcare Agent Orchestrator (2025), Alex G. Lee framework taxonomy (2025), PMC healthcare AI agents survey (2025).
 
-
 ## Industry Consensus: Healthcare AI Agent Architecture
 
 ### Six Core Modules

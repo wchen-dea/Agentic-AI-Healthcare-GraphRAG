@@ -123,6 +123,7 @@ make helm-ports-stop  # kill them
 | Conduktor | `http://localhost:9080` |
 
 Dev differences from production:
+
 - All deployments scaled to 1 replica
 - LLM provider: local Ollama (no external API keys needed)
 - Kafka, Neo4j, Qdrant, Ollama deployed in-cluster

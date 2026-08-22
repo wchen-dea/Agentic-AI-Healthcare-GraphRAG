@@ -79,7 +79,7 @@ def build_seed_cypher(bundle: dict) -> str:
 
 def main() -> int:
     bundle = load_ontology_bundle()
-    target = REPO_ROOT / "neo4j" / "generated_ontology_seeds.cypher"
+    target = Path(__file__).resolve().parents[3] / "platform" / "healthcare" / "neo4j" / "generated_ontology_seeds.cypher"
     target.write_text(build_seed_cypher(bundle), encoding="utf-8")
     return 0
 

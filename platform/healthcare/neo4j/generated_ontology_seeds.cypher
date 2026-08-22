@@ -1,4 +1,4 @@
-// Generated from config/ontology/graph_seeds.yaml
+// Generated from ontology/graph_seeds.yaml
 
 // Adverse outcomes
 MERGE (:AdverseOutcome {code: "DE", description: "Death"});
@@ -72,6 +72,8 @@ MATCH (m:Medication {name: "Insulin Glargine"}) SET m.activeIngredient = "Insuli
 MATCH (m:Medication {name: "Vancomycin"}) SET m.activeIngredient = "Vancomycin hydrochloride", m.isValidatedTradeNameUsed = false;
 MATCH (m:Medication {name: "Dexamethasone"}) SET m.activeIngredient = "Dexamethasone", m.isValidatedTradeNameUsed = false;
 MATCH (m:Medication {name: "Amoxicillin"}) SET m.activeIngredient = "Amoxicillin trihydrate", m.isValidatedTradeNameUsed = false;
+MATCH (m:Medication {name: "Aspirin"}) SET m.activeIngredient = "Acetylsalicylic acid", m.isValidatedTradeNameUsed = false;
+MATCH (m:Medication {name: "Fluconazole"}) SET m.activeIngredient = "Fluconazole", m.isValidatedTradeNameUsed = false;
 
 // Drug interactions
 MERGE (:Medication {name: "Warfarin"});
@@ -119,103 +121,6 @@ MATCH (from:Medication {name: "Hydrochlorothiazide"}) MATCH (to:Medication {name
 MERGE (:Medication {name: "Morphine"});
 MERGE (:Medication {name: "Gabapentin"});
 MATCH (from:Medication {name: "Morphine"}) MATCH (to:Medication {name: "Gabapentin"}) MERGE (from)-[:INTERACTS_WITH {risk: "respiratory_depression", severity: "high", mechanism: "additive_CNS_depression"}]->(to);
-
-// Expanded drug interactions
-MERGE (:Medication {name: "Warfarin"});
-MERGE (:Medication {name: "Ibuprofen"});
-MATCH (from:Medication {name: "Warfarin"}) MATCH (to:Medication {name: "Ibuprofen"}) MERGE (from)-[:INTERACTS_WITH {risk: "bleeding_risk", severity: "high", mechanism: "NSAID_inhibits_platelet_aggregation_and_displaces_warfarin"}]->(to);
-MERGE (:Medication {name: "Warfarin"});
-MERGE (:Medication {name: "Heparin"});
-MATCH (from:Medication {name: "Warfarin"}) MATCH (to:Medication {name: "Heparin"}) MERGE (from)-[:INTERACTS_WITH {risk: "bleeding_risk", severity: "high", mechanism: "dual_anticoagulation"}]->(to);
-MERGE (:Medication {name: "Warfarin"});
-MERGE (:Medication {name: "Enoxaparin"});
-MATCH (from:Medication {name: "Warfarin"}) MATCH (to:Medication {name: "Enoxaparin"}) MERGE (from)-[:INTERACTS_WITH {risk: "bleeding_risk", severity: "high", mechanism: "dual_anticoagulation_LMWH_plus_VKA"}]->(to);
-MERGE (:Medication {name: "Warfarin"});
-MERGE (:Medication {name: "Amoxicillin"});
-MATCH (from:Medication {name: "Warfarin"}) MATCH (to:Medication {name: "Amoxicillin"}) MERGE (from)-[:INTERACTS_WITH {risk: "bleeding_risk", severity: "moderate", mechanism: "gut_flora_disruption_increases_INR"}]->(to);
-MERGE (:Medication {name: "Sertraline"});
-MERGE (:Medication {name: "Morphine"});
-MATCH (from:Medication {name: "Sertraline"}) MATCH (to:Medication {name: "Morphine"}) MERGE (from)-[:INTERACTS_WITH {risk: "serotonin_syndrome", severity: "high", mechanism: "SSRI_plus_opioid_serotonergic_synergy"}]->(to);
-MERGE (:Medication {name: "Sertraline"});
-MERGE (:Medication {name: "Aspirin"});
-MATCH (from:Medication {name: "Sertraline"}) MATCH (to:Medication {name: "Aspirin"}) MERGE (from)-[:INTERACTS_WITH {risk: "GI_bleeding_risk", severity: "moderate", mechanism: "SSRI_impairs_platelet_serotonin_uptake"}]->(to);
-MERGE (:Medication {name: "Sertraline"});
-MERGE (:Medication {name: "Ibuprofen"});
-MATCH (from:Medication {name: "Sertraline"}) MATCH (to:Medication {name: "Ibuprofen"}) MERGE (from)-[:INTERACTS_WITH {risk: "GI_bleeding_risk", severity: "moderate", mechanism: "SSRI_plus_NSAID_additive_bleeding"}]->(to);
-MERGE (:Medication {name: "Lisinopril"});
-MERGE (:Medication {name: "Losartan"});
-MATCH (from:Medication {name: "Lisinopril"}) MATCH (to:Medication {name: "Losartan"}) MERGE (from)-[:INTERACTS_WITH {risk: "hyperkalemia_risk", severity: "high", mechanism: "dual_RAAS_blockade_ACEi_plus_ARB"}]->(to);
-MERGE (:Medication {name: "Digoxin"});
-MERGE (:Medication {name: "Amiodarone"});
-MATCH (from:Medication {name: "Digoxin"}) MATCH (to:Medication {name: "Amiodarone"}) MERGE (from)-[:INTERACTS_WITH {risk: "digoxin_toxicity", severity: "high", mechanism: "amiodarone_reduces_digoxin_clearance"}]->(to);
-MERGE (:Medication {name: "Digoxin"});
-MERGE (:Medication {name: "Furosemide"});
-MATCH (from:Medication {name: "Digoxin"}) MATCH (to:Medication {name: "Furosemide"}) MERGE (from)-[:INTERACTS_WITH {risk: "digoxin_toxicity", severity: "moderate", mechanism: "hypokalemia_increases_digoxin_sensitivity"}]->(to);
-MERGE (:Medication {name: "Digoxin"});
-MERGE (:Medication {name: "Spironolactone"});
-MATCH (from:Medication {name: "Digoxin"}) MATCH (to:Medication {name: "Spironolactone"}) MERGE (from)-[:INTERACTS_WITH {risk: "digoxin_toxicity", severity: "moderate", mechanism: "spironolactone_reduces_digoxin_clearance"}]->(to);
-MERGE (:Medication {name: "Apixaban"});
-MERGE (:Medication {name: "Aspirin"});
-MATCH (from:Medication {name: "Apixaban"}) MATCH (to:Medication {name: "Aspirin"}) MERGE (from)-[:INTERACTS_WITH {risk: "bleeding_risk", severity: "high", mechanism: "DOAC_plus_antiplatelet_additive_bleeding"}]->(to);
-MERGE (:Medication {name: "Rivaroxaban"});
-MERGE (:Medication {name: "Aspirin"});
-MATCH (from:Medication {name: "Rivaroxaban"}) MATCH (to:Medication {name: "Aspirin"}) MERGE (from)-[:INTERACTS_WITH {risk: "bleeding_risk", severity: "high", mechanism: "DOAC_plus_antiplatelet_additive_bleeding"}]->(to);
-MERGE (:Medication {name: "Enoxaparin"});
-MERGE (:Medication {name: "Aspirin"});
-MATCH (from:Medication {name: "Enoxaparin"}) MATCH (to:Medication {name: "Aspirin"}) MERGE (from)-[:INTERACTS_WITH {risk: "bleeding_risk", severity: "high", mechanism: "LMWH_plus_antiplatelet"}]->(to);
-MERGE (:Medication {name: "Prednisone"});
-MERGE (:Medication {name: "Ibuprofen"});
-MATCH (from:Medication {name: "Prednisone"}) MATCH (to:Medication {name: "Ibuprofen"}) MERGE (from)-[:INTERACTS_WITH {risk: "GI_ulceration_risk", severity: "high", mechanism: "corticosteroid_plus_NSAID_mucosal_injury"}]->(to);
-MERGE (:Medication {name: "Prednisone"});
-MERGE (:Medication {name: "Insulin Glargine"});
-MATCH (from:Medication {name: "Prednisone"}) MATCH (to:Medication {name: "Insulin Glargine"}) MERGE (from)-[:INTERACTS_WITH {risk: "hyperglycemia_risk", severity: "moderate", mechanism: "glucocorticoid_induced_insulin_resistance"}]->(to);
-MERGE (:Medication {name: "Metoprolol"});
-MERGE (:Medication {name: "Diltiazem"});
-MATCH (from:Medication {name: "Metoprolol"}) MATCH (to:Medication {name: "Diltiazem"}) MERGE (from)-[:INTERACTS_WITH {risk: "severe_bradycardia", severity: "high", mechanism: "additive_AV_node_blockade"}]->(to);
-MERGE (:Medication {name: "Metoprolol"});
-MERGE (:Medication {name: "Carvedilol"});
-MATCH (from:Medication {name: "Metoprolol"}) MATCH (to:Medication {name: "Carvedilol"}) MERGE (from)-[:INTERACTS_WITH {risk: "severe_bradycardia", severity: "high", mechanism: "duplicate_beta_blockade"}]->(to);
-MERGE (:Medication {name: "Sacubitril-Valsartan"});
-MERGE (:Medication {name: "Lisinopril"});
-MATCH (from:Medication {name: "Sacubitril-Valsartan"}) MATCH (to:Medication {name: "Lisinopril"}) MERGE (from)-[:INTERACTS_WITH {risk: "angioedema_risk", severity: "high", mechanism: "ARNI_plus_ACEi_contraindicated_within_36h"}]->(to);
-MERGE (:Medication {name: "Empagliflozin"});
-MERGE (:Medication {name: "Furosemide"});
-MATCH (from:Medication {name: "Empagliflozin"}) MATCH (to:Medication {name: "Furosemide"}) MERGE (from)-[:INTERACTS_WITH {risk: "dehydration_hypotension", severity: "moderate", mechanism: "SGLT2i_plus_loop_diuretic_volume_depletion"}]->(to);
-MERGE (:Medication {name: "Ceftriaxone"});
-MERGE (:Medication {name: "Furosemide"});
-MATCH (from:Medication {name: "Ceftriaxone"}) MATCH (to:Medication {name: "Furosemide"}) MERGE (from)-[:INTERACTS_WITH {risk: "nephrotoxicity_risk", severity: "moderate", mechanism: "synergistic_renal_tubular_toxicity"}]->(to);
-MERGE (:Medication {name: "Linezolid"});
-MERGE (:Medication {name: "Sertraline"});
-MATCH (from:Medication {name: "Linezolid"}) MATCH (to:Medication {name: "Sertraline"}) MERGE (from)-[:INTERACTS_WITH {risk: "serotonin_syndrome", severity: "high", mechanism: "MAOi_activity_plus_SSRI"}]->(to);
-MERGE (:Medication {name: "Ondansetron"});
-MERGE (:Medication {name: "Azithromycin"});
-MATCH (from:Medication {name: "Ondansetron"}) MATCH (to:Medication {name: "Azithromycin"}) MERGE (from)-[:INTERACTS_WITH {risk: "QT_prolongation", severity: "high", mechanism: "additive_QT_prolonging_effect"}]->(to);
-MERGE (:Medication {name: "Nitroglycerin"});
-MERGE (:Medication {name: "Amlodipine"});
-MATCH (from:Medication {name: "Nitroglycerin"}) MATCH (to:Medication {name: "Amlodipine"}) MERGE (from)-[:INTERACTS_WITH {risk: "severe_hypotension", severity: "high", mechanism: "additive_vasodilation"}]->(to);
-MERGE (:Medication {name: "Acetaminophen"});
-MERGE (:Medication {name: "Warfarin"});
-MATCH (from:Medication {name: "Acetaminophen"}) MATCH (to:Medication {name: "Warfarin"}) MERGE (from)-[:INTERACTS_WITH {risk: "INR_elevation", severity: "moderate", mechanism: "acetaminophen_potentiates_warfarin_at_high_doses"}]->(to);
-
-// Expanded contraindications
-MERGE (:Medication {name: "Ibuprofen"});
-MERGE (:Condition {name: "Chronic Kidney Disease"});
-MATCH (m:Medication {name: "Ibuprofen"}) MATCH (c:Condition {name: "Chronic Kidney Disease"}) MERGE (m)-[:CONTRAINDICATED_FOR {reason: "NSAID_nephrotoxicity", severity: "high"}]->(c);
-MERGE (:Medication {name: "Ibuprofen"});
-MERGE (:Condition {name: "Heart Failure"});
-MATCH (m:Medication {name: "Ibuprofen"}) MATCH (c:Condition {name: "Heart Failure"}) MERGE (m)-[:CONTRAINDICATED_FOR {reason: "NSAID_fluid_retention_worsens_HF", severity: "high"}]->(c);
-MERGE (:Medication {name: "Digoxin"});
-MERGE (:Condition {name: "Hyperkalemia"});
-MATCH (m:Medication {name: "Digoxin"}) MATCH (c:Condition {name: "Hyperkalemia"}) MERGE (m)-[:CONTRAINDICATED_FOR {reason: "hyperkalemia_increases_digoxin_toxicity", severity: "high"}]->(c);
-MERGE (:Medication {name: "Empagliflozin"});
-MERGE (:Condition {name: "Chronic Kidney Disease"});
-MATCH (m:Medication {name: "Empagliflozin"}) MATCH (c:Condition {name: "Chronic Kidney Disease"}) MERGE (m)-[:CONTRAINDICATED_FOR {reason: "eGFR_dependent_efficacy_reduced_below_20", severity: "moderate"}]->(c);
-MERGE (:Medication {name: "Apixaban"});
-MERGE (:Condition {name: "Anemia"});
-MATCH (m:Medication {name: "Apixaban"}) MATCH (c:Condition {name: "Anemia"}) MERGE (m)-[:CONTRAINDICATED_FOR {reason: "DOAC_bleeding_risk_in_anemia", severity: "high"}]->(c);
-MERGE (:Medication {name: "Enoxaparin"});
-MERGE (:Condition {name: "Chronic Kidney Disease"});
-MATCH (m:Medication {name: "Enoxaparin"}) MATCH (c:Condition {name: "Chronic Kidney Disease"}) MERGE (m)-[:CONTRAINDICATED_FOR {reason: "LMWH_accumulation_in_renal_impairment", severity: "high"}]->(c);
 
 // Contraindications
 MERGE (:Medication {name: "Warfarin"});

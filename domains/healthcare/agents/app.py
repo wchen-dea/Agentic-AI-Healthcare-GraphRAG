@@ -25,7 +25,7 @@ from domain.guardrails import classify_grounding, classify_input, classify_outpu
 from domain.memory import get_session_store
 from domain.react_controller import ReactLoopSettings, run_react_query_loop
 from domain.retrieval import graph_search, vector_search
-from domain.structured_output import build_structured_prompt, compact_graph_context as struct_graph, compact_vector_context as struct_vector, parse_structured_response
+from domain.structured_output import build_structured_prompt, parse_structured_response
 from domain.synthesis import compact_graph_context, compact_vector_context, synthesize_answer
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -499,8 +499,8 @@ def _run_query_single_pass(
     graph_items = rank_graph_context(graph_items_raw, request_type)
 
     if structured:
-        vector_summary = struct_vector(vector_items, max_items=context_limit)
-        graph_summary = struct_graph(graph_items, max_items=context_limit)
+        vector_summary = compact_vector_context(vector_items, max_items=context_limit)
+        graph_summary = compact_graph_context(graph_items, max_items=context_limit)
         prompt = build_structured_prompt(question, vector_summary, graph_summary)
         raw = llm_provider.generate(prompt=prompt, timeout_seconds=settings.llm_timeout_seconds, max_tokens=settings.llm_max_tokens, temperature=0.1)
         parsed = parse_structured_response(raw)

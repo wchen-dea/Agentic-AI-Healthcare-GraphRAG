@@ -12,7 +12,7 @@ class OntologyLoaderTests(unittest.TestCase):
     def test_duplicate_entity_ids_fail_fast(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            shutil.copytree(REPO_ROOT / "config" / "ontology", tmp_path / "ontology")
+            shutil.copytree(REPO_ROOT / "ontology", tmp_path / "ontology")
             entities_path = tmp_path / "ontology" / "entities.yaml"
             entities_path.write_text(
                 entities_path.read_text(encoding="utf-8") + "\n- id: patient\n  canonical_name: PatientDup\n",
@@ -25,7 +25,7 @@ class OntologyLoaderTests(unittest.TestCase):
     def test_malformed_rule_pack_fails_fast(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            shutil.copytree(REPO_ROOT / "config" / "ontology", tmp_path / "ontology")
+            shutil.copytree(REPO_ROOT / "ontology", tmp_path / "ontology")
             rule_path = tmp_path / "ontology" / "rules" / "lab_signals.yaml"
             rule_path.write_text("rules: [invalid", encoding="utf-8")
             load_ontology_bundle.cache_clear()

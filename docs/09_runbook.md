@@ -686,6 +686,7 @@ make helm-ports-stop  # kill all port-forwards
 ```
 
 Services:
+
 - RAG API: `http://localhost:8000`
 - Web UI: `http://localhost:8088`
 - Neo4j: `http://localhost:7474`
