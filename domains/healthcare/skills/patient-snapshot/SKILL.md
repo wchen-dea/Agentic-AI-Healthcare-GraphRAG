@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Designed for Agent Skills-compatible coding agents with MCP support
 metadata:
   source_skill_id: patient_snapshot
-  source_config: rag-api/config/skills_layer.json
+  source_config: agents/config/skills_layer.json
   generator: scripts/generate_agent_skills.py
 ---
 

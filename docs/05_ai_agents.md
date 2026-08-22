@@ -29,8 +29,8 @@ AI Client (Copilot, Claude Desktop, custom agent)
      - harness.py (retry, guards, prompt registry)
   -> langgraph_agents/ (optional multi-agent routing)
   -> External stores:
-     - Neo4j (data-platform/healthcare/neo4j)
-     - Qdrant (data-platform/healthcare via flink-app)
+     - Neo4j (platform/healthcare/neo4j)
+     - Qdrant (platform/healthcare via flink-app)
      - Ollama (infra)
 ```
 

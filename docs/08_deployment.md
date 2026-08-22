@@ -13,7 +13,7 @@ deploy/
 │   ├── values-production.yaml  Production overrides (multi-replica, OpenAI+Anthropic)
 │   ├── templates/              Namespace, NetworkPolicy, helpers
 │   └── charts/
-│       ├── rag-api/            AI agents with embedded MCP
+│       ├── rag-api/            Healthcare AI agents with embedded MCP
 │       ├── provider-web/       Frontend UI
 │       ├── flink/              Flink cluster (JobManager + TaskManager + job)
 │       ├── mlflow/             Tracing and evaluation server

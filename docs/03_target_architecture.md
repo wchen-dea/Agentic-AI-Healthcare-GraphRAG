@@ -10,7 +10,7 @@ This document defines the strategic target for the healthcare intelligence platf
 
 **For engineers:** This is the delivery backlog with acceptance criteria, file touchpoints, and staged execution order.
 
-Current ontology files live under `data-platform/healthcare/ontology/`. Implementation status details are in [06_technical_specs.md](06_technical_specs.md), [09_runbook.md](09_runbook.md), [05_ai_agents.md](05_ai_agents.md), and [12_future_improvements.md](12_future_improvements.md).
+Current ontology files live under `platform/healthcare/ontology/`. Implementation status details are in [06_technical_specs.md](06_technical_specs.md), [09_runbook.md](09_runbook.md), [05_ai_agents.md](05_ai_agents.md), and [12_future_improvements.md](12_future_improvements.md).
 
 ## Target Outcome
 
@@ -28,7 +28,7 @@ Desired characteristics:
 
 Implemented in the current repository:
 
-- ontology-driven ingestion modules exist in `data-platform/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
+- ontology-driven ingestion modules exist in `platform/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
 - dual persistence remains active across Qdrant and Neo4j,
 - `rag-api` query flow now includes request classification, retrieval planning, and deterministic evidence ranking,
 - LLM calls are routed through a provider adapter abstraction (`llm_provider.py`, default `ollama`),
@@ -173,7 +173,7 @@ flowchart LR
 
 ## Ontology Model
 
-The ontology layer is implemented under `data-platform/healthcare/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
+The ontology layer is implemented under `platform/healthcare/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
 
 ### Implemented ontology packages
 
@@ -189,7 +189,7 @@ The ontology layer is implemented under `data-platform/healthcare/ontology/` and
 ### Repository shape
 
 ```text
-data-platform/healthcare/ontology/
+platform/healthcare/ontology/
   entities.yaml
   relationships.yaml
   vocabularies.yaml
@@ -260,14 +260,14 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 
 | Capability area | Current state in repo | Target state | Primary repo touchpoints |
 | --- | --- | --- | --- |
-| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `data-platform/healthcare/schemas/medical_event.avsc`, `docs/04_data_platform.md`, `data-platform/healthcare/producer/produce_events.py` |
-| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `data-platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `data-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `data-platform/healthcare/flink-app/app/` |
-| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `data-platform/healthcare/ontology/vocabularies.yaml` and mapping files |
+| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `platform/healthcare/schemas/medical_event.avsc`, `docs/04_data_platform.md`, `platform/healthcare/producer/produce_events.py` |
+| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `platform/healthcare/flink-app/app/` |
+| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `platform/healthcare/ontology/vocabularies.yaml` and mapping files |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
-| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/04_data_platform.md`, `data-platform/healthcare/neo4j/init.cypher`, Flink graph writes |
-| Vector retrieval | stable embedding (MiniLM-L6-v2) with deterministic top-k similarity via `domain/retrieval.py` | neural reranking, richer filters, optional cross-encoder | `domains/healthcare/agents/domain/retrieval.py`, `data-platform/healthcare/flink-app/app/text_processing.py` |
+| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/04_data_platform.md`, `platform/healthcare/neo4j/init.cypher`, Flink graph writes |
+| Vector retrieval | stable embedding (MiniLM-L6-v2) with deterministic top-k similarity via `domain/retrieval.py` | neural reranking, richer filters, optional cross-encoder | `domains/healthcare/agents/domain/retrieval.py`, `platform/healthcare/flink-app/app/text_processing.py` |
 | Query orchestration | request classification, retrieval plan selection, and evidence ranking are implemented with deterministic planner logic; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning and ranking | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/domain/`, `domains/healthcare/agents/langgraph_agents/` |
-| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `data-platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/agents/langgraph_agents/agents.py` |
+| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/agents/langgraph_agents/agents.py` |
 | Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agents/app.py` |
 | MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/05_ai_agents.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
 | Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |

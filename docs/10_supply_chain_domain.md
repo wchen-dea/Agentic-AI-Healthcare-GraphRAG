@@ -77,7 +77,7 @@ domains/supply-chain/
 ├── skills/                   # Agent Skills packages (SKILL.md)
 └── webapp/                   # index.html, domain.js, Dockerfile
 
-data-platform/supply-chain/
+platform/supply-chain/
 ├── ontology/                 # Entity definitions, relationships, provenance, seeds, rules
 ├── flink-app/app/            # graph_writes.py, pipeline_service.py
 ├── neo4j/                    # init.cypher, seeds, bootstrap.sh

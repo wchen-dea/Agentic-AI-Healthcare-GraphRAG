@@ -32,8 +32,8 @@ REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
 echo "Building images in minikube Docker..."
 eval $(minikube docker-env)
 docker build -q -f "$REPO_ROOT/domains/healthcare/agents/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-rag-api:latest "$REPO_ROOT"
-docker build -q -f "$REPO_ROOT/data-platform/healthcare/producer/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-producer:latest "$REPO_ROOT"
-docker build -q -f "$REPO_ROOT/data-platform/healthcare/flink-app/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-flink-healthcare:latest "$REPO_ROOT"
+docker build -q -f "$REPO_ROOT/platform/healthcare/producer/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-producer:latest "$REPO_ROOT"
+docker build -q -f "$REPO_ROOT/platform/healthcare/flink-app/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-flink-healthcare:latest "$REPO_ROOT"
 docker build -q -f "$REPO_ROOT/domains/healthcare/webapp/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest "$REPO_ROOT"
 echo "Images built."
 

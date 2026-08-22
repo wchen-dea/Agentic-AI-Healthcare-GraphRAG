@@ -7,5 +7,5 @@ COPY domains/supply-chain/agents/llm_provider.py .
 COPY domains/supply-chain/agents/skills_layer.py .
 COPY domains/supply-chain/agents/domain ./domain
 COPY domains/supply-chain/agents/config ./config
-COPY data-platform/shared ./shared_lib
+COPY platform/shared ./shared_lib
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

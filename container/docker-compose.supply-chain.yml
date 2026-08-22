@@ -23,9 +23,9 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: /bin/sh /bootstrap.sh
     volumes:
-      - ../data-platform/supply-chain/neo4j/init.cypher:/init.cypher
-      - ../data-platform/supply-chain/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
-      - ../data-platform/supply-chain/neo4j/bootstrap.sh:/bootstrap.sh
+      - ../platform/supply-chain/neo4j/init.cypher:/init.cypher
+      - ../platform/supply-chain/neo4j/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
+      - ../platform/supply-chain/neo4j/bootstrap.sh:/bootstrap.sh
 
   qdrant-sc:
     image: qdrant/qdrant:latest
@@ -58,7 +58,7 @@ services:
   sc-producer:
     build:
       context: ..
-      dockerfile: data-platform/supply-chain/producer/Dockerfile
+      dockerfile: platform/supply-chain/producer/Dockerfile
     container_name: supplychain-producer
     depends_on:
       sc-kafka-init:
@@ -70,7 +70,7 @@ services:
       TRANSACTION_EVENTS_PER_INTERVAL: "3"
       REFERENCE_EVENTS_PER_INTERVAL: "2"
     volumes:
-      - ../data-platform/supply-chain/schemas:/app/schemas
+      - ../platform/supply-chain/schemas:/app/schemas
 
   sc-webapp:
     build:
@@ -105,7 +105,7 @@ services:
   sc-flink-jobmanager:
     build:
       context: ..
-      dockerfile: data-platform/supply-chain/flink-app/Dockerfile
+      dockerfile: platform/supply-chain/flink-app/Dockerfile
     container_name: supplychain-flink-jobmanager
     ports:
       - "8083:8081"
@@ -122,7 +122,7 @@ services:
   sc-flink-taskmanager:
     build:
       context: ..
-      dockerfile: data-platform/supply-chain/flink-app/Dockerfile
+      dockerfile: platform/supply-chain/flink-app/Dockerfile
     container_name: supplychain-flink-taskmanager
     depends_on:
       - sc-flink-jobmanager
@@ -137,7 +137,7 @@ services:
   sc-flink-app:
     build:
       context: ..
-      dockerfile: data-platform/supply-chain/flink-app/Dockerfile
+      dockerfile: platform/supply-chain/flink-app/Dockerfile
     container_name: supplychain-flink-app
     depends_on:
       sc-flink-jobmanager:

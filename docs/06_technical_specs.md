@@ -21,10 +21,10 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
 | `healthcare-neodash` | neo4jlabs/neodash | latest | 5005 | Neo4j dashboard UI |
 | `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
-| `infra-flink-jobmanager` | custom (data-platform/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
-| `infra-flink-taskmanager` | custom (data-platform/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
-| `healthcare-flink-app` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
-| `healthcare-producer` | custom (data-platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
+| `infra-flink-jobmanager` | custom (platform/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
+| `infra-flink-taskmanager` | custom (platform/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
+| `healthcare-flink-app` | custom (platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
+| `healthcare-producer` | custom (platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
 | `healthcare-rag-api` | custom (domains/healthcare/agents/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
 | `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (Nginx) |
 | `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
@@ -43,7 +43,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `supplychain-neo4j-init` | neo4j | 5.26.2 | — | One-shot supply chain Cypher seed |
 | `supplychain-qdrant` | qdrant/qdrant | latest | 6335 (HTTP), 6336 (gRPC) | Supply chain vector store |
 | `supplychain-kafka-init` | confluentinc/cp-kafka | 7.9.0 | — | One-shot supply chain topic creation |
-| `supplychain-producer` | custom (data-platform/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
+| `supplychain-producer` | custom (platform/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
 | `localstack` | localstack/localstack | 3.8.0 | 4566, 4510–4559 | Local AWS-compatible services |
 
 ---
@@ -71,7 +71,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 > **Note:** `pydantic` is pinned with a range (`>=2.11.7,<3.0.0`) rather than an exact version because `mcp==1.28.0` requires `pydantic>=2.12.0` on Python 3.14. The range allows pip to resolve on Python 3.11 (CI/Docker target) and 3.14+ without conflict.
 
-### flink-app (`data-platform/healthcare/flink-app/requirements.txt`)
+### flink-app (`platform/healthcare/flink-app/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -82,7 +82,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | qdrant-client | 1.11.3 | Qdrant upsert client |
 | requests | 2.32.3 | HTTP utilities |
 
-### producer (`data-platform/healthcare/producer/requirements.txt`)
+### producer (`platform/healthcare/producer/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -163,7 +163,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 ## 4. Avro Envelope Schema
 
-**File:** `data-platform/healthcare/schemas/medical_event.avsc`  
+**File:** `platform/healthcare/schemas/medical_event.avsc`  
 **Namespace:** `com.healthcare.graphrag`  
 **Record name:** `MedicalEvent`  
 **Schema version:** `1.0.0`
@@ -257,7 +257,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | HTTP port | 7474 |
 | Bolt port | 7687 |
 | Auth | `neo4j / ${NEO4J_PASSWORD:-healthcare123}` |
-| Init script | `data-platform/healthcare/neo4j/init.cypher` (mounted at startup) |
+| Init script | `platform/healthcare/neo4j/init.cypher` (mounted at startup) |
 
 ### Node labels (19)
 
@@ -308,7 +308,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `MANAGED_BY` | Patient → Provider | — |
 | `COVERED_BY` | Patient → Payer | — |
 
-### Seed data (from `data-platform/healthcare/neo4j/init.cypher`)
+### Seed data (from `platform/healthcare/neo4j/init.cypher`)
 
 | Category | Count |
 |----------|-------|

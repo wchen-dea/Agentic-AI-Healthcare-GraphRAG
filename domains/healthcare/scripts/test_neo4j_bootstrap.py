@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "healthcare"
+DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "platform" / "healthcare"
 
 
 def main() -> int:

@@ -86,7 +86,7 @@ make helm-ports  # Start port-forwards
 ## Project Layout
 
 ```
-data-platform/        Streaming infrastructure (Flink, producers, ontology)
+platform/        Streaming infrastructure (Flink, producers, ontology)
 domains/              Domain agents, scripts, skills, webapps
 deploy/               Helm charts, Docker Compose, monitoring
 docs/                 Full documentation suite

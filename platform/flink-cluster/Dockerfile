@@ -11,5 +11,5 @@ RUN apt-get update && apt-get install -y python3 python3-pip python3-dev default
 	&& pip3 install --no-cache-dir apache-flink==1.20.5 confluent-kafka==2.5.3 fastavro==1.9.7 neo4j==5.24.0 qdrant-client==1.11.3 requests==2.32.3 PyYAML==6.0.2 \
 	&& rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY data-platform/shared /app/shared_lib
+COPY platform/shared /app/shared_lib
 USER flink

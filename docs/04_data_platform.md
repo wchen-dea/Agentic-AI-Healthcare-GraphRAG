@@ -8,7 +8,7 @@ The stack uses one shared envelope schema and topic-based routing semantics.
 
 ## Envelope Schema
 
-Source file: data-platform/healthcare/schemas/medical_event.avsc
+Source file: platform/healthcare/schemas/medical_event.avsc
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Source file: data-platform/healthcare/schemas/medical_event.avsc
 
 ## Schema Registry Behavior
 
-Producer behavior in data-platform/healthcare/producer/produce_events.py:
+Producer behavior in platform/healthcare/producer/produce_events.py:
 
 - Registers the Avro envelope under topic-value subjects for transactional and reference topics.
 - Uses POST /subjects/{subject}/versions.
@@ -71,7 +71,7 @@ Fix:
 
 Important limitation in current schema design:
 
-- `payload_json` is defined as a `string` field in `data-platform/healthcare/schemas/medical_event.avsc`.
+- `payload_json` is defined as a `string` field in `platform/healthcare/schemas/medical_event.avsc`.
 - Field-level masking can apply to top-level envelope fields.
 - Field-level masking cannot target nested JSON attributes inside `payload_json` unless that payload is migrated to structured Avro fields.
 
@@ -127,7 +127,7 @@ Created by `supplychain-kafka-init` when the supply-chain overlay is active.
 
 ### Supply Chain Envelope Schema
 
-Source file: `data-platform/supply-chain/schemas/supply_chain_event.avsc`. Uses entity_id/facility_id/supplier_id instead of patient_id/encounter_id/provider_id.
+Source file: `platform/supply-chain/schemas/supply_chain_event.avsc`. Uses entity_id/facility_id/supplier_id instead of patient_id/encounter_id/provider_id.
 
 ## Topic Creation And Lifecycle
 
@@ -407,7 +407,7 @@ The model prioritizes traceability, simple traversal patterns, and deterministic
 
 ## Constraints And Seed Data
 
-Initialization in data-platform/healthcare/neo4j/init.cypher creates uniqueness constraints for:
+Initialization in platform/healthcare/neo4j/init.cypher creates uniqueness constraints for:
 
 - Patient.id
 - Encounter.id
@@ -750,4 +750,4 @@ The supply-chain domain uses a separate Neo4j instance (`supplychain-neo4j` on p
 | HAS_RISK_SIGNAL | Supplier/Part | RiskSignal | detected_ts |
 | HOLDS_INVENTORY | Facility | Part | on_hand_qty, below_reorder, days_of_supply |
 
-Constraints and seeds: `data-platform/supply-chain/neo4j/init.cypher` and `data-platform/supply-chain/neo4j/generated_ontology_seeds.cypher`.
+Constraints and seeds: `platform/supply-chain/neo4j/init.cypher` and `platform/supply-chain/neo4j/generated_ontology_seeds.cypher`.
