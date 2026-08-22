@@ -16,6 +16,7 @@ spec:
       containers:
       - name: submit
         image: "{{ .Values.job.image.repository }}:{{ .Values.job.image.tag }}"
+        imagePullPolicy: IfNotPresent
         command:
         - flink
         - run

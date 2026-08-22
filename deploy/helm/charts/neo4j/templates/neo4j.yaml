@@ -14,6 +14,7 @@ spec:
       labels:
         app: neo4j
     spec:
+      enableServiceLinks: false
       containers:
       - name: neo4j
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

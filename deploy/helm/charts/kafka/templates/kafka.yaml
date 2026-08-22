@@ -58,6 +58,7 @@ spec:
       labels:
         app: kafka
     spec:
+      enableServiceLinks: false
       containers:
       - name: kafka
         image: "{{ .Values.broker.image.repository }}:{{ .Values.broker.image.tag }}"
@@ -73,12 +74,24 @@ spec:
           value: "zookeeper:2181"
         - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
           value: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+        - name: KAFKA_LISTENERS
+          value: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092"
         - name: KAFKA_ADVERTISED_LISTENERS
           value: "INTERNAL://kafka:29092,EXTERNAL://kafka:9092"
         - name: KAFKA_INTER_BROKER_LISTENER_NAME
           value: "INTERNAL"
         - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
           value: "1"
+        - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+          value: "1"
+        - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+          value: "1"
+        - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+          value: "0"
+        - name: KAFKA_AUTHORIZER_CLASS_NAME
+          value: "kafka.security.authorizer.AclAuthorizer"
+        - name: KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND
+          value: "true"
         resources:
           {{- toYaml .Values.broker.resources | nindent 10 }}
 ---
@@ -114,6 +127,7 @@ spec:
       labels:
         app: schema-registry
     spec:
+      enableServiceLinks: false
       containers:
       - name: schema-registry
         image: "{{ .Values.schemaRegistry.image.repository }}:{{ .Values.schemaRegistry.image.tag }}"
@@ -123,6 +137,8 @@ spec:
         env:
         - name: SCHEMA_REGISTRY_HOST_NAME
           value: "schema-registry"
+        - name: SCHEMA_REGISTRY_LISTENERS
+          value: "http://0.0.0.0:8081"
         - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
           value: "kafka:29092"
         resources:

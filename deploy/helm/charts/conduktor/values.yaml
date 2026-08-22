@@ -1,0 +1,23 @@
+enabled: false
+image:
+  repository: conduktor/conduktor-console
+  tag: "1.25.1"
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 8080
+admin:
+  email: "admin@localhost"
+  password: "admin123"
+postgres:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  password: "conduktor_pg"
+resources:
+  requests:
+    cpu: 250m
+    memory: 2Gi
+  limits:
+    cpu: 1500m
+    memory: 3Gi

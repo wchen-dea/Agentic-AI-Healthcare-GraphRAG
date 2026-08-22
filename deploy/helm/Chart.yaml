@@ -29,3 +29,9 @@ dependencies:
 - name: ollama
   version: 0.1.0
   condition: ollama.enabled
+- name: conduktor
+  version: 0.1.0
+  condition: conduktor.enabled
+- name: producer
+  version: 0.1.0
+  condition: producer.enabled

@@ -17,7 +17,12 @@ echo "=== Minikube Dev Setup (Helm) ==="
 # Start minikube if not running
 if ! minikube status --format='{{.Host}}' 2>/dev/null | grep -q Running; then
   echo "Starting minikube (cpus=$MINIKUBE_CPUS, memory=${MINIKUBE_MEMORY}MB, driver=$MINIKUBE_DRIVER)..."
-  minikube start --cpus="$MINIKUBE_CPUS" --memory="$MINIKUBE_MEMORY" --driver="$MINIKUBE_DRIVER"
+  minikube start \
+    --cpus="$MINIKUBE_CPUS" \
+    --memory="$MINIKUBE_MEMORY" \
+    --driver="$MINIKUBE_DRIVER" \
+    --wait=all \
+    --wait-timeout=5m0s
 else
   echo "Minikube already running."
 fi

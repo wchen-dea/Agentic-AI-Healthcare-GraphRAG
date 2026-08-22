@@ -50,3 +50,11 @@ qdrant:
   enabled: true
 ollama:
   enabled: true
+conduktor:
+  enabled: true
+  service:
+    type: NodePort
+    port: 8080
+    nodePort: 30880
+producer:
+  enabled: true

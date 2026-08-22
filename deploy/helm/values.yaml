@@ -16,3 +16,7 @@ qdrant:
   enabled: false
 ollama:
   enabled: false
+conduktor:
+  enabled: false
+producer:
+  enabled: false

@@ -3,7 +3,8 @@ services:
     image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-rag-api:latest
     container_name: healthcare-rag-api
     env_file:
-      - ./rag-api.env
+      - path: ./rag-api.env
+        required: false
     ports:
       - "8000:8000"
     restart: unless-stopped
