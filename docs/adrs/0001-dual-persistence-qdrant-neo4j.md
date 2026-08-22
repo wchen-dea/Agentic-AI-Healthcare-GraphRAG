@@ -111,6 +111,6 @@ Trade-offs:
 
 - [ADR-0002: Qdrant as the streaming vector store for real-time RAG](./0002-qdrant-streaming-vector-store.md)
 - [Architecture](../02_architecture.md)
-- [Skills Layer](../08_skills_layer.md)
-- [Neo4j Graph Model](../05_neo4j_model.md)
+- [Skills Layer](../05_ai_agents.md)
+- [Neo4j Graph Model](../04_data_platform.md)
 - [Neo4j — Medical Care Industry Use Cases](https://neo4j.com/developer/industry-use-cases/life-sciences/medical-care/)

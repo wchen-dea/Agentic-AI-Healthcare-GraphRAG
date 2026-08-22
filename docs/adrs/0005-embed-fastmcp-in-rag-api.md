@@ -58,6 +58,6 @@ Trade-offs:
 
 - [ADR-0004: Local-first LLM with provider routing](./0004-local-first-llm-provider-routing.md)
 - [Architecture](../02_architecture.md)
-- [MCP Layer Design](../07_mcp_layer_design.md)
-- [Skills Layer](../08_skills_layer.md)
-- [Runbook](../13_runbook.md)
+- [MCP Layer Design](../05_ai_agents.md)
+- [Skills Layer](../05_ai_agents.md)
+- [Runbook](../09_runbook.md)

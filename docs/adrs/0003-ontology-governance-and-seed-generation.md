@@ -75,4 +75,4 @@ Trade-offs:
 - [ADR-0006: Skills layer standardization and validation](./0006-skills-layer-standardization-and-validation.md)
 - [Target Architecture](../03_target_architecture.md)
 - [Technical Specs](../06_technical_specs.md)
-- [Runbook](../13_runbook.md)
+- [Runbook](../09_runbook.md)

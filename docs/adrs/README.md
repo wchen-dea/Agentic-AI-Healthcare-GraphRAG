@@ -30,12 +30,12 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 | --- | --- |
 | [02_architecture.md](../02_architecture.md) | System architecture, design patterns, component diagrams |
 | [03_target_architecture.md](../03_target_architecture.md) | Reference architecture, target outcomes, and capability map |
-| [14_future_improvements.md](../14_future_improvements.md) | Actionable backlog, staged delivery plan, and execution sequence |
+| [12_future_improvements.md](../12_future_improvements.md) | Actionable backlog, staged delivery plan, and execution sequence |
 | [06_technical_specs.md](../06_technical_specs.md) | Container inventory, library versions, API specification |
-| [01_business_specs.md](../01_business_specs.md) | Use cases, business rules, stakeholders |
-| [05_neo4j_model.md](../05_neo4j_model.md) | Graph model, node labels, relationships, pharmacovigilance |
-| [04_kafka_schema.md](../04_kafka_schema.md) | Kafka topic topology, Avro schema, payload examples |
-| [07_mcp_layer_design.md](../07_mcp_layer_design.md) | MCP tool contracts and rollout stages |
-| [08_skills_layer.md](../08_skills_layer.md) | Skills layer flow, generated package model, and validation |
-| [13_runbook.md](../13_runbook.md) | Operations runbook, health checks, failure modes |
-| [12_ai_qa.md](../12_ai_qa.md) | QA strategy, contract tests, accuracy validation |
+| [01_business_requirements.md](../01_business_requirements.md) | Use cases, business rules, stakeholders |
+| [04_data_platform.md](../04_data_platform.md) | Graph model, node labels, relationships, pharmacovigilance |
+| [04_data_platform.md](../04_data_platform.md) | Kafka topic topology, Avro schema, payload examples |
+| [05_ai_agents.md](../05_ai_agents.md) | MCP tool contracts and rollout stages |
+| [05_ai_agents.md](../05_ai_agents.md) | Skills layer flow, generated package model, and validation |
+| [09_runbook.md](../09_runbook.md) | Operations runbook, health checks, failure modes |
+| [07_quality_assurance.md](../07_quality_assurance.md) | QA strategy, contract tests, accuracy validation |

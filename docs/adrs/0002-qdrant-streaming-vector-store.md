@@ -108,7 +108,7 @@ Trade-offs:
 
 - [ADR-0001: Dual Persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
 - [Architecture](../02_architecture.md)
-- [Kafka Schema](../04_kafka_schema.md)
+- [Kafka Schema](../04_data_platform.md)
 - [Conduktor — Vector Embeddings in Streaming](https://www.conduktor.io/glossary/vector-embeddings-in-streaming)
 
 ## Implementation Note (2026-08-21)

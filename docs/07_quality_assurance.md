@@ -7,9 +7,9 @@ across its three evidence paths: vector retrieval (Qdrant), graph traversal (Neo
 LLM answer generation (Ollama). Each path has distinct failure modes and requires a
 different validation technique.
 
-Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [03_target_architecture.md](03_target_architecture.md), [14_future_improvements.md](14_future_improvements.md), [08_skills_layer.md](08_skills_layer.md), and [06_technical_specs.md](06_technical_specs.md).
+Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [03_target_architecture.md](03_target_architecture.md), [12_future_improvements.md](12_future_improvements.md), [05_ai_agents.md](05_ai_agents.md), and [06_technical_specs.md](06_technical_specs.md).
 
-Multi-agent architecture comparison and evaluation framework details are in [10_langgraph_comparison.md](10_langgraph_comparison.md).
+Multi-agent architecture comparison and evaluation framework details are in [05_ai_agents.md](05_ai_agents.md).
 
 ```
 Question

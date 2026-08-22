@@ -4,13 +4,13 @@
 
 This runbook covers day-0 and day-2 operations for the local Docker Compose development stack, including startup, verification, recovery, and common failure handling.
 
-For production AI-only deployment boundaries and compose bundles, see [deploy/README.md](../deploy/README.md).
+For production AI-only deployment boundaries and compose bundles, see [docs/08_deployment.md](08_deployment.md).
 
 Scope note:
 
 - The commands and defaults in this runbook are for local development and synthetic-demo operation.
 - Production-ready deployment configuration lives under `deploy/` and should be operated with environment-specific security, secrets, networking, and platform controls.
-- For full deployment documentation including Helm charts, see [deploy/README.md](../deploy/README.md).
+- For full deployment documentation including Helm charts, see [docs/08_deployment.md](08_deployment.md).
 
 ## Prerequisites
 
@@ -135,7 +135,7 @@ curl -s -X POST "http://localhost:8000/query" \
 
 Expected: non-null object with `enabled`, `iterations`, `final_reason`, `confidence`, and `agent_trace`.
 
-LangGraph takes priority over ReAct when both are enabled. See [10_langgraph_comparison.md](10_langgraph_comparison.md) for details.
+LangGraph takes priority over ReAct when both are enabled. See [05_ai_agents.md](05_ai_agents.md) for details.
 
 ### Optional: Enable MLflow Tracing
 

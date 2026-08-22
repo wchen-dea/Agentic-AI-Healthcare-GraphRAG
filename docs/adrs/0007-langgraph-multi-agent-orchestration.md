@@ -82,6 +82,6 @@ Trade-offs:
 
 - [ADR-0005: Embed FastMCP in rag-api](./0005-embed-fastmcp-in-rag-api.md)
 - [ADR-0004: Local-first LLM with provider routing](./0004-local-first-llm-provider-routing.md)
-- [docs/10_langgraph_comparison.md](../10_langgraph_comparison.md)
+- [docs/05_ai_agents.md](../05_ai_agents.md)
 - [domains/healthcare/agents/langgraph_agents/](../../domains/healthcare/agents/langgraph_agents/)
 - [domains/healthcare/agents/domain/](../../domains/healthcare/agents/domain/)

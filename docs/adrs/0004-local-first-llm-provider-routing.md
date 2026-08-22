@@ -54,5 +54,5 @@ Trade-offs:
 ## Related
 
 - [Architecture](../02_architecture.md)
-- [MCP Layer Design](../07_mcp_layer_design.md)
-- [Skills Layer](../08_skills_layer.md)
+- [MCP Layer Design](../05_ai_agents.md)
+- [Skills Layer](../05_ai_agents.md)

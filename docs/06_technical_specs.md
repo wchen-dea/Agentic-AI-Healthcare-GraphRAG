@@ -178,7 +178,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `patient_id` | `["null","string"]` | `null` | Absent for non-patient reference events |
 | `encounter_id` | `["null","string"]` | `null` | Optional encounter scope |
 | `provider_id` | `["null","string"]` | `null` | Optional attending provider |
-| `payload_json` | `string` | — | Event-type-specific JSON object (see 04_kafka_schema.md) |
+| `payload_json` | `string` | — | Event-type-specific JSON object (see 04_data_platform.md) |
 | `schema_version` | `string` | `"1.0.0"` | Envelope schema version |
 
 ---
