@@ -186,6 +186,35 @@ docker compose -f deploy/production/docker-compose.monitoring.yml up -d
 
 ---
 
+## Technology Version Matrix
+
+| Technology | Version | Component |
+|------------|---------|-----------|
+| Python | 3.11 | All Python services |
+| Java | 17 | Flink runtime |
+| Apache Flink | 1.20.5 | Stream processing cluster |
+| PyFlink | 1.20.5 | Python stream jobs |
+| Flink Kafka Connector | 3.4.0 | Flink–Kafka integration |
+| Confluent Kafka (Docker) | 7.9.0 | Kafka brokers, Zookeeper, Schema Registry |
+| Confluent Kafka (Helm) | 7.6.0 | Kafka brokers (minikube) |
+| Neo4j | 5.26.2 (Docker) / 5-community (Helm) | Knowledge graph |
+| Qdrant | v1.12.1 | Vector store |
+| Ollama | latest | Local LLM inference |
+| FastAPI | 0.115.0 | RAG API framework |
+| LangGraph | >=0.4.1 | Multi-agent orchestration |
+| LangChain Core | >=0.3.0 | Agent framework |
+| MCP SDK | 1.28.0 | Tool protocol |
+| MLflow | v2.21.3 | Tracing and evaluation |
+| Conduktor Console | 1.25.1 | Kafka management UI |
+| sentence-transformers | 3.0.1 | Embedding model |
+| neo4j (Python driver) | 5.24.0 | Graph client |
+| qdrant-client | 1.11.3 | Vector client |
+| confluent-kafka (Python) | 2.5.3 | Kafka producer |
+| Prometheus | latest | Metrics collection |
+| Grafana | latest | Dashboards |
+
+---
+
 ## Configuration Guidelines
 
 | Area | Guidance |
