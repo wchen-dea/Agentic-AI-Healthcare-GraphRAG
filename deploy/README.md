@@ -95,6 +95,8 @@ docker compose -f docker-compose.monitoring.yml down -v
 ### Option B: Helm on Minikube
 
 ```bash
+make helm-dev    # one-command bootstrap
+# Or manually:
 minikube start --cpus=4 --memory=8192
 helm install healthcare-dev deploy/helm -f deploy/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
 ```
@@ -116,7 +118,7 @@ Dev differences from production:
 Tear down:
 
 ```bash
-helm uninstall healthcare-dev -n healthcare-ai-dev
+make helm-dev-down
 minikube delete  # full reset
 ```
 

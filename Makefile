@@ -16,7 +16,8 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
         validate-skills generate-skills validate-ontology \
-        test-hc test-sc pull-model fresh
+        test-hc test-sc pull-model fresh \
+        helm-dev helm-dev-down helm-prd helm-lint
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -132,3 +133,20 @@ pull-model: ## Pull Ollama LLM model
 	docker exec infra-ollama ollama pull llama3.1
 
 fresh: clean up pull-model ## Full fresh start with both domains
+
+# ── Helm / Minikube ───────────────────────────────────────────────────────────
+
+helm-dev: ## Deploy to minikube via Helm (dev values)
+	./deploy/dev/setup-minikube.sh
+
+helm-dev-down: ## Tear down minikube dev release
+	helm uninstall healthcare-dev -n healthcare-ai-dev || true
+
+helm-prd: ## Template production Helm chart (dry-run)
+	helm template healthcare deploy/helm -f deploy/helm/values-production.yaml
+
+helm-lint: ## Lint Helm chart and template both envs
+	helm lint deploy/helm
+	helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null
+	helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null
+	@echo "Helm lint: OK"

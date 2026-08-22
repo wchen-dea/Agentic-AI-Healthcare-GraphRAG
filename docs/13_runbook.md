@@ -42,6 +42,10 @@ make clean       # Full cleanup with volume removal
 make validate-skills  # Validate agent skills for both domains
 make generate-skills  # Regenerate skill packages
 make validate-ontology # Validate ontology configs
+make helm-dev    # Deploy to minikube via Helm
+make helm-dev-down # Tear down minikube release
+make helm-lint   # Lint Helm chart + template both envs
+make helm-prd    # Render production Helm templates (dry-run)
 make help        # Show all targets
 ```
 
