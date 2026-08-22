@@ -320,8 +320,9 @@ dependency. This ensures:
 - Predictable inference costs (no per-token fees)
 - Model selection is operator-controlled via `OLLAMA_MODEL`
 
-Anthropic/OpenAI routing is documented as a roadmap extension (ADR-0004) but is not
-active in the current implementation.
+OpenAI and Anthropic providers are implemented (ADR-0004) with automatic fallback.
+Production uses OpenAI as primary and Anthropic as fallback via `LLM_FALLBACK_PROVIDER`.
+Dev defaults to local Ollama for zero-cost iteration.
 
 Multi-agent orchestration is implemented via LangGraph with specialist agents for
 medication safety, lab interpretation, and coding review (feature-flagged via

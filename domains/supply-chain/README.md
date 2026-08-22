@@ -72,15 +72,17 @@ docker compose exec supplychain-neo4j cypher-shell \
 
 ```
 domains/supply-chain/
+├── agents/                   # app.py, skills_layer.py, domain/, config/
+├── scripts/                  # query_examples.sh, validate_ontology.py, etc.
+├── skills/                   # Agent Skills packages (SKILL.md)
+└── webapp/                   # index.html, domain.js, Dockerfile
+
+data-platform/supply-chain/
 ├── config/ontology/          # Entity definitions, seeds, risk signal rules
 ├── flink-app/app/            # graph_writes.py, pipeline_service.py
 ├── neo4j/                    # init.cypher, seeds, bootstrap.sh
 ├── producer/                 # Dockerfile, produce_events.py, requirements.txt
-├── agents/                  # app.py, skills_layer.py, domain/, config/
-├── schemas/                  # supply_chain_event.avsc
-├── scripts/                  # query_examples.sh, validate_ontology.py, etc.
-├── skills/                   # Agent Skills packages (SKILL.md)
-└── webapp/                   # index.html, domain.js, Dockerfile
+└── schemas/                  # supply_chain_event.avsc
 ```
 
 Note: `container/docker-compose.supply-chain.yml` lives in the `container/` directory.

@@ -34,7 +34,7 @@ Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
 - [ADR-0008: MLflow tracing and evaluation](adrs/0008-mlflow-tracing-and-evaluation.md)
 - [ADR-0009: Domain module extraction](adrs/0009-domain-module-extraction.md)
 
-Roadmap design strategy is documented in [docs/target_02_architecture.md](target_02_architecture.md), and execution backlog details are maintained in [docs/14_future_improvements.md](14_future_improvements.md).
+Roadmap design strategy is documented in [docs/03_target_architecture.md](03_target_architecture.md), and execution backlog details are maintained in [docs/14_future_improvements.md](14_future_improvements.md).
 
 Runtime skill orchestration flow and contracts are documented in [docs/08_skills_layer.md](08_skills_layer.md).
 
@@ -115,7 +115,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 | Contract-First Tooling | MCP tool request/response schemas and contract tests | Keeps tool semantics stable while internals change | Implemented |
 | Bounded Context Window | Max question/context/evidence/answer and response-byte budgets | Prevents unbounded prompt/output growth and latency spikes | Implemented |
 | Observability by Design | Prometheus metrics + Grafana latency dashboards + health probes | Makes latency and failure modes visible during iteration | Implemented |
-| Adapter Pattern for LLM Providers | Provider-agnostic client sketch in architecture doc | Enables Anthropic/OpenAI routing without rewriting retrieval | Roadmap |
+| Adapter Pattern for LLM Providers | OllamaProvider, OpenAIProvider, AnthropicProvider, FallbackProvider in llm_provider.py | Enables provider routing and automatic failover without rewriting retrieval | Implemented |
 | Multi-Agent Orchestration (LangGraph) | LangGraph StateGraph with specialist agents and conditional routing | Enables domain-specific reasoning branches and iterative confidence-gated retrieval | Implemented (feature-flagged) |
 | MLflow Tracing | Nested span hierarchy across agent nodes, retrievers, and LLM calls | Enables cross-mode pipeline comparison and healthcare-specific evaluation | Implemented (feature-flagged) |
 
@@ -128,7 +128,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 - Contract-First Tooling: [domains/healthcare/agents/tests/test_contracts.py](../domains/healthcare/agents/tests/test_contracts.py), [docs/07_mcp_layer_design.md](07_mcp_layer_design.md)
 - Bounded Context Window: [domains/healthcare/agents/domain/response_policy.py](../domains/healthcare/agents/domain/response_policy.py) (`apply_response_budget`, `truncate_text`)
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/13_runbook.md](13_runbook.md)
-- Adapter Pattern (roadmap): [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md)
+- Adapter Pattern: [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md), [domains/healthcare/agents/llm_provider.py](../domains/healthcare/agents/llm_provider.py)
 - Multi-Agent Orchestration: [domains/healthcare/agents/langgraph_agents/](../domains/healthcare/agents/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
 - MLflow Tracing: [domains/healthcare/agents/langgraph_agents/mlflow_tracing.py](../domains/healthcare/agents/langgraph_agents/mlflow_tracing.py), [domains/healthcare/agents/langgraph_agents/mlflow_eval.py](../domains/healthcare/agents/langgraph_agents/mlflow_eval.py)
 
@@ -146,7 +146,7 @@ This section maps the current implementation to a modern AI application stack mo
 | Agent / orchestration layer | Planner, skill registry, multi-step controller | Deterministic planner + skills layer + role-aware tool policies | Implemented (baseline) |
 | LangGraph multi-agent orchestration | StateGraph with conditional routing and specialist agents | LangGraph StateGraph with triage, retrieval, specialist, and synthesis agents | Implemented (feature-flagged) |
 | ReAct-style iterative control | Reason-act-observe loop controller | Feature-flagged ReAct loop path in the agents service | Implemented (phase 1 skeleton) |
-| Model provider abstraction | Adapter for local and managed providers | Ollama runtime + provider adapter structure | Implemented (single provider runtime) |
+| Model provider abstraction | Adapter for local and managed providers | Ollama + OpenAI + Anthropic + FallbackProvider | Implemented |
 | Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites + MLflow evaluation harness | Implemented (partial) |
 | Observability and operations | Metrics, dashboards, probes, runbooks | Prometheus + Grafana + blackbox probes + MLflow tracing + runbook | Implemented |
 | Production governance and safety | Privacy policy, rollout gates, SLO controls | Deployment bundle and policy foundations present | In progress |
@@ -163,14 +163,13 @@ This section maps the current implementation to a modern AI application stack mo
 | LangGraph multi-agent orchestration | Enables specialized domain reasoning with graph-based agent routing | StateGraph with triage, retrieval, specialist, confidence, and synthesis nodes | Implemented (feature-flagged) |
 | MLflow tracing and evaluation | Enables cross-mode pipeline comparison and experiment tracking | Nested span tracing + healthcare scorers + mode comparison harness | Implemented (feature-flagged) |
 | Policy enforcement point | Centralizes authorization and output controls | Role/tool checks + evidence shaping + byte budgets | Implemented |
-| Adapter pattern for model providers | Decouples retrieval from generation vendor | Provider adapter abstraction with Ollama runtime | Implemented (partial breadth) |
+| Adapter pattern for model providers | Decouples retrieval from generation vendor | Provider adapters with automatic failover | Implemented |
 | Contract-first evolution | Keeps external API/tool behavior stable as internals evolve | Contract test suite and MCP schema discipline | Implemented |
 | Evaluation-driven promotion | Uses objective quality gates for release progression | Planner tests in place; retrieval/grounding scorecards pending | In progress |
 | Progressive delivery controls | Reduces risk in production AI changes | Documented production deployment patterns; staged gates pending | In progress |
 
 ### Gap Summary for Full Modern-Stack Alignment
 
-- Multi-provider runtime breadth is not complete yet (adapter exists, runtime is primarily Ollama today).
 - Retrieval benchmark and grounded-answer scorecard automation are not fully enforced as release gates.
 - Policy and privacy controls are present at foundation level but not yet complete for non-demo production governance depth.
 - LangGraph and MLflow integrations are feature-flagged and require further production hardening for non-demo use.
@@ -208,7 +207,7 @@ Scoring guide:
 | Planner and skills orchestration | 3 | 4 | Deterministic planner + skills layer | Add route quality scorecards in CI |
 | LangGraph multi-agent orchestration | 3 | 4 | LangGraph StateGraph with specialist agents, feature-flagged | Add broader agent integration tests and production tuning |
 | ReAct iterative control | 3 | 4 | Feature-flagged ReAct loop and metadata | Add broader loop tests and stop/fallback metrics |
-| Model provider abstraction | 3 | 4 | Adapter structure with Ollama runtime | Add second provider + failover test suite |
+| Model provider abstraction | 4 | 4 | Ollama + OpenAI + Anthropic + FallbackProvider | Add provider failover contract tests |
 | Evaluation and quality gates | 3 | 4 | Contract + planner evaluation suites + MLflow evaluation harness | Add retrieval and grounding release gates |
 | Observability and operations | 4 | 4 | Prometheus, Grafana, probes, MLflow tracing, runbook | Add alert quality tuning and SLO dashboards |
 | Production governance and safety | 2 | 3 | Policy/deploy foundations under production bundle | Implement policy/privacy/SLO rollout controls |
@@ -422,33 +421,34 @@ MCP delivery in the current implementation:
 - MCP protocol endpoint: `POST /mcp` (streamable HTTP).
 - Human diagnostic endpoint: `GET /mcp/health`.
 
-### Roadmap Extension: Anthropic/OpenAI Routing
+### LLM Provider Routing (Implemented)
 
-The current repository runtime includes a provider adapter in `domains/healthcare/agents/llm_provider.py` and uses Ollama as the default configured provider.
+The repository runtime includes a provider adapter in `domains/healthcare/agents/llm_provider.py` with three implemented providers:
 
-For production extension, keep retrieval orchestration unchanged and swap only the generation provider behind an adapter.
+- **OllamaProvider** — local inference (default for dev)
+- **OpenAIProvider** — OpenAI Chat Completions API (production primary)
+- **AnthropicProvider** — Anthropic Messages API (production fallback)
+- **FallbackProvider** — wraps primary + fallback; auto-retries on error
 
-Recommended provider adapter contract:
+Routing is environment-driven:
 
-- generate(prompt, model, timeout, temperature, max_tokens) -> answer
+| Environment | Primary | Fallback |
+|-------------|---------|----------|
+| Dev / Local | Ollama (`llama3.1`) | none |
+| Production | OpenAI (`gpt-4.1-mini`) | Anthropic (`claude-sonnet-4-20250514`) |
 
-Provider options:
+Configuration keys:
 
-- Anthropic: Messages API with model families such as Claude.
-- OpenAI: Responses or Chat Completions API with GPT model families.
+- `LLM_PROVIDER`: `ollama`, `openai`, or `anthropic`
+- `LLM_MODEL`: provider-specific model name
+- `LLM_FALLBACK_PROVIDER`: optional fallback provider name
+- `LLM_FALLBACK_MODEL`: fallback model name
+- `LLM_TIMEOUT_SECONDS`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE`
+- `OLLAMA_URL`, `OLLAMA_MODEL` (for ollama mode)
+- `OPENAI_API_KEY` (for openai mode)
+- `ANTHROPIC_API_KEY` (for anthropic mode)
 
-Recommended routing policy:
-
-- Primary provider from environment configuration.
-- Optional failover provider on timeout or 5xx failures.
-- Per-use-case model profiles (latency-optimized vs quality-optimized).
-
-Current configuration keys used by implementation:
-
-- OLLAMA_URL
-- OLLAMA_MODEL
-- LLM_TIMEOUT_SECONDS
-- LLM_MAX_TOKENS
+Secrets should be sourced from a secret manager or runtime environment injection, never committed to repository files.
 
 Current rag-api observability metrics for query latency and throughput:
 
@@ -583,89 +583,32 @@ Query flow:
 7. Build synthesis prompt and call LLM provider (`domain/synthesis.py`).
 8. Apply response policy (`domain/response_policy.py`) and return answer with evidence.
 
-#### Provider-Agnostic LLM Interface Sketch (Roadmap)
+#### LLM Provider Interface (Implemented)
 
-The API can keep retrieval logic unchanged and swap only generation providers through an adapter.
-This sketch is design guidance and is not the current implementation.
-
-```python
-from __future__ import annotations
-
-import os
-from dataclasses import dataclass
-from typing import Protocol
-
-
-@dataclass
-class LLMConfig:
-  provider: str = os.getenv("LLM_PROVIDER", "ollama")
-  model: str = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "llama3.1"))
-  timeout_seconds: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "120"))
-  max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1200"))
-  temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.2"))
-
-
-class LLMClient(Protocol):
-  def generate(self, prompt: str, cfg: LLMConfig) -> str:
-    ...
-
-
-class OllamaClient:
-  def __init__(self, base_url: str):
-    self.base_url = base_url
-
-  def generate(self, prompt: str, cfg: LLMConfig) -> str:
-    # POST {base_url}/api/generate
-    ...
-
-
-class AnthropicClient:
-  def __init__(self, api_key: str):
-    self.api_key = api_key
-
-  def generate(self, prompt: str, cfg: LLMConfig) -> str:
-    # Call Anthropic Messages API
-    ...
-
-
-class OpenAIClient:
-  def __init__(self, api_key: str):
-    self.api_key = api_key
-
-  def generate(self, prompt: str, cfg: LLMConfig) -> str:
-    # Call OpenAI Responses or Chat Completions API
-    ...
-
-
-def llm_client_from_env() -> LLMClient:
-  provider = os.getenv("LLM_PROVIDER", "ollama").lower()
-  if provider == "anthropic":
-    return AnthropicClient(api_key=os.environ["ANTHROPIC_API_KEY"])
-  if provider == "openai":
-    return OpenAIClient(api_key=os.environ["OPENAI_API_KEY"])
-  return OllamaClient(base_url=os.getenv("OLLAMA_URL", "http://ollama:11434"))
-```
-
-Suggested integration point in [domains/healthcare/agents/app.py](domains/healthcare/agents/app.py):
-
-- Keep query orchestration as is.
-- Replace direct generation call in ask_ollama(...) with ask_llm(...).
-- Build prompt exactly once, then call client.generate(prompt, cfg).
-
-Minimal wiring sketch:
+The provider adapter in `domains/healthcare/agents/llm_provider.py` implements the following contract:
 
 ```python
-LLM_CFG = LLMConfig()
-LLM_CLIENT = llm_client_from_env()
-
-
-def ask_llm(prompt: str) -> str:
-  return LLM_CLIENT.generate(prompt, LLM_CFG)
+class LLMProvider(Protocol):
+    def generate(self, *, prompt: str, timeout_seconds: int, max_tokens: int, temperature: float) -> str: ...
 ```
 
-Environment-driven routing variables for adapter mode:
+Providers: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`.
+
+Factory: `create_provider(provider_name, base_url=..., configured_model=...)`
+
+Wiring in `app.py`:
+
+```python
+llm_provider = create_provider(settings.llm_provider, ...)
+if os.getenv("LLM_FALLBACK_PROVIDER"):
+    llm_provider = FallbackProvider(llm_provider, create_provider(fallback_name, ...))
+```
+
+Environment-driven routing variables:
 
 - LLM_PROVIDER: ollama, anthropic, or openai
+- LLM_FALLBACK_PROVIDER: optional fallback
+- LLM_FALLBACK_MODEL: fallback model name
 - LLM_MODEL: provider-specific model name
 - LLM_TIMEOUT_SECONDS: request timeout
 - LLM_MAX_TOKENS: response token budget

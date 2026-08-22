@@ -1,0 +1,34 @@
+enabled: false
+zookeeper:
+  image:
+    repository: confluentinc/cp-zookeeper
+    tag: "7.6.0"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+broker:
+  image:
+    repository: confluentinc/cp-kafka
+    tag: "7.6.0"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+schemaRegistry:
+  image:
+    repository: confluentinc/cp-schema-registry
+    tag: "7.6.0"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

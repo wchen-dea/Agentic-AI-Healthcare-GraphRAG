@@ -4,12 +4,13 @@
 
 This runbook covers day-0 and day-2 operations for the local Docker Compose development stack, including startup, verification, recovery, and common failure handling.
 
-For production AI-only deployment boundaries and compose bundles, see [deploy/production/README.md](../deploy/production/README.md).
+For production AI-only deployment boundaries and compose bundles, see [deploy/README.md](../deploy/README.md).
 
 Scope note:
 
 - The commands and defaults in this runbook are for local development and synthetic-demo operation.
-- Production-ready deployment configuration lives under `deploy/production/` and should be operated with environment-specific security, secrets, networking, and platform controls.
+- Production-ready deployment configuration lives under `deploy/` and should be operated with environment-specific security, secrets, networking, and platform controls.
+- For full deployment documentation including Helm charts, see [deploy/README.md](../deploy/README.md).
 
 ## Prerequisites
 
@@ -18,6 +19,8 @@ Scope note:
 - curl
 - jq
 - make (for Makefile shortcuts)
+- Helm 3 (for Kubernetes deployments)
+- minikube (for local Kubernetes)
 
 Optional but useful:
 
@@ -36,6 +39,9 @@ make neo4j-sc    # Supply-chain cypher-shell
 make test-hc     # Run healthcare tests
 make topics      # List Kafka topics
 make clean       # Full cleanup with volume removal
+make validate-skills  # Validate agent skills for both domains
+make generate-skills  # Regenerate skill packages
+make validate-ontology # Validate ontology configs
 make help        # Show all targets
 ```
 
@@ -533,12 +539,21 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 Symptom:
 
 - API answer reports no model installed or model not found.
+- In dev/local environments using Ollama as `LLM_PROVIDER`.
 
-Fix:
+Fix (Docker Compose):
 
 ```bash
 docker exec -it infra-ollama ollama pull llama3.1
 ```
+
+Fix (Minikube/Helm):
+
+```bash
+kubectl -n healthcare-ai-dev exec deploy/ollama -- ollama pull llama3.1
+```
+
+Note: Production uses OpenAI (primary) with Anthropic (fallback) — Ollama is not deployed. If both cloud providers fail, check `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` secrets.
 
 ### 6) Conduktor Message Cannot Be Displayed (Bytes Deserializer)
 
@@ -588,7 +603,16 @@ After changing compose, streaming code, or docs:
 ```bash
 ./scripts/validate_docs.sh
 ./scripts/validate_all_stacks.sh
+make validate-skills
+make validate-ontology
 curl -s http://localhost:8082/jobs/overview | jq .
+```
+
+For Helm deployments:
+
+```bash
+helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null && echo OK
+helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null && echo OK
 ```
 
 Confirm:
@@ -596,6 +620,64 @@ Confirm:
 - docs lint passes,
 - stack checks pass,
 - only HealthcareGraphRagPyFlinkJob is actively running unless intentionally launching additional jobs.
+
+## Kubernetes / Helm Operations
+
+### Deploy dev (minikube)
+
+```bash
+./deploy/dev/setup-minikube.sh
+# Or manually:
+minikube start --cpus=4 --memory=8192
+helm install healthcare-dev deploy/helm -f deploy/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
+```
+
+### Deploy production
+
+```bash
+helm install healthcare deploy/helm \
+  -f deploy/helm/values-production.yaml \
+  -n healthcare-ai --create-namespace \
+  --set rag-api.secrets.NEO4J_PASSWORD=<value> \
+  --set rag-api.secrets.OPENAI_API_KEY=<value> \
+  --set rag-api.secrets.ANTHROPIC_API_KEY=<value>
+```
+
+### Upgrade
+
+```bash
+helm upgrade healthcare deploy/helm -f deploy/helm/values-production.yaml -n healthcare-ai
+```
+
+### Rollback
+
+```bash
+helm rollback healthcare 1 -n healthcare-ai
+```
+
+### Check pod health
+
+```bash
+kubectl -n healthcare-ai-dev get pods
+kubectl -n healthcare-ai-dev logs deploy/rag-api --tail=50
+kubectl -n healthcare-ai-dev exec deploy/rag-api -- curl -s localhost:8000/health
+```
+
+### Tear down dev
+
+```bash
+helm uninstall healthcare-dev -n healthcare-ai-dev
+minikube delete
+```
+
+## LLM Provider Troubleshooting
+
+| Env | Provider | Symptom | Check |
+|-----|----------|---------|-------|
+| Dev | Ollama | "no models installed" | `ollama pull llama3.1` in the ollama pod/container |
+| Prod | OpenAI | "OPENAI_API_KEY not set" | Verify secret injection via `kubectl get secret rag-api-secrets -o yaml` |
+| Prod | Anthropic (fallback) | "ANTHROPIC_API_KEY not set" | Same — check secret |
+| Prod | Both fail | "LLM error" in answer | Check network egress to `api.openai.com` and `api.anthropic.com` |
 
 ## Escalation Notes
 

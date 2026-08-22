@@ -1,0 +1,21 @@
+enabled: false
+image:
+  repository: neo4j
+  tag: "5-community"
+  pullPolicy: IfNotPresent
+auth:
+  password: "healthcare123"
+plugins:
+- apoc
+service:
+  type: ClusterIP
+persistence:
+  enabled: false
+  size: 5Gi
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-jobmanager
+  labels:
+    app: flink-jobmanager
+    {{- include "flink.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.jobmanager.replicas }}
+  selector:
+    matchLabels:
+      app: flink-jobmanager
+  template:
+    metadata:
+      labels:
+        app: flink-jobmanager
+    spec:
+      containers:
+      - name: jobmanager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/docker-entrypoint.sh", "jobmanager"]
+        ports:
+        - containerPort: 8081
+          name: web
+        - containerPort: 6123
+          name: rpc
+        env:
+        - name: FLINK_PROPERTIES
+          value: |
+            jobmanager.rpc.address: flink-jobmanager
+        resources:
+          {{- toYaml .Values.jobmanager.resources | nindent 10 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-taskmanager
+  labels:
+    app: flink-taskmanager
+    {{- include "flink.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.taskmanager.replicas }}
+  selector:
+    matchLabels:
+      app: flink-taskmanager
+  template:
+    metadata:
+      labels:
+        app: flink-taskmanager
+    spec:
+      containers:
+      - name: taskmanager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/docker-entrypoint.sh", "taskmanager"]
+        env:
+        - name: FLINK_PROPERTIES
+          value: |
+            jobmanager.rpc.address: flink-jobmanager
+            taskmanager.numberOfTaskSlots: 2
+        resources:
+          {{- toYaml .Values.taskmanager.resources | nindent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-jobmanager
+  labels:
+    app: flink-jobmanager
+spec:
+  selector:
+    app: flink-jobmanager
+  ports:
+  - name: web
+    port: 8081
+    targetPort: 8081
+  - name: rpc
+    port: 6123
+    targetPort: 6123

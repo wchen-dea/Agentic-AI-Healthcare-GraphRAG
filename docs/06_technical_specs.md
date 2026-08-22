@@ -495,10 +495,10 @@ When `MLFLOW_TRACKING_URI` is set, MLflow traces every query pipeline as a neste
 Both jobs run in parallel. Neither requires live external services (all dependencies mocked in contract tests).
 
 **File:** `.github/workflows/deploy-ai-prd.yml`  
-Separate production deployment workflow targeting the AI services bundle under `deploy/production/`.
+Production deployment workflow using Helm. Deploys the `deploy/helm/` chart with `values-production.yaml` to AWS EKS.
 
 **File:** `.github/workflows/ontology-conformance.yml`  
-Includes ontology and pipeline checks plus `terminology-coverage-gate` that runs `python scripts/validate_terminology_coverage.py` and fails when LAB/CPT/ICD-10 mapping coverage drops below configured thresholds.
+Includes ontology and pipeline checks plus `terminology-coverage-gate` that runs `python domains/healthcare/scripts/validate_terminology_coverage.py` and fails when LAB/CPT/ICD-10 mapping coverage drops below configured thresholds.
 
 ---
 
@@ -514,7 +514,16 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `QDRANT_URL` | `http://qdrant:6333` | flink-app, rag-api | Qdrant HTTP base URL |
 | `QDRANT_COLLECTION` | `healthcare_events` | flink-app, rag-api | Collection name |
 | `OLLAMA_URL` | `http://ollama:11434` | rag-api | Ollama inference endpoint |
-| `OLLAMA_MODEL` | `llama3.1` | rag-api | Model name for generation |
+| `OLLAMA_MODEL` | `llama3.1` | rag-api | Model name for Ollama generation |
+| `LLM_PROVIDER` | `ollama` | rag-api | Primary LLM provider: `ollama`, `openai`, or `anthropic` |
+| `LLM_MODEL` | `llama3.1` | rag-api | Provider-specific model name |
+| `LLM_FALLBACK_PROVIDER` | (unset) | rag-api | Fallback provider on primary failure |
+| `LLM_FALLBACK_MODEL` | (unset) | rag-api | Model name for fallback provider |
+| `LLM_TIMEOUT_SECONDS` | `120` | rag-api | LLM request timeout |
+| `LLM_MAX_TOKENS` | `1200` | rag-api | Max response tokens |
+| `LLM_TEMPERATURE` | `0.2` | rag-api | Sampling temperature |
+| `OPENAI_API_KEY` | (unset) | rag-api | Required when LLM_PROVIDER=openai |
+| `ANTHROPIC_API_KEY` | (unset) | rag-api | Required when LLM_PROVIDER=anthropic |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092,...` | producer, flink-app | Broker list |
 | `SCHEMA_REGISTRY_URL` | `http://schema-registry:8081` | producer, flink-app | Schema Registry URL |
 | `EVENT_INTERVAL_SECONDS` | `1` | producer | Seconds between emitted events |

@@ -10,7 +10,7 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 | [ADR-0001](0001-dual-persistence-qdrant-neo4j.md) | Dual persistence (Qdrant + Neo4j) | Data architecture | accepted |
 | [ADR-0002](0002-qdrant-streaming-vector-store.md) | Qdrant as the streaming vector store for real-time RAG | Data — vector store | accepted |
 | [ADR-0003](0003-ontology-governance-and-seed-generation.md) | Ontology governance and seed generation | Semantic model governance | accepted |
-| [ADR-0004](0004-local-first-llm-provider-routing.md) | Local-first LLM with provider routing | AI generation | accepted (partial) |
+| [ADR-0004](0004-local-first-llm-provider-routing.md) | Local-first LLM with provider routing | AI generation | accepted |
 | [ADR-0005](0005-embed-fastmcp-in-rag-api.md) | Embed FastMCP in rag-api | API surface | accepted |
 | [ADR-0006](0006-skills-layer-standardization-and-validation.md) | Skills layer standardization and validation | Agent orchestration and CI policy | accepted |
 | [ADR-0007](0007-langgraph-multi-agent-orchestration.md) | LangGraph multi-agent query orchestration | Agent orchestration | accepted |
@@ -29,7 +29,7 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 | Document | Description |
 | --- | --- |
 | [02_architecture.md](../02_architecture.md) | System architecture, design patterns, component diagrams |
-| [target_02_architecture.md](../target_02_architecture.md) | Reference architecture, target outcomes, and capability map |
+| [03_target_architecture.md](../03_target_architecture.md) | Reference architecture, target outcomes, and capability map |
 | [14_future_improvements.md](../14_future_improvements.md) | Actionable backlog, staged delivery plan, and execution sequence |
 | [06_technical_specs.md](../06_technical_specs.md) | Container inventory, library versions, API specification |
 | [01_business_specs.md](../01_business_specs.md) | Use cases, business rules, stakeholders |

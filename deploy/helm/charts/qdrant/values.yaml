@@ -1,0 +1,17 @@
+enabled: false
+image:
+  repository: qdrant/qdrant
+  tag: "v1.12.1"
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+persistence:
+  enabled: false
+  size: 5Gi
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

@@ -1,0 +1,28 @@
+enabled: true
+image:
+  repository: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-flink-cluster
+  tag: latest
+  pullPolicy: IfNotPresent
+jobmanager:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+taskmanager:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+job:
+  image:
+    repository: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-flink-healthcare
+    tag: latest
+  mainClass: healthcare_graph_rag_pyflink_job.py

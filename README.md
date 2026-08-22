@@ -169,11 +169,11 @@ Ops/UI
 ## LLM Strategy
 
 - Local default: Ollama using OLLAMA_URL and OLLAMA_MODEL.
-- LLM calls are routed through a provider abstraction in `domains/healthcare/agents/llm_provider.py`; the default provider is `OllamaProvider`.
+- Production: OpenAI (primary) with Anthropic (fallback) via `LLM_PROVIDER` and `LLM_FALLBACK_PROVIDER`.
+- LLM calls are routed through a provider abstraction in `domains/healthcare/agents/llm_provider.py` (`OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`).
 - Prompt construction and synthesis logic are in `domains/healthcare/agents/domain/synthesis.py`.
-- Active latency and output controls: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
-- Temperature is currently fixed in code (`0.2`) and is not yet env-configurable.
-- Anthropic/OpenAI provider routing remains a documented extension path, not the active local runtime.
+- Active latency and output controls: LLM_TIMEOUT_SECONDS, LLM_MAX_TOKENS, LLM_TEMPERATURE.
+- Production uses OpenAI (primary) with Anthropic (fallback); dev defaults to local Ollama.
 
 ### Ollama Cost Model (Local)
 
@@ -609,7 +609,7 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 - `domain/response_policy.py` contains response sanitization, truncation, budget enforcement, and confidence estimation.
 - `domain/planner.py` and `domain/evidence.py` handle request classification and deterministic evidence ranking.
 - `langgraph_agents/` provides multi-agent orchestration (LangGraph StateGraph), MLflow tracing, and evaluation.
-- `llm_provider.py` provides the provider abstraction; only `OllamaProvider` is implemented at runtime.
+- `llm_provider.py` provides the provider abstraction with `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, and `FallbackProvider`.
 - flink-app submits a native PyFlink DataStream job (healthcare_graph_rag_pyflink_job.py) to Flink JobManager.
 - healthcare_graph_rag_job.py is retained as a fallback processing implementation and provides reusable sink/enrichment logic consumed by the PyFlink job.
 - Schema Registry stores MedicalEvent Avro schemas and Kafka payloads are published with Confluent Avro serialization (schema ID on wire).
@@ -633,8 +633,7 @@ deploy/         Deployment bundles (production AI runtime and monitoring)
 | [docs/11_healthcare_ai_agent_landscape.md](docs/11_healthcare_ai_agent_landscape.md) | Industry AI agent landscape analysis and platform alignment |
 | [docs/13_runbook.md](docs/13_runbook.md) | Operations runbook, health checks, failure modes |
 | [docs/12_ai_qa.md](docs/12_ai_qa.md) | QA strategy, contract tests, graph validation, accuracy |
-| [deploy/production/README.md](deploy/production/README.md) | Production deployment assets |
-| [deploy/production/k8s/README.md](deploy/production/k8s/README.md) | Kubernetes manifests |
+| [deploy/README.md](deploy/README.md) | Deployment: dev (minikube), production (k8s + compose) |
 | [domains/supply-chain/README.md](domains/supply-chain/README.md) | Supply Chain domain: graph model, events, quick start |
 | [Makefile](Makefile) | Local development shortcuts (make up, make test-hc, etc.) |
 | [pyproject.toml](pyproject.toml) | Unified Python project config (uv, dependencies, ruff) |

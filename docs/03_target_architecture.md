@@ -54,7 +54,7 @@ Current gaps to close:
 
 - terminology mappings are still partial and need broader vocabulary coverage and stronger governance workflows,
 - planner logic is currently heuristic and requires benchmark-driven route quality evaluation,
-- provider abstraction exists but only Ollama is implemented at runtime today,
+- provider abstraction is implemented with Ollama, OpenAI, Anthropic, and FallbackProvider; production contract testing is pending,
 - quality validation now covers planner behavior and contracts, but retrieval benchmarks and grounded-answer scorecards remain limited,
 - production controls (policy classes, privacy posture, staged rollout controls) remain incomplete for non-demo workloads.
 
