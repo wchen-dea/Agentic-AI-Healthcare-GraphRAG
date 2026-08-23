@@ -1,6 +1,6 @@
-# Deployment
+# CI/CD and Deployment Automation
 
-This directory contains all deployment configurations for the Healthcare AI GraphRAG platform.
+This document covers deployment configurations and CI/CD automation for the Healthcare AI GraphRAG platform.
 
 ## Directory Structure
 

@@ -58,7 +58,7 @@ Notes:
 
 - Keep tool names stable; evolve behavior via versioned schemas.
 - Add async tools optionally when needed (`ai_task_submit`, `ai_task_status_get`).
-- Skill-composed tool expansion roadmap is documented in [05_ai_agents.md](05_ai_agents.md), [03_target_architecture.md](03_target_architecture.md), and [12_future_improvements.md](12_future_improvements.md).
+- Skill-composed tool expansion roadmap is documented in [03_target_architecture.md](03_target_architecture.md) and [12_future_improvements.md](12_future_improvements.md).
 
 ## 2) Request/Response Schemas
 
@@ -583,7 +583,7 @@ Generated skill packages are stored under [healthcare/skills](../domains/healthc
 
 This specification defines a concrete ReAct-style controller for the current GraphRAG runtime.
 
-Note: The ReAct controller is one of three query orchestration modes. See [05_ai_agents.md](05_ai_agents.md) for the comparison between single-pass, ReAct, and LangGraph multi-agent modes. The LangGraph multi-agent mode provides a more capable alternative with specialist agents and MLflow tracing.
+Note: The ReAct controller is one of three query orchestration modes. See the comparison below between single-pass, ReAct, and LangGraph multi-agent modes. The LangGraph multi-agent mode provides a more capable alternative with specialist agents and MLflow tracing.
 
 Design intent:
 
@@ -649,7 +649,7 @@ Not yet implemented from this spec:
 - Detailed observation objects and plan history in state
 - ReAct-specific Prometheus metrics and audit fields
 
-The LangGraph multi-agent mode (ADR-0007) provides the richer specialist routing that the Phase 2 ReAct design proposed. See [05_ai_agents.md](05_ai_agents.md) for details.
+The LangGraph multi-agent mode (ADR-0007) provides the richer specialist routing that the Phase 2 ReAct design proposed. See the multi-agent architecture comparison section above for details.
 
 ## Runtime Configuration
 

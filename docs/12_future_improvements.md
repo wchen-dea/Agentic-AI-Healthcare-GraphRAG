@@ -102,7 +102,7 @@ Target outcomes:
 Suggested repo touchpoints:
 
 - `deploy/production/`
-- `docs/09_runbook.md`
+- `docs/09_operation_runbook.md`
 - `docs/06_technical_specs.md`
 - monitoring and alerting assets
 

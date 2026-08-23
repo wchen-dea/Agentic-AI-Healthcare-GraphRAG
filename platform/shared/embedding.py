@@ -1,3 +1,13 @@
+"""Domain-routed embedding registry.
+
+Maps event types to embedding domains (clinical, claims, device) and loads
+a per-domain sentence-transformer model. All domains default to the same
+model (EMBEDDING_MODEL env var) unless overridden with EMBEDDING_MODEL_CLINICAL,
+EMBEDDING_MODEL_CLAIMS, or EMBEDDING_MODEL_DEVICE.
+
+Falls back to a deterministic MD5 bag-of-words embedding when
+sentence-transformers is not installed.
+"""
 from __future__ import annotations
 
 import hashlib

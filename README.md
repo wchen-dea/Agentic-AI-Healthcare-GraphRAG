@@ -76,8 +76,8 @@ make helm-ports  # Start port-forwards
 | [05_ai_agents.md](docs/05_ai_agents.md) | MCP, Skills, ReAct, LangGraph agents |
 | [06_technical_specs.md](docs/06_technical_specs.md) | API specs, env vars, CI pipelines |
 | [07_quality_assurance.md](docs/07_quality_assurance.md) | Testing strategy, contract tests |
-| [08_deployment.md](docs/08_deployment.md) | Helm, Compose, minikube, tech matrix |
-| [09_runbook.md](docs/09_runbook.md) | Operations, troubleshooting, Makefile |
+| [08_cicd_automation.md](docs/08_cicd_automation.md) | CI/CD, Helm, Compose, minikube, tech matrix |
+| [09_operation_runbook.md](docs/09_operation_runbook.md) | Operations, troubleshooting, Makefile |
 | [10_supply_chain_domain.md](docs/10_supply_chain_domain.md) | Supply chain graph model, events |
 | [11_healthcare_landscape.md](docs/11_healthcare_landscape.md) | Industry AI landscape analysis |
 | [12_future_improvements.md](docs/12_future_improvements.md) | Roadmap, backlog, trends |

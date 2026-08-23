@@ -4,13 +4,13 @@
 
 This runbook covers day-0 and day-2 operations for the local Docker Compose development stack, including startup, verification, recovery, and common failure handling.
 
-For production AI-only deployment boundaries and compose bundles, see [docs/08_deployment.md](08_deployment.md).
+For production AI-only deployment boundaries and compose bundles, see [docs/08_cicd_automation.md](08_cicd_automation.md).
 
 Scope note:
 
 - The commands and defaults in this runbook are for local development and synthetic-demo operation.
 - Production-ready deployment configuration lives under `deploy/` and should be operated with environment-specific security, secrets, networking, and platform controls.
-- For full deployment documentation including Helm charts, see [docs/08_deployment.md](08_deployment.md).
+- For full deployment documentation including Helm charts, see [docs/08_cicd_automation.md](08_cicd_automation.md).
 
 ## Prerequisites
 

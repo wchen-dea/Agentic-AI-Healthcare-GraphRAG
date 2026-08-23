@@ -10,7 +10,7 @@ This document defines the strategic target for the healthcare intelligence platf
 
 **For engineers:** This is the delivery backlog with acceptance criteria, file touchpoints, and staged execution order.
 
-Current ontology files live under `platform/healthcare/ontology/`. Implementation status details are in [06_technical_specs.md](06_technical_specs.md), [09_runbook.md](09_runbook.md), [05_ai_agents.md](05_ai_agents.md), and [12_future_improvements.md](12_future_improvements.md).
+Current ontology files live under `platform/healthcare/ontology/`. Implementation status details are in [06_technical_specs.md](06_technical_specs.md), [09_operation_runbook.md](09_operation_runbook.md), [05_ai_agents.md](05_ai_agents.md), and [12_future_improvements.md](12_future_improvements.md).
 
 ## Target Outcome
 

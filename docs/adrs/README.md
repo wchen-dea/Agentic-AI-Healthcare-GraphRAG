@@ -37,5 +37,5 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 | [04_data_platform.md](../04_data_platform.md) | Kafka topic topology, Avro schema, payload examples |
 | [05_ai_agents.md](../05_ai_agents.md) | MCP tool contracts and rollout stages |
 | [05_ai_agents.md](../05_ai_agents.md) | Skills layer flow, generated package model, and validation |
-| [09_runbook.md](../09_runbook.md) | Operations runbook, health checks, failure modes |
+| [09_operation_runbook.md](../09_operation_runbook.md) | Operations runbook, health checks, failure modes |
 | [07_quality_assurance.md](../07_quality_assurance.md) | QA strategy, contract tests, accuracy validation |
