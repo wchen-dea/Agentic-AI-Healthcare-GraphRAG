@@ -52,21 +52,25 @@ What is implemented today:
 - MLflow tracing with nested span hierarchy and healthcare-specific evaluation harness is implemented behind the `MLFLOW_TRACKING_URI` feature flag,
 - LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`,
 - terminology mappings cover all 6 producer vocabularies at 100% (LAB→LOINC, ICD-10, MED→RxNorm, CPT, Specialty→NUCC, Payer→NAIC),
-- ontology governance enforced via CODEOWNERS, drift detection CI gate (`validate_ontology_drift.py`), and terminology coverage CI gate (`validate_terminology_coverage.py`).
+- ontology governance enforced via CODEOWNERS, drift detection CI gate (`validate_ontology_drift.py`), and terminology coverage CI gate (`validate_terminology_coverage.py`),
+- ontology conformance tests validate relationship cardinality, node type alignment, required properties, and direction correctness (`test_ontology_conformance.py`),
+- retrieval benchmark with 25 labeled query fixtures and precision@k / recall@k scoring (`retrieval_benchmark.py`),
+- grounded-answer scorecard with unsupported-claim rate and citation coverage metrics (`grounding_scorecard.py`),
+- evidence fusion reranking combining relevance, recency, and graph signal weighting (`evidence.py`),
+- provider failover contract tests covering timeout, connection error, non-200, and cross-provider kwargs (`test_provider_failover.py`),
+- latency-based model routing with per-tier rolling average tracking and automatic tier downgrade (`LatencyTracker`),
+- cost budget tracking with hourly accumulation and tier downgrade on budget exhaustion (`CostTracker`, env `LLM_COST_BUDGET_HOURLY_USD`).
 
 ## Open Gaps
 
 Infrastructure and governance gaps:
 
 - planner logic is currently heuristic and requires benchmark-driven route quality evaluation,
-- multi-provider production contract testing is pending,
-- retrieval benchmarks and grounded-answer scorecards remain limited,
 - production controls (policy classes, privacy posture, staged rollout controls) remain incomplete for non-demo workloads.
 
 AI-capability gaps (see [Part III](#part-iii--delivery-backlog) for detailed backlog):
 
 - schema-constrained decoding (grammar-enforced JSON) beyond current JSON-mode prompting,
-- latency-based model routing and cost budget tracking beyond current complexity-based tier selection,
 - dedicated ML guardrail model (Llama Guard) beyond current regex-based classifier,
 - streaming responses (SSE) to client UIs,
 - hard evaluation gate promotion once baseline quality is stable,
@@ -274,7 +278,7 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 | Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agents/app.py` |
 | MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/05_ai_agents.md`, `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
 | Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agents/app.py`, `domains/healthcare/agents/config/tool_policies.json` |
-| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, LangGraph agent tests, MLflow evaluation harness, model router tests, retrieval domain classification tests, and polypharmacy scenario tests (151 agent tests, 58 Flink tests) | evaluation-gated CI, adversarial red-teaming, retrieval benchmarks, grounded answer scorecards | `domains/healthcare/agents/tests/`, `domains/healthcare/scripts/validate_ontology.py`, `docs/06_quality_assurance.md` |
+| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, retrieval benchmarks (25 fixtures), grounding scorecard, evidence fusion reranking, provider failover tests, LangGraph agent tests, MLflow evaluation harness, model router tests, and retrieval domain classification tests (213 agent tests, 58 Flink tests) | evaluation-gated CI, adversarial red-teaming | `domains/healthcare/agents/tests/`, `domains/healthcare/scripts/validate_ontology.py`, `docs/06_quality_assurance.md` |
 
 ## Execution Backlog
 
@@ -936,9 +940,6 @@ Terminology and governance:
 
 Partially implemented:
 
-- ontology conformance test depth (relationship cardinality constraints pending),
-- ontology conformance and retrieval quality benchmark depth,
-- provider abstraction production test coverage (adapters implemented, failover contract tests pending),
 - production privacy, policy, and rollout controls,
 - LangGraph and MLflow production hardening for non-demo use.
 
@@ -970,34 +971,16 @@ flowchart LR
 | Stage | Focus | Status | Remaining work |
 | --- | --- | --- | --- |
 | 0 | Documentation and semantic contract baseline | Completed | — |
-| 1 | Ontology externalization and normalization | Completed | Formal conformance tests for relationship cardinality |
+| 1 | Ontology externalization and normalization | Completed | — |
 | 2 | Query planner and evidence ranking | Completed | — |
 | 3 | Skill-composed MCP expansion | Completed | — |
 | 3.5 | Multi-agent orchestration and tracing | Implemented (feature-flagged) | Production hardening |
-| 4 | Multi-domain support and provider abstraction | Largely completed | Retrieval benchmarks, production failover tests |
+| 4 | Multi-domain support and provider abstraction | Completed | — |
 | 5 | Production controls | In progress | Policy-as-code, PHI boundaries, SLO gates |
 | 6 | Advanced agent capabilities | Partially implemented | See Stage 6 backlog below |
 | 7 | Enterprise governance and scale | Pending | See Stage 7 backlog below |
 
 ## Remaining Work by Stage
-
-### Stage 1 — Ontology governance depth
-
-- [x] 100% mapping coverage across all 6 vocabulary domains (LAB, CPT, ICD-10, MED, Specialty, Payer)
-- [x] Governance workflow: CODEOWNERS for ontology paths, drift detection CI gate, terminology coverage CI gate
-- [x] Mapping version consistency and TBD-code enforcement via `validate_ontology_drift.py`
-- [ ] Formal ontology conformance tests for relationship cardinality constraints
-
-Touchpoints: `platform/healthcare/ontology/`, `domains/healthcare/scripts/validate_ontology_drift.py`, `.github/workflows/ontology-conformance.yml`
-
-### Stage 4 — Evaluation hardening
-
-- [ ] Retrieval benchmark gate: 20+ labeled queries, precision@5 >= 0.70, recall@5 >= 0.75, CI artifact
-- [ ] Grounded-answer scorecard: unsupported-claim rate <= 0.10, citation coverage >= 0.80
-- [ ] Evidence fusion reranking: deterministic cross-source ranking (relevance + recency + graph signal weight)
-- [ ] Provider failover contract tests and latency-based model routing
-
-Touchpoints: `domains/healthcare/agents/tests/`, `domains/healthcare/agents/llm_provider.py`, `.github/workflows/rag-api-contracts.yml`
 
 ### Stage 5 — Production controls
 
@@ -1013,7 +996,7 @@ Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/work
 | # | Item | Status | Remaining |
 |---|------|--------|-----------|
 | 1 | Structured output generation | **Implemented** | Schema-constrained decoding (grammar-enforced JSON) |
-| 2 | Dynamic model routing | **Implemented** | Latency-based routing, cost budget tracking, token metering |
+| 2 | Dynamic model routing | **Implemented** | — |
 | 3 | Persistent agent memory | **Implemented** | Patient-scoped memory (per-patient context across sessions) |
 | 4 | Input-side guardrails | **Implemented** | Dedicated ML model (Llama Guard) |
 | 5 | Streaming responses (SSE) | Pending | FastAPI StreamingResponse to provider web UI |
@@ -1035,31 +1018,22 @@ Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/work
 
 ## Near-Term Execution Order
 
-1. **Stage 4** — Retrieval and grounding benchmark suites
-2. **Stage 4** — Provider failover contract tests
-3. **Stage 5** — Policy-as-code and PHI boundaries
-4. **Stage 5** — SLO gates and deployment playbooks
-5. **Stage 6** — Streaming responses, adversarial evaluation
+1. **Stage 5** — Policy-as-code and PHI boundaries
+2. **Stage 5** — SLO gates and deployment playbooks
+3. **Stage 6** — Streaming responses, adversarial evaluation
 
 ## Sprint Plan
 
-### Sprint 1: Quality hardening (Stage 4)
+### Sprint 1: Production readiness (Stage 5)
 
-- [ ] Retrieval benchmark gate with CI artifact
-- [ ] Grounded-answer scorecard with failure taxonomy
-- [ ] Evidence fusion reranking (deterministic cross-source)
-
-### Sprint 2: Production readiness (Stages 4 + 5)
-
-- [ ] Provider failover contract tests
 - [ ] Policy-as-code regression suite
 - [ ] SLO promotion gates in deployment workflow
 - [ ] Deployment rollback criteria and canary checklist
 
 ### Exit criteria
 
-- [x] ReAct and planner validation runs via a single stable command and CI job
-- [x] At least two LLM providers are supported with tested failover
+### Exit criteria
+
 - [ ] Retrieval and grounding quality gates are required checks on pull requests
 - [ ] Ontology and policy drift checks block merges
 - [ ] Production promotion includes explicit SLO gates and rollback criteria
