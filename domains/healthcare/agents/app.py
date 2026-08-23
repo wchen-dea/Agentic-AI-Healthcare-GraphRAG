@@ -25,6 +25,7 @@ from domain.guardrails import classify_grounding, classify_input, classify_outpu
 from domain.memory import get_session_store
 from domain.react_controller import ReactLoopSettings, run_react_query_loop
 from domain.retrieval import graph_search, vector_search
+from domain.model_router import ModelRouter, ModelTierConfig, classify_complexity
 from domain.structured_output import build_structured_prompt, parse_structured_response
 from domain.synthesis import compact_graph_context, compact_vector_context, synthesize_answer
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -216,6 +217,25 @@ if _fallback_provider_name:
         configured_model=os.getenv("LLM_FALLBACK_MODEL", ""),
     )
     llm_provider = FallbackProvider(llm_provider, _fallback)
+
+_tier_config = ModelTierConfig.from_env(settings.ollama_model)
+if not _tier_config.is_uniform():
+    _providers: dict[str, object] = {settings.llm_provider: llm_provider}
+    for _env_name in ("LLM_MODEL_SIMPLE", "LLM_MODEL_MODERATE", "LLM_MODEL_COMPLEX"):
+        _spec = os.getenv(_env_name, "")
+        if ":" in _spec:
+            _prov_name = _spec.split(":", 1)[0]
+            if _prov_name not in _providers:
+                _providers[_prov_name] = create_provider(
+                    _prov_name,
+                    base_url=settings.ollama_url,
+                    configured_model=_spec.split(":", 1)[1],
+                )
+    llm_provider = ModelRouter(
+        providers=_providers,
+        tier_config=_tier_config,
+        default_provider_name=settings.llm_provider,
+    )
 
 
 class AuthorizationError(RuntimeError):
@@ -502,9 +522,9 @@ def _run_query_single_pass(
         vector_summary = compact_vector_context(vector_items, max_items=context_limit)
         graph_summary = compact_graph_context(graph_items, max_items=context_limit)
         prompt = build_structured_prompt(question, vector_summary, graph_summary)
-        raw = llm_provider.generate(prompt=prompt, timeout_seconds=settings.llm_timeout_seconds, max_tokens=settings.llm_max_tokens, temperature=0.1)
+        raw = llm_provider.generate(prompt=prompt, timeout_seconds=settings.llm_timeout_seconds, max_tokens=settings.llm_max_tokens, temperature=0.1, question=question)
         parsed = parse_structured_response(raw)
-        return {
+        result = {
             "question": question,
             "request_type": request_type,
             "retrieval_plan": {"name": plan.name, "top_k": plan.top_k, "reason": plan.reason},
@@ -514,9 +534,12 @@ def _run_query_single_pass(
             "answer": parsed.summary,
             "structured_response": parsed.model_dump(),
         }
+        if hasattr(llm_provider, "last_routing") and llm_provider.last_routing:
+            result["model_routing"] = llm_provider.last_routing
+        return result
 
     answer = ask_ollama(question, vector_items, graph_items)
-    return {
+    result = {
         "question": question,
         "request_type": request_type,
         "retrieval_plan": {
@@ -529,6 +552,9 @@ def _run_query_single_pass(
         "graph_context": graph_items,
         "answer": answer,
     }
+    if hasattr(llm_provider, "last_routing") and llm_provider.last_routing:
+        result["model_routing"] = llm_provider.last_routing
+    return result
 
 
 def _patient_scope(patient_id: str | None) -> list[str] | str:
@@ -583,6 +609,8 @@ def _build_query_response(
     }
     if result.get("react"):
         payload["react"] = result["react"]
+    if result.get("model_routing"):
+        payload["model_routing"] = result["model_routing"]
     return apply_response_budget(payload, max_response_bytes=settings.max_response_bytes)
 
 

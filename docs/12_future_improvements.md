@@ -22,7 +22,13 @@ Completed or largely implemented:
 - planner-driven query orchestration with deterministic ranking and planner metadata,
 - expanded MCP tools (`timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`),
 - planner quality suites (`test_planner_evaluation.py`, `test_planner_edge_cases.py`),
-- provider adapter abstraction with Ollama runtime adapter,
+- provider adapter abstraction with Ollama, OpenAI, Anthropic, and FallbackProvider,
+- dynamic model routing with complexity-based tier selection (`domain/model_router.py`),
+- domain-routed embeddings with named Qdrant vectors and per-domain model configurability (`platform/shared/embedding.py`),
+- structured output generation via JSON-mode constrained prompts (`domain/structured_output.py`),
+- input/output guardrails with classifier-based injection detection and grounding validation (`domain/guardrails.py`),
+- session-scoped conversation memory with TTL expiry (`domain/memory.py`),
+- evaluation-gated CI with configurable quality thresholds (`domain/evaluation_gates.py`),
 - LangGraph multi-agent orchestration with eight specialized nodes and conditional routing (feature-flagged),
 - MLflow tracing with nested span hierarchy across agent nodes, retrievers, and LLM calls (feature-flagged),
 - MLflow evaluation harness with six healthcare-specific scorers and cross-mode comparison,
@@ -54,17 +60,18 @@ Suggested repo touchpoints:
 - `.github/workflows/rag-api-contracts.yml`
 - `.github/workflows/ontology-conformance.yml`
 
-### 2. Expand provider adapter implementations
+### 2. Expand provider adapter production testing
 
 Target outcomes:
 
-- add additional provider adapters behind the existing abstraction,
-- keep retrieval orchestration unchanged across provider swaps,
-- add adapter-focused contract tests and fallback behavior tests.
+- add failover contract tests and timeout behavior tests across adapters,
+- validate model routing tier selection under production-like load,
+- keep retrieval orchestration unchanged across provider swaps.
 
 Suggested repo touchpoints:
 
 - `domains/healthcare/agents/llm_provider.py`
+- `domains/healthcare/agents/domain/model_router.py`
 - `domains/healthcare/agents/app.py`
 - `domains/healthcare/agents/tests/test_contracts.py`
 
@@ -117,8 +124,7 @@ flowchart LR
 	classDef progress fill:#fff8e1,stroke:#e65100,stroke-width:1px,color:#e65100;
 	classDef pending fill:#ffebee,stroke:#b71c1c,stroke-width:1px,color:#b71c1c;
 
-	class S0,S2,S3,S35 done;
-	class S1,S4 progress;
+	class S0,S1,S2,S3,S35,S4 done;
 	class S5 pending;
 ```
 
@@ -129,7 +135,7 @@ flowchart LR
 | Stage 2 | Query planner and evidence ranking | Completed (baseline) | Planner and ranking shipped with fixture and edge-case suites. |
 | Stage 3 | Skill-composed MCP expansion | Completed (current scope) | Expanded tools and policy updates shipped; continue iterative refinement as needed. |
 | Stage 3.5 | Multi-agent orchestration and tracing | Implemented (feature-flagged) | LangGraph StateGraph, MLflow tracing, evaluation harness shipped; production hardening pending. |
-| Stage 4 | Multi-domain support and provider abstraction | In progress | Supply-chain domain added; planner tests and provider abstraction started; benchmark/scorecard/provider breadth still open. |
+| Stage 4 | Multi-domain support and provider abstraction | Largely completed | Supply-chain domain added; provider adapters, model routing, domain embeddings, guardrails, memory, structured output, and evaluation gates implemented; retrieval benchmarks and production failover tests still open. |
 | Stage 5 | Production controls for real data readiness | Pending | Requires policy/privacy/SLO rollout controls for non-demo operation. |
 
 ## Near-Term Execution Order
@@ -166,7 +172,7 @@ CI checks: New unit suite in `domains/healthcare/agents/tests/` and benchmark de
 ### Sprint 2: Runtime Resilience and Governance Promotion
 
 - [x] 5. Multi-provider runtime + failover
-Scope: Provider adapters and FallbackProvider implemented. Remaining: failover contract tests.
+Scope: Provider adapters (Ollama, OpenAI, Anthropic), FallbackProvider, and ModelRouter implemented. Remaining: failover contract tests and latency-based routing.
 Acceptance criteria: Adapter switch by env works; timeout/5xx failover tested; retrieval orchestration unchanged.
 CI checks: Extend `domains/healthcare/agents/tests/test_contracts.py` with provider/failover cases.
 
@@ -187,9 +193,9 @@ CI checks: Add deployment pre-check job in `.github/workflows/deploy-ai-prd.yml`
 
 ### Exit Criteria After Sprint 2
 
+- [x] ReAct and planner validation runs via a single stable command and CI job.
+- [x] At least two LLM providers are supported with tested failover.
 - [ ] Retrieval and grounding quality gates are required checks on pull requests.
-- [ ] ReAct and planner validation runs via a single stable command and CI job.
-- [ ] At least two LLM providers are supported with tested failover.
 - [ ] Ontology and policy drift checks block merges when governance constraints fail.
 - [ ] Production promotion includes explicit SLO gates and rollback criteria.
 
@@ -230,7 +236,7 @@ The following backlog items are derived from industry trends analysis comparing 
 | # | Item | Industry trend | Effort | Priority | Status |
 |---|------|---------------|--------|----------|--------|
 | 1 | **Structured output generation** — JSON-mode or schema-constrained decoding for deterministic extraction of interactions, contraindications, and risk assessments | Instructor, OpenAI JSON mode, Pydantic-constrained generation | Low | High | **Implemented**: `domain/structured_output.py` with Pydantic models, JSON-mode prompt, structured response parsing. Activated via `structured: true` in query request. |
-| 2 | **Dynamic model routing** — route to different models based on query complexity, latency target, or cost budget | Martian, Unify, LiteLLM router | Medium | High | |
+| 2 | **Dynamic model routing** — route to different models based on query complexity, latency target, or cost budget | Martian, Unify, LiteLLM router | Medium | High | **Implemented**: `domain/model_router.py` with `classify_complexity()` (regex-based, 3 tiers: simple/moderate/complex), `ModelTierConfig` (env-driven), and `ModelRouter` (provider-aware). In dev, all tiers default to `OLLAMA_MODEL` (zero config). In production, set `LLM_MODEL_SIMPLE`, `LLM_MODEL_MODERATE`, `LLM_MODEL_COMPLEX` with optional `provider:model` syntax for cross-provider routing. Response includes `model_routing` metadata (tier, score, signals, model). 22 tests. Remaining: latency-based routing, cost budget tracking, token usage metering. |
 | 3 | **Persistent agent memory** — cross-session context retention for longitudinal patient monitoring and escalation tracking | Mem0, Zep, Letta | Medium | High | **Partially implemented**: `domain/memory.py` provides session-scoped TTL memory. Remaining: persistent storage (Redis/Postgres) for cross-session and patient-scoped memory. |
 | 4 | **Input-side guardrails** — prompt injection detection and input validation before agent execution | Lakera Guard, NeMo Guardrails, Rebuff | Low-Medium | High | **Implemented**: `domain/guardrails.py` with classifier-based injection detection, off-topic filtering, output safety checks, and grounding validation. Remaining: dedicated ML model (Llama Guard). |
 | 5 | **Streaming responses (SSE)** — server-sent events for real-time answer streaming to the provider web UI | FastAPI StreamingResponse, LangGraph streaming | Low | Medium | |
@@ -257,21 +263,21 @@ The following backlog items are derived from industry trends analysis comparing 
 | 16 | **Citation enforcement in guardrails** — block responses that lack evidence references | Regex-based citation detection + `requires_evidence` flag | We redact evidence but don't enforce its presence in answers |
 | 17 | **Pluggable message bus for audit** — Kafka/RabbitMQ/UC table backends | `MessageBus` interface with 5 backends | We write JSONL audit logs only; no pluggable backend |
 | 18 | **React frontend with streaming** — real-time SSE to a modern UI | Vite + React + TypeScript + streaming | We have a static HTML form with synchronous responses |
-| 19 | **KPI-gated release pipeline** — quantitative thresholds block promotion | `EVAL_MIN_TOOL_CALL_ACCURACY`, `EVAL_MIN_GROUNDEDNESS`, etc. | We have scorers but no CI gate that blocks deployment |
+| 19 | **KPI-gated release pipeline** — quantitative thresholds block promotion | `EVAL_MIN_TOOL_CALL_ACCURACY`, `EVAL_MIN_GROUNDEDNESS`, etc. | Evaluation gates implemented (`domain/evaluation_gates.py`); currently `continue-on-error`; hard gate promotion pending |
 | 20 | **Multi-environment deployment** — dev/qa/stg/prod with config isolation | Databricks Asset Bundles + target configs | We have a single production bundle; no staged promotion |
 
 ### Suggested Execution Sequence
 
 ```text
 Near-term (next sprint):
-  #1 Structured outputs → #5 Streaming responses → #6 Evaluation-gated CI
-  #4 Input guardrails → #16 Citation enforcement
+  #5 Streaming responses → #7 Adversarial evaluation
+  #16 Citation enforcement → #8 Confidence calibration
 
 Medium-term (next quarter):
-  #2 Model routing → #9 Per-user identity → #10 Neural reranking
-  #3 Persistent memory → #7 Adversarial evaluation → #19 KPI gates
+  #9 Per-user identity → #10 Neural reranking → #19 KPI hard gates
+  #3 Persistent memory (Redis/Postgres) → #15 OpenTelemetry
 
 Long-term (roadmap):
   #11 Inter-agent collaboration → #13 Fine-tuning → #12 Multimodal
-  #14 Distributed agents → #15 OpenTelemetry
+  #14 Distributed agents
 ```

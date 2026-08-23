@@ -1,6 +1,7 @@
 from .evidence import rank_graph_context, rank_vector_context
 from .guardrails import classify_grounding, classify_input, classify_output
 from .memory import ConversationSession, get_session_store, generate_session_id
+from .model_router import ComplexityResult, ModelRouter, ModelTierConfig, classify_complexity
 from .models import RequestType, RetrievalPlan
 from .planner import classify_request_type, select_retrieval_plan
 from .response_policy import (
@@ -16,7 +17,10 @@ from .structured_output import StructuredClinicalResponse, build_structured_prom
 from .synthesis import build_synthesis_prompt, compact_graph_context, compact_vector_context, synthesize_answer
 
 __all__ = [
+    "ComplexityResult",
     "ConversationSession",
+    "ModelRouter",
+    "ModelTierConfig",
     "RequestType",
     "RetrievalPlan",
     "StructuredClinicalResponse",
@@ -24,6 +28,7 @@ __all__ = [
     "apply_response_budget",
     "build_structured_prompt",
     "build_synthesis_prompt",
+    "classify_complexity",
     "classify_grounding",
     "classify_input",
     "classify_output",

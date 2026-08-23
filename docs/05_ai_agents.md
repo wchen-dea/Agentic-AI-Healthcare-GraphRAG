@@ -25,6 +25,7 @@ AI Client (Copilot, Claude Desktop, custom agent)
   -> domain/ modules:
      - retrieval.py (Neo4j graph_search + Qdrant vector_search)
      - synthesis.py (LLM prompt + generation)
+     - model_router.py (complexity-based model selection)
      - response_policy.py (sanitization + budget)
      - harness.py (retry, guards, prompt registry)
   -> langgraph_agents/ (optional multi-agent routing)
@@ -1176,6 +1177,11 @@ domains/healthcare/agents/
 ├── domain/
 │   ├── retrieval.py         # Embedding, vector search, graph search (Cypher)
 │   ├── synthesis.py         # Prompt construction and LLM synthesis
+│   ├── model_router.py      # Complexity classifier and dynamic model routing
+│   ├── structured_output.py # JSON-mode structured response generation
+│   ├── guardrails.py        # Input/output safety classification
+│   ├── memory.py            # Session-scoped conversation context
+│   ├── evaluation_gates.py  # CI quality gate thresholds
 │   ├── response_policy.py   # Truncation, sanitization, budget enforcement, confidence
 │   ├── planner.py           # Request classification and retrieval planning
 │   ├── evidence.py          # Deterministic evidence ranking

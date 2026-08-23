@@ -380,7 +380,32 @@ All three domains default to the same model. Set domain-specific env vars to act
 | `RAG_API_MAX_RESPONSE_BYTES` | 50 000 | Hard byte budget for entire response payload |
 | `LLM_TIMEOUT_SECONDS` | 120 | Ollama request timeout |
 | `LLM_MAX_TOKENS` | 1200 | Ollama `num_predict` |
-| `OLLAMA_MODEL` | `llama3.1` | Model pulled and used for generation |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Default model for generation |
+| `LLM_MODEL_SIMPLE` | (= `OLLAMA_MODEL`) | Model for simple queries (greetings, lookups) |
+| `LLM_MODEL_MODERATE` | (= `OLLAMA_MODEL`) | Model for moderate queries (single-domain clinical) |
+| `LLM_MODEL_COMPLEX` | (= `OLLAMA_MODEL`) | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
+
+### Dynamic model routing (`domain/model_router.py`)
+
+The model router classifies each query into a complexity tier and selects the appropriate model. When all tiers map to the same model (the default), the router is not activated and the standard provider is used directly.
+
+| Tier | Trigger signals | Example queries |
+|------|----------------|-----------------|
+| `simple` | Greeting patterns, short statements, `list` commands | "hello", "list conditions", "thanks" |
+| `moderate` | Single-domain keywords (medication, lab, vitals, claims, diagnosis) | "What medications does the patient take?", "Are there abnormal labs?" |
+| `complex` | Multi-system reasoning, polypharmacy, differential diagnosis, risk stratification, temporal analysis | "Analyze drug interactions and contraindications", "Risk stratify for sepsis deterioration" |
+
+Complexity classification is deterministic (regex-based, no LLM call). Each signal has a weight; the sum determines the tier.
+
+Production configuration example:
+
+| Tier | Env var | Example value | Rationale |
+|------|---------|---------------|-----------|
+| simple | `LLM_MODEL_SIMPLE` | `llama3.2:3b` | Fast, low cost for greetings and lookups |
+| moderate | `LLM_MODEL_MODERATE` | `llama3.1` | Balanced quality for single-domain clinical queries |
+| complex | `LLM_MODEL_COMPLEX` | `openai:gpt-4.1` | Best reasoning for multi-system analysis |
+
+Cross-provider routing uses `provider:model` syntax (e.g. `openai:gpt-4.1`). The router auto-creates the provider if not already instantiated.
 
 ### Response shape (`/query`)
 
@@ -399,6 +424,12 @@ All three domains default to the same model. Set domain-specific env vars to act
   "answer": "...",
   "retrieved_at": "2026-07-02T...",
   "trace_id": "uuid",
+  "model_routing": {
+    "tier": "moderate",
+    "score": 2,
+    "signals": ["medication_query", "diagnosis_query"],
+    "model": "llama3.2:3b"
+  },
   "guardrails": {
     "evidence_text_redacted": true,
     "evidence_access_level": "none",
@@ -521,9 +552,12 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `QDRANT_URL` | `http://qdrant:6333` | flink-app, rag-api | Qdrant HTTP base URL |
 | `QDRANT_COLLECTION` | `healthcare_events` | flink-app, rag-api | Collection name |
 | `OLLAMA_URL` | `http://ollama:11434` | rag-api | Ollama inference endpoint |
-| `OLLAMA_MODEL` | `llama3.1` | rag-api | Model name for Ollama generation |
+| `OLLAMA_MODEL` | `llama3.2:3b` | rag-api | Default model name for generation |
 | `LLM_PROVIDER` | `ollama` | rag-api | Primary LLM provider: `ollama`, `openai`, or `anthropic` |
-| `LLM_MODEL` | `llama3.1` | rag-api | Provider-specific model name |
+| `LLM_MODEL` | `llama3.2:3b` | rag-api | Provider-specific model name |
+| `LLM_MODEL_SIMPLE` | (= `OLLAMA_MODEL`) | rag-api | Model for simple queries (greetings, lookups). Used by `ModelRouter` |
+| `LLM_MODEL_MODERATE` | (= `OLLAMA_MODEL`) | rag-api | Model for moderate queries (single-domain clinical). Used by `ModelRouter` |
+| `LLM_MODEL_COMPLEX` | (= `OLLAMA_MODEL`) | rag-api | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
 | `LLM_FALLBACK_PROVIDER` | (unset) | rag-api | Fallback provider on primary failure |
 | `LLM_FALLBACK_MODEL` | (unset) | rag-api | Model name for fallback provider |
 | `LLM_TIMEOUT_SECONDS` | `120` | rag-api | LLM request timeout |

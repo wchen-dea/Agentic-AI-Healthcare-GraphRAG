@@ -23,8 +23,9 @@ Implementation status:
 - Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider` in `domains/healthcare/agents/llm_provider.py`.
 - Factory: `create_provider()` routes by `LLM_PROVIDER` env var.
 - Fallback: `FallbackProvider` wraps primary + fallback; triggered by `LLM_FALLBACK_PROVIDER` env var.
+- Dynamic model routing: `ModelRouter` in `domains/healthcare/agents/domain/model_router.py` classifies query complexity (simple/moderate/complex) and selects the appropriate model tier. Supports cross-provider routing via `provider:model` syntax (e.g. `openai:gpt-4.1` for complex queries).
 - Prompt construction and synthesis extracted into `domains/healthcare/agents/domain/synthesis.py`.
-- Helm values: dev uses Ollama, production uses OpenAI + Anthropic fallback.
+- Helm values: dev uses Ollama (uniform model across tiers), production uses OpenAI + Anthropic fallback with optional per-tier model configuration.
 
 ## Consequences
 
