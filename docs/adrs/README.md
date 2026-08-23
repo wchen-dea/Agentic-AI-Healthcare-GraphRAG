@@ -29,13 +29,11 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 | Document | Description |
 | --- | --- |
 | [02_architecture.md](../02_architecture.md) | System architecture, design patterns, component diagrams |
-| [03_target_architecture.md](../03_target_architecture.md) | Reference architecture, target outcomes, and capability map |
-| [12_future_improvements.md](../12_future_improvements.md) | Actionable backlog, staged delivery plan, and execution sequence |
-| [06_technical_specs.md](../06_technical_specs.md) | Container inventory, library versions, API specification |
+| [03_platform_blueprint.md](../03_platform_blueprint.md) | Platform blueprint, target architecture, specs, and execution backlog |
 | [01_business_requirements.md](../01_business_requirements.md) | Use cases, business rules, stakeholders |
 | [04_data_platform.md](../04_data_platform.md) | Graph model, node labels, relationships, pharmacovigilance |
 | [04_data_platform.md](../04_data_platform.md) | Kafka topic topology, Avro schema, payload examples |
 | [05_ai_agents.md](../05_ai_agents.md) | MCP tool contracts and rollout stages |
 | [05_ai_agents.md](../05_ai_agents.md) | Skills layer flow, generated package model, and validation |
-| [09_operation_runbook.md](../09_operation_runbook.md) | Operations runbook, health checks, failure modes |
-| [07_quality_assurance.md](../07_quality_assurance.md) | QA strategy, contract tests, accuracy validation |
+| [08_operation_runbook.md](../08_operation_runbook.md) | Operations runbook, health checks, failure modes |
+| [06_quality_assurance.md](../06_quality_assurance.md) | QA strategy, contract tests, accuracy validation |

@@ -1,8 +1,8 @@
-# Agentic AI Healthcare GraphRAG
+# Agentic AI Healthcare Platform — Streaming GraphRAG with Multi-Agent Orchestration
 
-A production-grade, multi-agent healthcare intelligence platform combining streaming event processing, hybrid GraphRAG retrieval, and agentic AI orchestration for real-time clinical decision support.
+End-to-end clinical decision-support system that streams healthcare events through Kafka and Flink, persists them as vector embeddings (Qdrant) and a knowledge graph (Neo4j), and answers clinical questions through multi-agent reasoning with domain-routed retrieval, guardrails, and structured output.
 
-Built on Kafka, PyFlink, Qdrant, Neo4j, LangGraph, FastAPI, and Ollama.
+Runs fully local on Ollama, scales to OpenAI/Anthropic in production with complexity-based model routing.
 
 ## Tech Stack
 
@@ -71,28 +71,26 @@ make helm-ports  # Start port-forwards
 |----------|-------|
 | [01_business_requirements.md](docs/01_business_requirements.md) | Use cases, stakeholders, governance |
 | [02_architecture.md](docs/02_architecture.md) | System architecture, design patterns |
-| [03_target_architecture.md](docs/03_target_architecture.md) | Target state, capability map |
+| [03_platform_blueprint.md](docs/03_platform_blueprint.md) | Platform blueprint, target architecture, specs, and backlog |
 | [04_data_platform.md](docs/04_data_platform.md) | Kafka schema, Neo4j graph model |
 | [05_ai_agents.md](docs/05_ai_agents.md) | MCP, Skills, ReAct, LangGraph agents |
-| [06_technical_specs.md](docs/06_technical_specs.md) | API specs, env vars, CI pipelines |
-| [07_quality_assurance.md](docs/07_quality_assurance.md) | Testing strategy, contract tests |
-| [08_cicd_automation.md](docs/08_cicd_automation.md) | CI/CD, Helm, Compose, minikube, tech matrix |
-| [09_operation_runbook.md](docs/09_operation_runbook.md) | Operations, troubleshooting, Makefile |
-| [10_supply_chain_domain.md](docs/10_supply_chain_domain.md) | Supply chain graph model, events |
-| [11_healthcare_landscape.md](docs/11_healthcare_landscape.md) | Industry AI landscape analysis |
-| [12_future_improvements.md](docs/12_future_improvements.md) | Roadmap, backlog, trends |
+| [06_quality_assurance.md](docs/06_quality_assurance.md) | Testing strategy, contract tests |
+| [07_cicd_automation.md](docs/07_cicd_automation.md) | CI/CD, Helm, Compose, minikube, tech matrix |
+| [08_operation_runbook.md](docs/08_operation_runbook.md) | Operations, troubleshooting, Makefile |
+| [09_supply_chain_domain.md](docs/09_supply_chain_domain.md) | Supply chain graph model, events |
+| [10_healthcare_landscape.md](docs/10_healthcare_landscape.md) | Industry AI landscape analysis |
 | [ADRs](docs/adrs/README.md) | Architecture Decision Records |
 
 ## Project Layout
 
 ```
-platform/        Streaming infrastructure (Flink, producers, ontology)
-domains/              Domain agents, scripts, skills, webapps
+container/            Docker Compose orchestration files
 deploy/               Helm charts, Docker Compose, monitoring
 docs/                 Full documentation suite
-scripts/              Cross-domain validation, shared lib
-container/            Docker Compose orchestration files
+domains/              Domain agents, scripts, skills, webapps
 monitoring/           Prometheus, Grafana, alerting configs
+platform/             Streaming infrastructure (Flink, producers, ontology)
+scripts/              Cross-domain validation, shared lib
 ```
 
 ## Safety Disclaimer

@@ -60,4 +60,4 @@ Trade-offs:
 - [Architecture](../02_architecture.md)
 - [MCP Layer Design](../05_ai_agents.md)
 - [Skills Layer](../05_ai_agents.md)
-- [Runbook](../09_operation_runbook.md)
+- [Runbook](../08_operation_runbook.md)

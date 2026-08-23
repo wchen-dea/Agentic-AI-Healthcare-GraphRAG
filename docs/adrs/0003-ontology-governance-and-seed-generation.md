@@ -73,6 +73,5 @@ Trade-offs:
 
 - [ADR-0001: Use dual persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
 - [ADR-0006: Skills layer standardization and validation](./0006-skills-layer-standardization-and-validation.md)
-- [Target Architecture](../03_target_architecture.md)
-- [Technical Specs](../06_technical_specs.md)
-- [Runbook](../09_operation_runbook.md)
+- [Platform Blueprint](../03_platform_blueprint.md)
+- [Runbook](../08_operation_runbook.md)
