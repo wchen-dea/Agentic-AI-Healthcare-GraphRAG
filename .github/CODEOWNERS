@@ -1,0 +1,12 @@
+# Ontology and terminology mappings require platform-team review
+platform/healthcare/ontology/          @wchen-dea
+platform/supply-chain/ontology/        @wchen-dea
+
+# Generated seed Cypher must stay in sync with ontology
+platform/healthcare/neo4j/generated_ontology_seeds.cypher   @wchen-dea
+platform/supply-chain/neo4j/generated_ontology_seeds.cypher  @wchen-dea
+
+# Validation scripts guard ontology integrity
+domains/healthcare/scripts/validate_ontology.py              @wchen-dea
+domains/healthcare/scripts/validate_terminology_coverage.py  @wchen-dea
+domains/healthcare/scripts/generate_ontology_seed_cypher.py  @wchen-dea

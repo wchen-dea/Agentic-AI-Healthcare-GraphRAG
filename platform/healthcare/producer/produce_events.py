@@ -862,17 +862,20 @@ def patient_reference_event():
     )
 
 
+PROVIDER_SPECIALTIES = [
+    "Cardiology", "Pulmonology", "Endocrinology", "Primary Care",
+    "Nephrology", "Neurology", "Oncology", "Orthopedics",
+    "Psychiatry", "Radiology", "Emergency Medicine", "Gastroenterology",
+    "Infectious Disease", "Rheumatology", "Hematology", "Hospitalist",
+]
+
+
 def provider_reference_event():
     provider = choose_provider_id()
     payload = {
         "provider_id": provider,
         "name": fake.name(),
-        "specialty": random.choice([
-            "Cardiology", "Pulmonology", "Endocrinology", "Primary Care",
-            "Nephrology", "Neurology", "Oncology", "Orthopedics",
-            "Psychiatry", "Radiology", "Emergency Medicine", "Gastroenterology",
-            "Infectious Disease", "Rheumatology", "Hematology", "Hospitalist",
-        ]),
+        "specialty": random.choice(PROVIDER_SPECIALTIES),
         "organization": random.choice([
             "City Hospital", "County Clinic", "Regional Health",
             "University Medical Center", "Community Health Network",

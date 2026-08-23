@@ -101,16 +101,18 @@ def trace_query(
     query_fn: Callable,
     *,
     top_k: int | None = None,
+    **extra_kwargs: Any,
 ) -> dict[str, Any]:
     """Execute a query function inside an MLflow trace.
 
     Creates a parent trace span containing the full pipeline, with
     metadata for the query mode and patient scope.
     """
+    kwargs: dict[str, Any] = {k: v for k, v in extra_kwargs.items() if v}
     if not mlflow_enabled():
         if top_k is not None:
-            return query_fn(question, patient_id, top_k)
-        return query_fn(question, patient_id)
+            return query_fn(question, patient_id, top_k, **kwargs)
+        return query_fn(question, patient_id, **kwargs)
 
     _ensure_experiment()
 
@@ -123,9 +125,9 @@ def trace_query(
         started = time.perf_counter()
 
         if top_k is not None:
-            result = query_fn(question, patient_id, top_k)
+            result = query_fn(question, patient_id, top_k, **kwargs)
         else:
-            result = query_fn(question, patient_id)
+            result = query_fn(question, patient_id, **kwargs)
 
         elapsed_ms = (time.perf_counter() - started) * 1000
         root.set_attributes({

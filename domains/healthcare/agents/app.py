@@ -451,7 +451,10 @@ def run_query(question: str, patient_id: str | None = None, top_k: int | None = 
     elif os.getenv("MLFLOW_TRACKING_URI"):
         from langgraph_agents.mlflow_tracing import trace_query
         mode = "react" if settings.react_enabled else "single_pass"
-        result = trace_query(question, patient_id, mode, _run_query_core, top_k=top_k)
+        result = trace_query(
+            question, patient_id, mode, _run_query_core,
+            top_k=top_k, structured=structured, session_context=session_context,
+        )
     else:
         result = _run_query_core(question, patient_id, top_k, structured=structured, session_context=session_context)
 
@@ -463,10 +466,13 @@ def run_query(question: str, patient_id: str | None = None, top_k: int | None = 
         result.setdefault("guardrails", {})["output_blocked"] = True
         result["guardrails"]["category"] = output_check.category
 
-    # Memory: store turn
+    # Memory: store turn and persist
     if session_id:
-        session = get_session_store().get_or_create(session_id)
+        store = get_session_store()
+        session = store.get_or_create(session_id)
         session.add_turn(question=question, answer=result.get("answer", ""), patient_id=patient_id)
+        if hasattr(store, "save"):
+            store.save(session)
 
     return result
 

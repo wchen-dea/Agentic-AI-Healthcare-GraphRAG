@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from domain.model_router import (
     ComplexityResult,
+    CostTracker,
+    LatencyTracker,
     ModelRouter,
     ModelTierConfig,
     classify_complexity,
@@ -160,6 +162,119 @@ class ModelRouterTests(unittest.TestCase):
 
         self.assertIn("signals", router.last_routing)
         self.assertIsInstance(router.last_routing["signals"], list)
+
+
+class LatencyTrackerTests(unittest.TestCase):
+    def test_empty_returns_zero(self):
+        tracker = LatencyTracker()
+        self.assertEqual(tracker.average_ms("complex"), 0.0)
+
+    def test_records_and_averages(self):
+        tracker = LatencyTracker(window=3)
+        tracker.record("complex", 100)
+        tracker.record("complex", 200)
+        tracker.record("complex", 300)
+        self.assertAlmostEqual(tracker.average_ms("complex"), 200.0)
+
+    def test_exceeds_target(self):
+        tracker = LatencyTracker()
+        tracker.record("complex", 5000)
+        self.assertTrue(tracker.exceeds_target("complex", 2000))
+
+    def test_does_not_exceed_zero_target(self):
+        tracker = LatencyTracker()
+        tracker.record("complex", 99999)
+        self.assertFalse(tracker.exceeds_target("complex", 0))
+
+
+class CostTrackerTests(unittest.TestCase):
+    def test_starts_at_zero(self):
+        tracker = CostTracker()
+        self.assertEqual(tracker.current_hourly_cost(), 0.0)
+
+    def test_accumulates_cost(self):
+        tracker = CostTracker()
+        tracker.record("openai", 1000)
+        self.assertGreater(tracker.current_hourly_cost(), 0.0)
+
+    def test_ollama_is_free(self):
+        tracker = CostTracker()
+        tracker.record("ollama", 1000)
+        self.assertEqual(tracker.current_hourly_cost(), 0.0)
+
+    def test_exceeds_budget(self):
+        tracker = CostTracker()
+        tracker.record("openai", 1000000)
+        self.assertTrue(tracker.exceeds_budget(0.01))
+
+    def test_does_not_exceed_zero_budget(self):
+        tracker = CostTracker()
+        tracker.record("openai", 1000000)
+        self.assertFalse(tracker.exceeds_budget(0))
+
+
+class LatencyDowngradeTests(unittest.TestCase):
+    def _make_provider(self, response="test response"):
+        provider = Mock()
+        provider.generate.return_value = response
+        provider.configured_model = "default-model"
+        return provider
+
+    def test_downgrades_when_latency_exceeds_target(self):
+        provider = self._make_provider()
+        config = ModelTierConfig(simple="small", moderate="medium", complex="large", latency_target_ms=100)
+        router = ModelRouter(providers={"ollama": provider}, tier_config=config, default_provider_name="ollama")
+
+        # Simulate high latency for complex tier
+        for _ in range(5):
+            router.latency_tracker.record("complex", 5000)
+
+        router.generate(
+            prompt="test", timeout_seconds=60, max_tokens=100,
+            question="Analyze drug-drug interactions and contraindications with risk stratification",
+        )
+
+        self.assertEqual(router.last_routing["original_tier"], "complex")
+        self.assertEqual(router.last_routing["tier"], "moderate")
+        self.assertTrue(router.last_routing["downgraded"])
+
+    def test_no_downgrade_when_under_target(self):
+        provider = self._make_provider()
+        config = ModelTierConfig(simple="small", moderate="medium", complex="large", latency_target_ms=10000)
+        router = ModelRouter(providers={"ollama": provider}, tier_config=config, default_provider_name="ollama")
+
+        router.generate(
+            prompt="test", timeout_seconds=60, max_tokens=100,
+            question="Analyze drug-drug interactions and contraindications",
+        )
+
+        self.assertFalse(router.last_routing["downgraded"])
+
+    def test_cost_budget_forces_downgrade(self):
+        provider = self._make_provider()
+        config = ModelTierConfig(simple="small", moderate="medium", complex="large", cost_budget_hourly_usd=0.001)
+        router = ModelRouter(providers={"ollama": provider}, tier_config=config, default_provider_name="ollama")
+
+        # Exhaust budget
+        router.cost_tracker.record("openai", 1000000)
+
+        router.generate(
+            prompt="test", timeout_seconds=60, max_tokens=100,
+            question="Analyze drug-drug interactions and contraindications with risk stratification",
+        )
+
+        self.assertTrue(router.last_routing["downgraded"])
+
+    def test_routing_includes_latency_and_cost(self):
+        provider = self._make_provider()
+        config = ModelTierConfig(simple="s", moderate="m", complex="c")
+        router = ModelRouter(providers={"ollama": provider}, tier_config=config, default_provider_name="ollama")
+
+        router.generate(prompt="test", timeout_seconds=60, max_tokens=100, question="hello")
+
+        self.assertIn("latency_ms", router.last_routing)
+        self.assertIn("hourly_cost_usd", router.last_routing)
+        self.assertIn("downgraded", router.last_routing)
 
 
 if __name__ == "__main__":

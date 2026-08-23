@@ -1,7 +1,14 @@
-version: 0.1.0
-status: draft
+version: 0.2.0
+status: active
 owner: platform-team
 purpose: Standard terminology bindings and local-to-standard mapping inventory.
+governance:
+  review_required: true
+  codeowners: .github/CODEOWNERS
+  ci_gates:
+  - domains/healthcare/scripts/validate_terminology_coverage.py
+  - domains/healthcare/scripts/validate_ontology_drift.py
+  change_process: PRs touching ontology/ require platform-team review and passing CI gates
 standard_systems:
 - id: ICD10
   canonical_uri: https://hl7.org/fhir/sid/icd-10-cm

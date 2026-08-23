@@ -1,15 +1,25 @@
-"""Dynamic model routing based on query complexity.
+"""Dynamic model routing based on query complexity, latency, and cost.
 
 Classifies queries into complexity tiers and routes to the appropriate
-model. In dev all tiers default to the same model (zero config change).
+model. Tracks per-tier latency and enforces cost budgets.
+
+In dev all tiers default to the same model (zero config change).
 In production, set LLM_MODEL_SIMPLE / LLM_MODEL_MODERATE / LLM_MODEL_COMPLEX
 to route to different providers or model sizes.
+
+Latency-based routing: if a tier's rolling average latency exceeds
+LATENCY_TARGET_MS, the router downgrades to the next cheaper tier.
+
+Cost tracking: each request estimates token cost and accumulates against
+a configurable hourly budget (COST_BUDGET_HOURLY_USD).
 """
 from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+import time
+from collections import deque
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 ComplexityTier = Literal["simple", "moderate", "complex"]
@@ -97,6 +107,8 @@ class ModelTierConfig:
     simple: str
     moderate: str
     complex: str
+    latency_target_ms: float = 0.0
+    cost_budget_hourly_usd: float = 0.0
 
     def model_for_tier(self, tier: ComplexityTier) -> str:
         return getattr(self, tier)
@@ -107,26 +119,111 @@ class ModelTierConfig:
             simple=os.getenv("LLM_MODEL_SIMPLE", default_model),
             moderate=os.getenv("LLM_MODEL_MODERATE", default_model),
             complex=os.getenv("LLM_MODEL_COMPLEX", default_model),
+            latency_target_ms=float(os.getenv("LLM_LATENCY_TARGET_MS", "0")),
+            cost_budget_hourly_usd=float(os.getenv("LLM_COST_BUDGET_HOURLY_USD", "0")),
         )
 
     def is_uniform(self) -> bool:
         return self.simple == self.moderate == self.complex
 
 
+# Per-token cost estimates (USD) by provider prefix
+_DEFAULT_COST_PER_TOKEN: dict[str, float] = {
+    "openai": 0.000015,
+    "anthropic": 0.000015,
+    "ollama": 0.0,
+}
+
+_TIER_DOWNGRADE: dict[ComplexityTier, ComplexityTier] = {
+    "complex": "moderate",
+    "moderate": "simple",
+    "simple": "simple",
+}
+
+
+class LatencyTracker:
+    """Rolling average latency per tier."""
+
+    def __init__(self, window: int = 20):
+        self._window = window
+        self._samples: dict[str, deque[float]] = {}
+
+    def record(self, tier: str, latency_ms: float) -> None:
+        if tier not in self._samples:
+            self._samples[tier] = deque(maxlen=self._window)
+        self._samples[tier].append(latency_ms)
+
+    def average_ms(self, tier: str) -> float:
+        samples = self._samples.get(tier)
+        if not samples:
+            return 0.0
+        return sum(samples) / len(samples)
+
+    def exceeds_target(self, tier: str, target_ms: float) -> bool:
+        if target_ms <= 0:
+            return False
+        return self.average_ms(tier) > target_ms
+
+
+class CostTracker:
+    """Hourly cost accumulator with budget enforcement."""
+
+    def __init__(self):
+        self._hour_start: float = time.time()
+        self._hour_cost: float = 0.0
+
+    def _maybe_reset(self) -> None:
+        now = time.time()
+        if now - self._hour_start >= 3600:
+            self._hour_start = now
+            self._hour_cost = 0.0
+
+    def record(self, provider_prefix: str, token_count: int) -> None:
+        self._maybe_reset()
+        cost_per_token = _DEFAULT_COST_PER_TOKEN.get(provider_prefix, 0.000010)
+        self._hour_cost += cost_per_token * token_count
+
+    def current_hourly_cost(self) -> float:
+        self._maybe_reset()
+        return self._hour_cost
+
+    def exceeds_budget(self, budget_usd: float) -> bool:
+        if budget_usd <= 0:
+            return False
+        self._maybe_reset()
+        return self._hour_cost >= budget_usd
+
+
 class ModelRouter:
-    """Selects model based on query complexity, delegates to underlying providers."""
+    """Selects model based on query complexity, latency, and cost budget."""
 
     def __init__(self, *, providers: dict[str, Any], tier_config: ModelTierConfig, default_provider_name: str) -> None:
         self.providers = providers
         self.tier_config = tier_config
         self.default_provider_name = default_provider_name
         self._last_routing: dict[str, Any] | None = None
+        self.latency_tracker = LatencyTracker()
+        self.cost_tracker = CostTracker()
 
     def _resolve_provider_and_model(self, model_spec: str) -> tuple[Any, str]:
         if ":" in model_spec and model_spec.split(":", 1)[0] in self.providers:
             provider_name, model_name = model_spec.split(":", 1)
             return self.providers[provider_name], model_name
         return self.providers[self.default_provider_name], model_spec
+
+    def _provider_prefix(self, model_spec: str) -> str:
+        if ":" in model_spec:
+            return model_spec.split(":", 1)[0]
+        return self.default_provider_name
+
+    def _maybe_downgrade_tier(self, tier: ComplexityTier) -> ComplexityTier:
+        """Downgrade tier if latency target exceeded or cost budget exhausted."""
+        effective = tier
+        if self.latency_tracker.exceeds_target(effective, self.tier_config.latency_target_ms):
+            effective = _TIER_DOWNGRADE[effective]
+        if self.cost_tracker.exceeds_budget(self.tier_config.cost_budget_hourly_usd):
+            effective = _TIER_DOWNGRADE.get(effective, "simple")
+        return effective
 
     def generate(
         self,
@@ -138,7 +235,9 @@ class ModelRouter:
         question: str = "",
     ) -> str:
         complexity = classify_complexity(question or prompt[:200])
-        model_spec = self.tier_config.model_for_tier(complexity.tier)
+        original_tier = complexity.tier
+        effective_tier = self._maybe_downgrade_tier(original_tier)
+        model_spec = self.tier_config.model_for_tier(effective_tier)
         provider, model_override = self._resolve_provider_and_model(model_spec)
 
         if hasattr(provider, "configured_model"):
@@ -150,12 +249,7 @@ class ModelRouter:
         else:
             original_model = None
 
-        self._last_routing = {
-            "tier": complexity.tier,
-            "score": complexity.score,
-            "signals": complexity.signals,
-            "model": model_spec,
-        }
+        start_ms = time.time() * 1000
 
         try:
             result = provider.generate(
@@ -170,6 +264,23 @@ class ModelRouter:
                     provider.configured_model = original_model
                 elif hasattr(provider, "model"):
                     provider.model = original_model
+
+        latency_ms = time.time() * 1000 - start_ms
+        self.latency_tracker.record(effective_tier, latency_ms)
+
+        token_estimate = max(len(result.split()), 1) if not result.startswith("LLM error:") else 0
+        self.cost_tracker.record(self._provider_prefix(model_spec), token_estimate)
+
+        self._last_routing = {
+            "tier": effective_tier,
+            "original_tier": original_tier,
+            "downgraded": effective_tier != original_tier,
+            "score": complexity.score,
+            "signals": complexity.signals,
+            "model": model_spec,
+            "latency_ms": round(latency_ms, 1),
+            "hourly_cost_usd": round(self.cost_tracker.current_hourly_cost(), 6),
+        }
 
         return result
 

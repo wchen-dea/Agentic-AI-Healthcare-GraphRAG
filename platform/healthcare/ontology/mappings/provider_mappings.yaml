@@ -1,22 +1,78 @@
-version: 0.1.0
-status: draft
+version: 0.2.0
+status: active
 owner: platform-team
-purpose: Provider-specific terminology mappings separated from the generic vocabulary inventory.
+purpose: Provider specialty terminology mappings with NUCC taxonomy codes.
 local_mappings:
   provider_specialties:
   - local_code: cardiology
-    standard_system: NUCC_TAXONOMY_GROUPING
-    standard_code: TBD
-    display: Cardiology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RC0000X
+    display: Cardiovascular Disease
   - local_code: internal medicine
-    standard_system: NUCC_TAXONOMY_GROUPING
-    standard_code: TBD
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207R00000X
     display: Internal Medicine
   - local_code: family medicine
-    standard_system: NUCC_TAXONOMY_GROUPING
-    standard_code: TBD
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207Q00000X
     display: Family Medicine
   - local_code: pulmonology
-    standard_system: NUCC_TAXONOMY_GROUPING
-    standard_code: TBD
-    display: Pulmonology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RP1001X
+    display: Pulmonary Disease
+  - local_code: endocrinology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RE0101X
+    display: Endocrinology, Diabetes and Metabolism
+  - local_code: primary care
+    standard_system: NUCC_TAXONOMY
+    standard_code: 208D00000X
+    display: General Practice
+  - local_code: nephrology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RN0300X
+    display: Nephrology
+  - local_code: neurology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 2084N0400X
+    display: Neurology
+  - local_code: oncology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RX0202X
+    display: Medical Oncology
+  - local_code: orthopedics
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207X00000X
+    display: Orthopaedic Surgery
+  - local_code: psychiatry
+    standard_system: NUCC_TAXONOMY
+    standard_code: 2084P0800X
+    display: Psychiatry
+  - local_code: radiology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 2085R0202X
+    display: Diagnostic Radiology
+  - local_code: emergency medicine
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207P00000X
+    display: Emergency Medicine
+  - local_code: gastroenterology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RG0100X
+    display: Gastroenterology
+  - local_code: infectious disease
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RI0200X
+    display: Infectious Disease
+  - local_code: rheumatology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RR0500X
+    display: Rheumatology
+  - local_code: hematology
+    standard_system: NUCC_TAXONOMY
+    standard_code: 207RH0003X
+    display: Hematology and Oncology
+  - local_code: hospitalist
+    standard_system: NUCC_TAXONOMY
+    standard_code: 208M00000X
+    display: Hospitalist
