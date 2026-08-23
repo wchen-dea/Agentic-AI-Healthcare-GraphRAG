@@ -1032,8 +1032,6 @@ Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/work
 
 ### Exit criteria
 
-### Exit criteria
-
 - [ ] Retrieval and grounding quality gates are required checks on pull requests
 - [ ] Ontology and policy drift checks block merges
 - [ ] Production promotion includes explicit SLO gates and rollback criteria

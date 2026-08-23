@@ -451,7 +451,10 @@ def run_query(question: str, patient_id: str | None = None, top_k: int | None = 
     elif os.getenv("MLFLOW_TRACKING_URI"):
         from langgraph_agents.mlflow_tracing import trace_query
         mode = "react" if settings.react_enabled else "single_pass"
-        result = trace_query(question, patient_id, mode, _run_query_core, top_k=top_k)
+        result = trace_query(
+            question, patient_id, mode, _run_query_core,
+            top_k=top_k, structured=structured, session_context=session_context,
+        )
     else:
         result = _run_query_core(question, patient_id, top_k, structured=structured, session_context=session_context)
 
