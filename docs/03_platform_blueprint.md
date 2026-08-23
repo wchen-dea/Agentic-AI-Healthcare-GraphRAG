@@ -44,19 +44,20 @@ What is implemented today:
 - domain-routed embeddings use named Qdrant vectors (`clinical`, `claims`, `device`) with per-domain model configurability (`platform/shared/embedding.py`),
 - structured output generation via JSON-mode constrained prompts (`domain/structured_output.py`) with Pydantic response models,
 - input/output guardrails with classifier-based injection detection, off-topic filtering, and grounding validation (`domain/guardrails.py`),
-- session-scoped conversation memory with TTL expiry (`domain/memory.py`),
+- session-scoped and cross-session conversation memory with pluggable Redis persistence (`domain/memory.py`),
 - evaluation-gated CI with configurable quality thresholds (`domain/evaluation_gates.py`),
 - MCP surface includes 10 clinical workflow tools (`skills_plan_get`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`, and others),
 - planner quality checks exist (`test_planner_evaluation.py`, `test_planner_edge_cases.py`) in addition to API contract tests,
 - LangGraph multi-agent orchestration with eight specialized nodes is implemented behind the `RAG_API_LANGGRAPH_ENABLED` feature flag,
 - MLflow tracing with nested span hierarchy and healthcare-specific evaluation harness is implemented behind the `MLFLOW_TRACKING_URI` feature flag,
-- LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`.
+- LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`,
+- terminology mappings cover all 6 producer vocabularies at 100% (LAB→LOINC, ICD-10, MED→RxNorm, CPT, Specialty→NUCC, Payer→NAIC),
+- ontology governance enforced via CODEOWNERS, drift detection CI gate (`validate_ontology_drift.py`), and terminology coverage CI gate (`validate_terminology_coverage.py`).
 
 ## Open Gaps
 
 Infrastructure and governance gaps:
 
-- terminology mappings are still partial and need broader vocabulary coverage and stronger governance workflows,
 - planner logic is currently heuristic and requires benchmark-driven route quality evaluation,
 - multi-provider production contract testing is pending,
 - retrieval benchmarks and grounded-answer scorecards remain limited,
@@ -66,7 +67,6 @@ AI-capability gaps (see [Part III](#part-iii--delivery-backlog) for detailed bac
 
 - schema-constrained decoding (grammar-enforced JSON) beyond current JSON-mode prompting,
 - latency-based model routing and cost budget tracking beyond current complexity-based tier selection,
-- persistent cross-session memory store (Redis/Postgres) beyond current session-scoped TTL,
 - dedicated ML guardrail model (Llama Guard) beyond current regex-based classifier,
 - streaming responses (SSE) to client UIs,
 - hard evaluation gate promotion once baseline quality is stable,
@@ -185,7 +185,7 @@ The ontology layer is implemented under `platform/healthcare/ontology/` and cons
 | --- | --- | --- |
 | Clinical entity ontology | `entities.yaml` | Implemented — defines canonical concepts (Patient, Encounter, ClinicalEvent, Observation, Condition, Medication, SourceSystem, etc.) |
 | Relationship ontology | `relationships.yaml` | Implemented — defines allowed edges (HAS_CONDITION, INTERACTS_WITH, MAY_INDICATE, CONTRAINDICATED_FOR, etc.) |
-| Terminology mappings | `mappings/*.yaml` | Implemented — partial vocabulary coverage; broader mapping governance is a backlog item |
+| Terminology mappings | `mappings/*.yaml` | Implemented — 100% coverage across 8 mapping files (36 labs, 52 ICD-10, 48 medications, 36 CPT, 16 specialties, 20 payers); validated by CI coverage gate |
 | Provenance and policy | `provenance.yaml` | Implemented — defines source trust, PHI class, and retention class |
 | Graph seeds | `graph_seeds.yaml` | Implemented — drug safety relationships generated into `generated_ontology_seeds.cypher` |
 | Domain rules | `rules/lab_signals.yaml`, `rules/drug_safety.yaml`, `rules/claims_outcomes.yaml` | Implemented — 14 lab rules, drug interaction/reaction/contraindication rules, 6 claims outcome rules |
@@ -216,7 +216,6 @@ platform/healthcare/ontology/
 
 ### Remaining ontology work
 
-- Widen standard-code mapping coverage (LOINC, RxNorm, SNOMED CT depth).
 - Add formal ontology conformance tests that block CI on schema drift.
 - Add entity resolution policies beyond source-ID-based matching.
 - Validate that runtime graph merges conform to declared relationship cardinality constraints.
@@ -266,7 +265,7 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 | --- | --- | --- | --- |
 | Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `platform/healthcare/schemas/medical_event.avsc`, `docs/04_data_platform.md`, `platform/healthcare/producer/produce_events.py` |
 | Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `platform/healthcare/flink-app/app/` |
-| Terminology mapping | partial ICD-10, MedDRA, and CPT mappings implemented across 9 YAML files | governed mapping packs with broader LOINC, RxNorm, SNOMED CT coverage | `platform/healthcare/ontology/vocabularies.yaml` and mapping files |
+| Terminology mapping | 100% coverage: 36 labs→LOINC, 52 ICD-10, 48 meds→RxNorm, 36 CPT, 16 specialties→NUCC, 20 payers→NAIC across 8 mapping files; CI coverage gate enforces thresholds | governed mapping packs with broader SNOMED CT depth and formal governance workflows | `platform/healthcare/ontology/mappings/*.yaml`, `domains/healthcare/scripts/validate_terminology_coverage.py` |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
 | Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/04_data_platform.md`, `platform/healthcare/neo4j/init.cypher`, Flink graph writes |
 | Vector retrieval | domain-routed embedding (clinical / claims / device) with MiniLM-L6-v2, named Qdrant vectors, and query-time domain classification via `domain/retrieval.py` | neural reranking, domain-tuned models, optional cross-encoder | `domains/healthcare/agents/domain/retrieval.py`, `platform/shared/embedding.py`, `platform/healthcare/flink-app/app/text_processing.py` |
@@ -829,7 +828,7 @@ Both jobs run in parallel. Neither requires live external services (all dependen
 Production deployment workflow using Helm. Deploys the `deploy/helm/` chart with `values-production.yaml` to AWS EKS.
 
 **File:** `.github/workflows/ontology-conformance.yml`  
-Includes ontology and pipeline checks plus `terminology-coverage-gate` that runs `python domains/healthcare/scripts/validate_terminology_coverage.py` and fails when LAB/CPT/ICD-10 mapping coverage drops below configured thresholds.
+Includes ontology and pipeline checks plus `terminology-coverage-gate` that runs `python domains/healthcare/scripts/validate_terminology_coverage.py` and fails when LAB/CPT/ICD-10/MED/Specialty/Payer mapping coverage drops below configured thresholds.
 
 ---
 
@@ -878,6 +877,9 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `TERMINOLOGY_COVERAGE_THRESHOLD_LABS` | `0.95` | CI/scripts | Minimum lab mapping coverage threshold |
 | `TERMINOLOGY_COVERAGE_THRESHOLD_CPT` | `0.95` | CI/scripts | Minimum CPT mapping coverage threshold |
 | `TERMINOLOGY_COVERAGE_THRESHOLD_ICD10` | `0.95` | CI/scripts | Minimum ICD-10 mapping coverage threshold |
+| `TERMINOLOGY_COVERAGE_THRESHOLD_MEDS` | `0.90` | CI/scripts | Minimum medication mapping coverage threshold |
+| `TERMINOLOGY_COVERAGE_THRESHOLD_PROVIDERS` | `0.90` | CI/scripts | Minimum provider specialty mapping coverage threshold |
+| `TERMINOLOGY_COVERAGE_THRESHOLD_PAYERS` | `0.90` | CI/scripts | Minimum payer mapping coverage threshold |
 | `CONDUKTOR_POSTGRES_PASSWORD` | `change_me` | conduktor-postgres | Postgres password |
 | `CONDUKTOR_ADMIN_PASSWORD` | `Admin@123!` | conduktor-console | Console admin password |
 | `GRAFANA_ADMIN_PASSWORD` | `admin123` | grafana | Grafana admin password |
@@ -919,16 +921,22 @@ Completed or largely implemented:
 - domain-routed embeddings with named Qdrant vectors and per-domain model configurability (`platform/shared/embedding.py`),
 - structured output generation via JSON-mode constrained prompts (`domain/structured_output.py`),
 - input/output guardrails with classifier-based injection detection and grounding validation (`domain/guardrails.py`),
-- session-scoped conversation memory with TTL expiry (`domain/memory.py`),
+- session-scoped and cross-session conversation memory with pluggable Redis persistence (`domain/memory.py`),
 - evaluation-gated CI with configurable quality thresholds (`domain/evaluation_gates.py`),
 - LangGraph multi-agent orchestration with eight specialized nodes and conditional routing (feature-flagged),
 - MLflow tracing with nested span hierarchy across agent nodes, retrievers, and LLM calls (feature-flagged),
 - MLflow evaluation harness with six healthcare-specific scorers and cross-mode comparison,
 - LangSmith integration for LangGraph pipeline tracing.
 
+Terminology and governance:
+
+- 100% terminology mapping coverage across 6 vocabulary domains with CI enforcement,
+- ontology governance via CODEOWNERS, drift detection CI gate, and terminology coverage gate,
+- all mapping files at version 0.2.0 active with no TBD codes.
+
 Partially implemented:
 
-- terminology governance breadth and mapping coverage,
+- ontology conformance test depth (relationship cardinality constraints pending),
 - ontology conformance and retrieval quality benchmark depth,
 - provider abstraction production test coverage (adapters implemented, failover contract tests pending),
 - production privacy, policy, and rollout controls,
@@ -962,7 +970,7 @@ flowchart LR
 | Stage | Focus | Status | Remaining work |
 | --- | --- | --- | --- |
 | 0 | Documentation and semantic contract baseline | Completed | — |
-| 1 | Ontology externalization and normalization | Largely completed | Widen mapping coverage (LOINC, RxNorm, SNOMED CT depth) |
+| 1 | Ontology externalization and normalization | Completed | Formal conformance tests for relationship cardinality |
 | 2 | Query planner and evidence ranking | Completed | — |
 | 3 | Skill-composed MCP expansion | Completed | — |
 | 3.5 | Multi-agent orchestration and tracing | Implemented (feature-flagged) | Production hardening |
@@ -975,11 +983,12 @@ flowchart LR
 
 ### Stage 1 — Ontology governance depth
 
-- [ ] Widen standard-code mapping coverage (LOINC, RxNorm, SNOMED CT)
-- [ ] Strengthen governance workflow for mapping updates
-- [ ] Add ontology drift detection that fails CI on parity mismatch
+- [x] 100% mapping coverage across all 6 vocabulary domains (LAB, CPT, ICD-10, MED, Specialty, Payer)
+- [x] Governance workflow: CODEOWNERS for ontology paths, drift detection CI gate, terminology coverage CI gate
+- [x] Mapping version consistency and TBD-code enforcement via `validate_ontology_drift.py`
+- [ ] Formal ontology conformance tests for relationship cardinality constraints
 
-Touchpoints: `platform/healthcare/ontology/`, `domains/healthcare/scripts/validate_ontology.py`, `.github/workflows/ontology-conformance.yml`
+Touchpoints: `platform/healthcare/ontology/`, `domains/healthcare/scripts/validate_ontology_drift.py`, `.github/workflows/ontology-conformance.yml`
 
 ### Stage 4 — Evaluation hardening
 
@@ -1005,7 +1014,7 @@ Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/work
 |---|------|--------|-----------|
 | 1 | Structured output generation | **Implemented** | Schema-constrained decoding (grammar-enforced JSON) |
 | 2 | Dynamic model routing | **Implemented** | Latency-based routing, cost budget tracking, token metering |
-| 3 | Persistent agent memory | **Partial** | Persistent store (Redis/Postgres) for cross-session and patient-scoped memory |
+| 3 | Persistent agent memory | **Implemented** | Patient-scoped memory (per-patient context across sessions) |
 | 4 | Input-side guardrails | **Implemented** | Dedicated ML model (Llama Guard) |
 | 5 | Streaming responses (SSE) | Pending | FastAPI StreamingResponse to provider web UI |
 | 6 | Evaluation-gated CI/CD | **Implemented** | Promote to hard gate when baseline is stable |
@@ -1028,19 +1037,17 @@ Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/work
 
 1. **Stage 4** — Retrieval and grounding benchmark suites
 2. **Stage 4** — Provider failover contract tests
-3. **Stage 1** — Terminology/ontology mapping coverage deepening
-4. **Stage 5** — Policy-as-code and PHI boundaries
-5. **Stage 5** — SLO gates and deployment playbooks
-6. **Stage 6** — Streaming responses, adversarial evaluation
+3. **Stage 5** — Policy-as-code and PHI boundaries
+4. **Stage 5** — SLO gates and deployment playbooks
+5. **Stage 6** — Streaming responses, adversarial evaluation
 
 ## Sprint Plan
 
-### Sprint 1: Quality hardening (Stages 1 + 4)
+### Sprint 1: Quality hardening (Stage 4)
 
 - [ ] Retrieval benchmark gate with CI artifact
 - [ ] Grounded-answer scorecard with failure taxonomy
 - [ ] Evidence fusion reranking (deterministic cross-source)
-- [ ] Ontology mapping coverage report and drift detection
 
 ### Sprint 2: Production readiness (Stages 4 + 5)
 

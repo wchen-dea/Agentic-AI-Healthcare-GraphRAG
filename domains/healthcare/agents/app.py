@@ -463,10 +463,13 @@ def run_query(question: str, patient_id: str | None = None, top_k: int | None = 
         result.setdefault("guardrails", {})["output_blocked"] = True
         result["guardrails"]["category"] = output_check.category
 
-    # Memory: store turn
+    # Memory: store turn and persist
     if session_id:
-        session = get_session_store().get_or_create(session_id)
+        store = get_session_store()
+        session = store.get_or_create(session_id)
         session.add_turn(question=question, answer=result.get("answer", ""), patient_id=patient_id)
+        if hasattr(store, "save"):
+            store.save(session)
 
     return result
 
