@@ -1,8 +1,201 @@
-version: 0.1.0
-status: draft
+version: 0.2.0
+status: active
 owner: platform-team
-purpose: Medication reference semantics separated from the generic vocabulary inventory.
+purpose: Medication terminology mapping with RxNorm codes and drug class coverage.
 local_mappings:
+  medications:
+  - local_code: Warfarin
+    standard_system: RXNORM
+    standard_code: "11289"
+    display: warfarin
+  - local_code: Metformin
+    standard_system: RXNORM
+    standard_code: "6809"
+    display: metformin
+  - local_code: Lisinopril
+    standard_system: RXNORM
+    standard_code: "29046"
+    display: lisinopril
+  - local_code: Azithromycin
+    standard_system: RXNORM
+    standard_code: "18631"
+    display: azithromycin
+  - local_code: Albuterol
+    standard_system: RXNORM
+    standard_code: "435"
+    display: albuterol
+  - local_code: Amlodipine
+    standard_system: RXNORM
+    standard_code: "17767"
+    display: amlodipine
+  - local_code: Atorvastatin
+    standard_system: RXNORM
+    standard_code: "83367"
+    display: atorvastatin
+  - local_code: Omeprazole
+    standard_system: RXNORM
+    standard_code: "7646"
+    display: omeprazole
+  - local_code: Losartan
+    standard_system: RXNORM
+    standard_code: "52175"
+    display: losartan
+  - local_code: Metoprolol
+    standard_system: RXNORM
+    standard_code: "6918"
+    display: metoprolol
+  - local_code: Levothyroxine
+    standard_system: RXNORM
+    standard_code: "10582"
+    display: levothyroxine
+  - local_code: Gabapentin
+    standard_system: RXNORM
+    standard_code: "25480"
+    display: gabapentin
+  - local_code: Sertraline
+    standard_system: RXNORM
+    standard_code: "36437"
+    display: sertraline
+  - local_code: Hydrochlorothiazide
+    standard_system: RXNORM
+    standard_code: "5487"
+    display: hydrochlorothiazide
+  - local_code: Prednisone
+    standard_system: RXNORM
+    standard_code: "8640"
+    display: prednisone
+  - local_code: Amoxicillin
+    standard_system: RXNORM
+    standard_code: "723"
+    display: amoxicillin
+  - local_code: Heparin
+    standard_system: RXNORM
+    standard_code: "5224"
+    display: heparin
+  - local_code: Insulin Glargine
+    standard_system: RXNORM
+    standard_code: "274783"
+    display: insulin glargine
+  - local_code: Vancomycin
+    standard_system: RXNORM
+    standard_code: "11124"
+    display: vancomycin
+  - local_code: Morphine
+    standard_system: RXNORM
+    standard_code: "7052"
+    display: morphine
+  - local_code: Furosemide
+    standard_system: RXNORM
+    standard_code: "4603"
+    display: furosemide
+  - local_code: Clopidogrel
+    standard_system: RXNORM
+    standard_code: "32968"
+    display: clopidogrel
+  - local_code: Spironolactone
+    standard_system: RXNORM
+    standard_code: "9997"
+    display: spironolactone
+  - local_code: Dexamethasone
+    standard_system: RXNORM
+    standard_code: "3264"
+    display: dexamethasone
+  - local_code: Aspirin
+    standard_system: RXNORM
+    standard_code: "1191"
+    display: aspirin
+  - local_code: Insulin Lispro
+    standard_system: RXNORM
+    standard_code: "86009"
+    display: insulin lispro
+  - local_code: Enoxaparin
+    standard_system: RXNORM
+    standard_code: "67108"
+    display: enoxaparin
+  - local_code: Ceftriaxone
+    standard_system: RXNORM
+    standard_code: "2193"
+    display: ceftriaxone
+  - local_code: Piperacillin-Tazobactam
+    standard_system: RXNORM
+    standard_code: "139462"
+    display: piperacillin / tazobactam
+  - local_code: Levofloxacin
+    standard_system: RXNORM
+    standard_code: "82122"
+    display: levofloxacin
+  - local_code: Apixaban
+    standard_system: RXNORM
+    standard_code: "1364430"
+    display: apixaban
+  - local_code: Rivaroxaban
+    standard_system: RXNORM
+    standard_code: "1114195"
+    display: rivaroxaban
+  - local_code: Diltiazem
+    standard_system: RXNORM
+    standard_code: "3443"
+    display: diltiazem
+  - local_code: Carvedilol
+    standard_system: RXNORM
+    standard_code: "20352"
+    display: carvedilol
+  - local_code: Nitroglycerin
+    standard_system: RXNORM
+    standard_code: "7417"
+    display: nitroglycerin
+  - local_code: Pantoprazole
+    standard_system: RXNORM
+    standard_code: "40790"
+    display: pantoprazole
+  - local_code: Famotidine
+    standard_system: RXNORM
+    standard_code: "4278"
+    display: famotidine
+  - local_code: Ondansetron
+    standard_system: RXNORM
+    standard_code: "26225"
+    display: ondansetron
+  - local_code: Acetaminophen
+    standard_system: RXNORM
+    standard_code: "161"
+    display: acetaminophen
+  - local_code: Ibuprofen
+    standard_system: RXNORM
+    standard_code: "5640"
+    display: ibuprofen
+  - local_code: Cefepime
+    standard_system: RXNORM
+    standard_code: "20481"
+    display: cefepime
+  - local_code: Meropenem
+    standard_system: RXNORM
+    standard_code: "29561"
+    display: meropenem
+  - local_code: Linezolid
+    standard_system: RXNORM
+    standard_code: "190376"
+    display: linezolid
+  - local_code: Digoxin
+    standard_system: RXNORM
+    standard_code: "3407"
+    display: digoxin
+  - local_code: Sacubitril-Valsartan
+    standard_system: RXNORM
+    standard_code: "1656328"
+    display: sacubitril / valsartan
+  - local_code: Empagliflozin
+    standard_system: RXNORM
+    standard_code: "1545653"
+    display: empagliflozin
+  - local_code: Tamsulosin
+    standard_system: RXNORM
+    standard_code: "77492"
+    display: tamsulosin
+  - local_code: Hydralazine
+    standard_system: RXNORM
+    standard_code: "5470"
+    display: hydralazine
   medication_drug_classes:
   - local_code: Anticoagulant
     standard_system: LOCAL_DRUG_CLASS
@@ -64,6 +257,50 @@ local_mappings:
     standard_system: LOCAL_DRUG_CLASS
     standard_code: antiplatelet
     display: Antiplatelet
+  - local_code: Calcium Channel Blocker
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: calcium_channel_blocker
+    display: Calcium Channel Blocker
+  - local_code: Vasodilator
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: vasodilator
+    display: Vasodilator
+  - local_code: H2 Blocker
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: h2_blocker
+    display: H2 Blocker
+  - local_code: Antiemetic
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: antiemetic
+    display: Antiemetic
+  - local_code: Analgesic
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: analgesic
+    display: Analgesic
+  - local_code: NSAID
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: nsaid
+    display: NSAID
+  - local_code: Cardiac Glycoside
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: cardiac_glycoside
+    display: Cardiac Glycoside
+  - local_code: Heart Failure Therapy
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: heart_failure_therapy
+    display: Heart Failure Therapy
+  - local_code: Alpha Blocker
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: alpha_blocker
+    display: Alpha Blocker
+  - local_code: SGLT2 Inhibitor
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: sglt2_inhibitor
+    display: SGLT2 Inhibitor
+  - local_code: Insulin
+    standard_system: LOCAL_DRUG_CLASS
+    standard_code: insulin
+    display: Insulin
   medication_safety_tiers:
   - local_code: routine
     standard_system: LOCAL_MEDICATION_SAFETY_TIER

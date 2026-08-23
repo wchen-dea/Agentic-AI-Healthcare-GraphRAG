@@ -1,7 +1,7 @@
-version: 0.1.0
-status: draft
+version: 0.2.0
+status: active
 owner: platform-team
-purpose: Expanded local ICD-10 diagnosis coding coverage for synthetic encounter and claim generation.
+purpose: ICD-10 diagnosis coding coverage for healthcare event normalization.
 local_mappings:
   icd10_diagnoses:
   - local_code: I10
@@ -84,3 +84,131 @@ local_mappings:
     standard_system: ICD10
     standard_code: M79.1
     display: Myalgia
+  - local_code: J45.909
+    standard_system: ICD10
+    standard_code: J45.909
+    display: Unspecified asthma, uncomplicated
+  - local_code: E87.5
+    standard_system: ICD10
+    standard_code: E87.5
+    display: Hyperkalemia
+  - local_code: A41.9
+    standard_system: ICD10
+    standard_code: A41.9
+    display: Sepsis, unspecified organism
+  - local_code: N39.0
+    standard_system: ICD10
+    standard_code: N39.0
+    display: Urinary tract infection, site not specified
+  - local_code: M81.0
+    standard_system: ICD10
+    standard_code: M81.0
+    display: Age-related osteoporosis without current pathological fracture
+  - local_code: E78.5
+    standard_system: ICD10
+    standard_code: E78.5
+    display: Hyperlipidemia, unspecified
+  - local_code: I21.9
+    standard_system: ICD10
+    standard_code: I21.9
+    display: Acute myocardial infarction, unspecified
+  - local_code: I63.9
+    standard_system: ICD10
+    standard_code: I63.9
+    display: Cerebral infarction, unspecified
+  - local_code: I82.409
+    standard_system: ICD10
+    standard_code: I82.409
+    display: Acute embolism and thrombosis of unspecified deep veins of unspecified lower extremity
+  - local_code: I26.99
+    standard_system: ICD10
+    standard_code: I26.99
+    display: Other pulmonary embolism without acute cor pulmonale
+  - local_code: L03.90
+    standard_system: ICD10
+    standard_code: L03.90
+    display: Cellulitis, unspecified
+  - local_code: K35.80
+    standard_system: ICD10
+    standard_code: K35.80
+    display: Unspecified acute appendicitis
+  - local_code: K85.9
+    standard_system: ICD10
+    standard_code: K85.9
+    display: Acute pancreatitis, unspecified
+  - local_code: K74.60
+    standard_system: ICD10
+    standard_code: K74.60
+    display: Unspecified cirrhosis of liver
+  - local_code: M06.9
+    standard_system: ICD10
+    standard_code: M06.9
+    display: Rheumatoid arthritis, unspecified
+  - local_code: G43.909
+    standard_system: ICD10
+    standard_code: G43.909
+    display: Migraine, unspecified, not intractable, without status migrainosus
+  - local_code: E05.90
+    standard_system: ICD10
+    standard_code: E05.90
+    display: Thyrotoxicosis, unspecified without thyrotoxic crisis or storm
+  - local_code: K52.9
+    standard_system: ICD10
+    standard_code: K52.9
+    display: Noninfective gastroenteritis and colitis, unspecified
+  - local_code: K57.92
+    standard_system: ICD10
+    standard_code: K57.92
+    display: Diverticulitis of intestine, part unspecified, without perforation or abscess without bleeding
+  - local_code: I73.9
+    standard_system: ICD10
+    standard_code: I73.9
+    display: Peripheral vascular disease, unspecified
+  - local_code: L40.9
+    standard_system: ICD10
+    standard_code: L40.9
+    display: Psoriasis, unspecified
+  - local_code: M10.9
+    standard_system: ICD10
+    standard_code: M10.9
+    display: Gout, unspecified
+  - local_code: G89.29
+    standard_system: ICD10
+    standard_code: G89.29
+    display: Other chronic pain
+  - local_code: F03.90
+    standard_system: ICD10
+    standard_code: F03.90
+    display: Unspecified dementia without behavioral disturbance
+  - local_code: G40.909
+    standard_system: ICD10
+    standard_code: G40.909
+    display: Epilepsy, unspecified, not intractable, without status epilepticus
+  - local_code: I87.2
+    standard_system: ICD10
+    standard_code: I87.2
+    display: Venous insufficiency (chronic) (peripheral)
+  - local_code: G35
+    standard_system: ICD10
+    standard_code: G35
+    display: Multiple sclerosis
+  - local_code: G20
+    standard_system: ICD10
+    standard_code: G20
+    display: Parkinson disease
+  - local_code: K58.9
+    standard_system: ICD10
+    standard_code: K58.9
+    display: Irritable bowel syndrome without diarrhea
+  - local_code: T78.40XA
+    standard_system: ICD10
+    standard_code: T78.40XA
+    display: Allergy, unspecified, initial encounter
+  - local_code: T88.7XXA
+    standard_system: ICD10
+    standard_code: T88.7XXA
+    display: Unspecified adverse effect of drug or medicament, initial encounter
+  - local_code: T88.6XXA
+    standard_system: ICD10
+    standard_code: T88.6XXA
+    display: Anaphylactic reaction due to adverse effect of correct drug or medicament properly administered, initial encounter

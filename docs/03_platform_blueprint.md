@@ -1,20 +1,30 @@
 # Platform Blueprint
 
-## Purpose
+> **Version:** 1.0 | **Last updated:** 2026-08-22 | **Status:** Active
 
-This document is the single reference for the platform's architecture, technical specifications, and delivery roadmap. It consolidates target architecture, capability map, technical specs, environment configuration, and the execution backlog into one blueprint.
+Single source of truth for architecture, technical specifications, and delivery roadmap.
 
-**For executives:** Capability roadmap, implementation status, and staged delivery plan.
+| Audience | Use this document to... |
+|----------|------------------------|
+| Executives | Assess capability maturity, review gaps, and track staged delivery |
+| Architects | Reference the target architecture, capability map, and integration contracts |
+| Engineers | Look up container topology, API contracts, env vars, and sprint work items |
 
-**For architects:** Reference architecture, capability map, technical specifications, and measurable gaps.
+## Table of Contents
 
-**For engineers:** Container topology, API contracts, environment variables, sprint-level work items with acceptance criteria.
+- [Part I — Architecture](#target-outcome): Target outcome, implementation status, gaps, principles, architecture diagrams, ontology model, skill architecture, capability map
+- [Part II — Technical Specifications](#part-ii--technical-specifications): Container inventory, library versions, Kafka/Flink/Qdrant/Neo4j specs, RAG API contracts, observability, CI/CD, environment variables
+- [Part III — Delivery Backlog](#part-iii--delivery-backlog): Status summary, staged plan, sprint work items, multi-domain extension, AI trends gap analysis
+
+---
+
+# Part I — Architecture
 
 ## Target Outcome
 
-The target system should behave like a semantic intelligence platform rather than a simple GraphRAG pipeline.
+A semantic intelligence platform — not a simple GraphRAG pipeline.
 
-Desired characteristics:
+Key characteristics:
 
 - source events are normalized into canonical healthcare concepts before persistence,
 - vector and graph stores are populated from the same semantic contract,
@@ -22,9 +32,9 @@ Desired characteristics:
 - AI tools are decomposed into auditable skills with policy-aware execution,
 - evaluation, provenance, and guardrails are part of the architecture rather than post-processing.
 
-## Current Implementation Snapshot
+## Implementation Status
 
-Implemented in the current repository:
+What is implemented today:
 
 - ontology-driven ingestion modules exist in `platform/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
 - dual persistence remains active across Qdrant and Neo4j,
@@ -42,11 +52,9 @@ Implemented in the current repository:
 - MLflow tracing with nested span hierarchy and healthcare-specific evaluation harness is implemented behind the `MLFLOW_TRACKING_URI` feature flag,
 - LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`.
 
-## Current Gaps
+## Open Gaps
 
-The current repository is strong on streaming, dual persistence, and shared API logic, but several important semantics remain implicit.
-
-Gaps to close:
+Infrastructure and governance gaps:
 
 - terminology mappings are still partial and need broader vocabulary coverage and stronger governance workflows,
 - planner logic is currently heuristic and requires benchmark-driven route quality evaluation,
@@ -54,7 +62,7 @@ Gaps to close:
 - retrieval benchmarks and grounded-answer scorecards remain limited,
 - production controls (policy classes, privacy posture, staged rollout controls) remain incomplete for non-demo workloads.
 
-AI-trends-driven gaps (see [AI Trends Gap Backlog](#ai-trends-gap-backlog) below):
+AI-capability gaps (see [Part III](#part-iii--delivery-backlog) for detailed backlog):
 
 - schema-constrained decoding (grammar-enforced JSON) beyond current JSON-mode prompting,
 - latency-based model routing and cost budget tracking beyond current complexity-based tier selection,
@@ -66,7 +74,7 @@ AI-trends-driven gaps (see [AI Trends Gap Backlog](#ai-trends-gap-backlog) below
 - neural reranking between retrieval and synthesis,
 - multimodal clinical image and document understanding.
 
-## Target Architecture Principles
+## Design Principles
 
 1. Canonical semantics before retrieval.
 2. Shared semantic contract across Kafka, Flink, Neo4j, Qdrant, REST, and MCP.
@@ -273,9 +281,9 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 
 See Part III below for the full actionable backlog with staged delivery sequencing and sprint-level work items.
 
-## Definition Of Done For The Target Architecture
+## Definition of Done
 
-The architecture target should be considered reached only when all of the following are true:
+The architecture target is reached when:
 
 - every persisted concept and relationship is defined in ontology config,
 - every major healthcare query route is plan-driven rather than hard-coded,
@@ -926,70 +934,6 @@ Partially implemented:
 - production privacy, policy, and rollout controls,
 - LangGraph and MLflow production hardening for non-demo use.
 
-## Remaining High-Priority Backlog
-
-### 1. Complete Stage 4 evaluation hardening
-
-Target outcomes:
-
-- add retrieval benchmark suites with stable datasets and release-over-release comparison,
-- add grounded answer scorecards and failure taxonomy,
-- expand ontology conformance depth beyond current checks,
-- add quality trend reporting in CI artifacts.
-
-Suggested repo touchpoints:
-
-- `domains/healthcare/agents/tests/`
-- `docs/06_quality_assurance.md`
-- `.github/workflows/rag-api-contracts.yml`
-- `.github/workflows/ontology-conformance.yml`
-
-### 2. Expand provider adapter production testing
-
-Target outcomes:
-
-- add failover contract tests and timeout behavior tests across adapters,
-- validate model routing tier selection under production-like load,
-- keep retrieval orchestration unchanged across provider swaps.
-
-Suggested repo touchpoints:
-
-- `domains/healthcare/agents/llm_provider.py`
-- `domains/healthcare/agents/domain/model_router.py`
-- `domains/healthcare/agents/app.py`
-- `domains/healthcare/agents/tests/test_contracts.py`
-
-### 3. Finish terminology and ontology governance depth
-
-Target outcomes:
-
-- widen standard-code mapping coverage and validation,
-- strengthen governance workflow for mapping updates,
-- ensure graph seed and runtime semantic consistency remains auditable.
-
-Suggested repo touchpoints:
-
-- `platform/healthcare/ontology/`
-- `domains/healthcare/scripts/generate_ontology_seed_cypher.py`
-- `domains/healthcare/scripts/validate_ontology.py`
-- `platform/healthcare/neo4j/generated_ontology_seeds.cypher`
-
-### 4. Production controls for non-demo readiness (Stage 5)
-
-Target outcomes:
-
-- stronger policy classes and PHI handling boundaries,
-- retention and lineage controls tied to ontology provenance,
-- deployment-level rollout and rollback playbooks,
-- explicit SLO gates for latency, freshness, and audit completeness.
-
-Suggested repo touchpoints:
-
-- `deploy/production/`
-- `docs/08_operation_runbook.md`
-- production controls section in this document
-- monitoring and alerting assets
-
 ## Staged Plan Status
 
 ```mermaid
@@ -1001,89 +945,127 @@ flowchart LR
 	S35[Stage 3.5\nMulti-agent and tracing]
 	S4[Stage 4\nMulti-domain and provider breadth]
 	S5[Stage 5\nProduction controls]
+	S6[Stage 6\nAdvanced agent capabilities]
+	S7[Stage 7\nEnterprise governance]
 
-	S0 --> S1 --> S2 --> S3 --> S35 --> S4 --> S5
+	S0 --> S1 --> S2 --> S3 --> S35 --> S4 --> S5 --> S6 --> S7
 
 	classDef done fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px,color:#1b5e20;
 	classDef progress fill:#fff8e1,stroke:#e65100,stroke-width:1px,color:#e65100;
 	classDef pending fill:#ffebee,stroke:#b71c1c,stroke-width:1px,color:#b71c1c;
 
 	class S0,S1,S2,S3,S35,S4 done;
-	class S5 pending;
+	class S5 progress;
+	class S6,S7 pending;
 ```
 
-| Stage | Focus | Status | Notes |
+| Stage | Focus | Status | Remaining work |
 | --- | --- | --- | --- |
-| Stage 0 | Documentation and semantic contract baseline | Completed | Architecture, ADRs, and references are in place. |
-| Stage 1 | Ontology externalization and normalization | Largely completed | Loader/normalization/rules modules exist; continue mapping depth work. |
-| Stage 2 | Query planner and evidence ranking | Completed (baseline) | Planner and ranking shipped with fixture and edge-case suites. |
-| Stage 3 | Skill-composed MCP expansion | Completed (current scope) | Expanded tools and policy updates shipped; continue iterative refinement as needed. |
-| Stage 3.5 | Multi-agent orchestration and tracing | Implemented (feature-flagged) | LangGraph StateGraph, MLflow tracing, evaluation harness shipped; production hardening pending. |
-| Stage 4 | Multi-domain support and provider abstraction | Largely completed | Supply-chain domain added; provider adapters, model routing, domain embeddings, guardrails, memory, structured output, and evaluation gates implemented; retrieval benchmarks and production failover tests still open. |
-| Stage 5 | Production controls for real data readiness | Pending | Requires policy/privacy/SLO rollout controls for non-demo operation. |
+| 0 | Documentation and semantic contract baseline | Completed | — |
+| 1 | Ontology externalization and normalization | Largely completed | Widen mapping coverage (LOINC, RxNorm, SNOMED CT depth) |
+| 2 | Query planner and evidence ranking | Completed | — |
+| 3 | Skill-composed MCP expansion | Completed | — |
+| 3.5 | Multi-agent orchestration and tracing | Implemented (feature-flagged) | Production hardening |
+| 4 | Multi-domain support and provider abstraction | Largely completed | Retrieval benchmarks, production failover tests |
+| 5 | Production controls | In progress | Policy-as-code, PHI boundaries, SLO gates |
+| 6 | Advanced agent capabilities | Partially implemented | See Stage 6 backlog below |
+| 7 | Enterprise governance and scale | Pending | See Stage 7 backlog below |
+
+## Remaining Work by Stage
+
+### Stage 1 — Ontology governance depth
+
+- [ ] Widen standard-code mapping coverage (LOINC, RxNorm, SNOMED CT)
+- [ ] Strengthen governance workflow for mapping updates
+- [ ] Add ontology drift detection that fails CI on parity mismatch
+
+Touchpoints: `platform/healthcare/ontology/`, `domains/healthcare/scripts/validate_ontology.py`, `.github/workflows/ontology-conformance.yml`
+
+### Stage 4 — Evaluation hardening
+
+- [ ] Retrieval benchmark gate: 20+ labeled queries, precision@5 >= 0.70, recall@5 >= 0.75, CI artifact
+- [ ] Grounded-answer scorecard: unsupported-claim rate <= 0.10, citation coverage >= 0.80
+- [ ] Evidence fusion reranking: deterministic cross-source ranking (relevance + recency + graph signal weight)
+- [ ] Provider failover contract tests and latency-based model routing
+
+Touchpoints: `domains/healthcare/agents/tests/`, `domains/healthcare/agents/llm_provider.py`, `.github/workflows/rag-api-contracts.yml`
+
+### Stage 5 — Production controls
+
+- [ ] Policy-as-code: encode policy classes, redaction rules, and retention constraints as testable rules
+- [ ] PHI handling boundaries: export guardrails validated for all roles
+- [ ] Progressive delivery SLO gates: latency, error rate, and grounding score thresholds
+- [ ] Deployment rollout and rollback playbooks with explicit promotion criteria
+
+Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/workflows/deploy-ai-prd.yml`
+
+### Stage 6 — Advanced agent capabilities
+
+| # | Item | Status | Remaining |
+|---|------|--------|-----------|
+| 1 | Structured output generation | **Implemented** | Schema-constrained decoding (grammar-enforced JSON) |
+| 2 | Dynamic model routing | **Implemented** | Latency-based routing, cost budget tracking, token metering |
+| 3 | Persistent agent memory | **Partial** | Persistent store (Redis/Postgres) for cross-session and patient-scoped memory |
+| 4 | Input-side guardrails | **Implemented** | Dedicated ML model (Llama Guard) |
+| 5 | Streaming responses (SSE) | Pending | FastAPI StreamingResponse to provider web UI |
+| 6 | Evaluation-gated CI/CD | **Implemented** | Promote to hard gate when baseline is stable |
+| 7 | Adversarial evaluation | Pending | Automated red-teaming (Garak, promptfoo) |
+| 8 | Confidence calibration | Pending | Selective abstention with uncertainty quantification |
+
+### Stage 7 — Enterprise governance and scale
+
+| # | Item | Effort | Priority |
+|---|------|--------|----------|
+| 9 | Per-user identity and authorization | Medium | High |
+| 10 | Neural reranking (cross-encoder) | Medium | Medium |
+| 11 | Inter-agent collaboration (A2A) | High | Medium |
+| 12 | Multimodal support (clinical imaging) | High | Low |
+| 13 | Domain-specific fine-tuning (LoRA/DPO) | High | Medium |
+| 14 | Distributed agent systems | High | Low |
+| 15 | OpenTelemetry integration | Medium | Medium |
 
 ## Near-Term Execution Order
 
-1. Stage 4 retrieval and grounding benchmark suites.
-2. Stage 4 additional provider adapters and adapter-level tests.
-3. Stage 1 terminology/ontology mapping coverage deepening.
-4. Stage 5 production privacy and rollout controls.
+1. **Stage 4** — Retrieval and grounding benchmark suites
+2. **Stage 4** — Provider failover contract tests
+3. **Stage 1** — Terminology/ontology mapping coverage deepening
+4. **Stage 5** — Policy-as-code and PHI boundaries
+5. **Stage 5** — SLO gates and deployment playbooks
+6. **Stage 6** — Streaming responses, adversarial evaluation
 
-## Two-Sprint Implementation Plan
+## Sprint Plan
 
-### Sprint 1: Quality and Orchestration Hardening
+### Sprint 1: Quality hardening (Stages 1 + 4)
 
-- [ ] 1. Retrieval benchmark gate
-Scope: Add stable retrieval fixtures and scoring script for precision@k and recall@k.
-Acceptance criteria: At least 20 labeled queries in fixtures; precision@5 >= 0.70; recall@5 >= 0.75; benchmark output published as CI artifact.
-CI checks: New workflow job `retrieval-benchmark` in `.github/workflows/rag-api-contracts.yml`; fails when thresholds are missed.
+- [ ] Retrieval benchmark gate with CI artifact
+- [ ] Grounded-answer scorecard with failure taxonomy
+- [ ] Evidence fusion reranking (deterministic cross-source)
+- [ ] Ontology mapping coverage report and drift detection
 
-- [ ] 2. Grounded-answer scorecard
-Scope: Add answer grounding evaluator with unsupported-claim and citation-coverage metrics.
-Acceptance criteria: Golden set committed; unsupported-claim rate <= 0.10; citation coverage >= 0.80; failure taxonomy emitted per run.
-CI checks: New workflow job `grounding-scorecard`; uploads JSON/Markdown report artifact and enforces thresholds.
+### Sprint 2: Production readiness (Stages 4 + 5)
 
-- [ ] 3. ReAct loop hardening (phase 2)
-Scope: Extend loop stop criteria, fallback behavior, and loop metadata tests.
-Acceptance criteria: ReAct tests cover confidence stop, max-iteration stop, no-progress stop, and fallback path; no regression in planner suites.
-CI checks: `python3 domains/healthcare/agents/tests/test_react_controller.py`; `python3 domains/healthcare/agents/tests/test_planner_evaluation.py`; `python3 domains/healthcare/agents/tests/test_planner_edge_cases.py`; aggregated via `domains/healthcare/scripts/test_react_planner.sh`.
+- [ ] Provider failover contract tests
+- [ ] Policy-as-code regression suite
+- [ ] SLO promotion gates in deployment workflow
+- [ ] Deployment rollback criteria and canary checklist
 
-- [ ] 4. Evidence fusion reranking
-Scope: Add deterministic cross-source reranking using relevance + recency + graph signal weight.
-Acceptance criteria: Ranking function documented and unit tested; top-k ordering deterministic across repeated runs; route quality improves on fixture set.
-CI checks: New unit suite in `domains/healthcare/agents/tests/` and benchmark delta assertion in `retrieval-benchmark` job.
+### Exit criteria
 
-### Sprint 2: Runtime Resilience and Governance Promotion
+- [x] ReAct and planner validation runs via a single stable command and CI job
+- [x] At least two LLM providers are supported with tested failover
+- [ ] Retrieval and grounding quality gates are required checks on pull requests
+- [ ] Ontology and policy drift checks block merges
+- [ ] Production promotion includes explicit SLO gates and rollback criteria
 
-- [x] 5. Multi-provider runtime + failover
-Scope: Provider adapters (Ollama, OpenAI, Anthropic), FallbackProvider, and ModelRouter implemented. Remaining: failover contract tests and latency-based routing.
-Acceptance criteria: Adapter switch by env works; timeout/5xx failover tested; retrieval orchestration unchanged.
-CI checks: Extend `domains/healthcare/agents/tests/test_contracts.py` with provider/failover cases.
+## Competitive Parity Items
 
-- [ ] 6. Ontology governance depth
-Scope: Increase vocabulary mapping coverage and drift checks.
-Acceptance criteria: Mapping coverage report generated; generator output parity enforced; ontology drift fails CI.
-CI checks: Strengthen `.github/workflows/ontology-conformance.yml`; run `python domains/healthcare/scripts/validate_ontology.py` and fail on parity/drift mismatch.
-
-- [ ] 7. Policy-as-code and PHI boundaries
-Scope: Encode policy classes, redaction rules, and retention constraints as testable rules.
-Acceptance criteria: Policy fixtures cover allowed/denied tool calls and redaction classes; export guardrails validated for all roles.
-CI checks: Add policy regression suite in `domains/healthcare/agents/tests/`; run as required check in `rag-api-contracts.yml`.
-
-- [ ] 8. Progressive delivery SLO gates
-Scope: Define promotion gates for latency, error rate, and grounding score.
-Acceptance criteria: Documented SLO thresholds in runbook; canary promotion checklist added; rollback trigger criteria explicit.
-CI checks: Add deployment pre-check job in `.github/workflows/deploy-ai-prd.yml` validating SLO config and required artifacts.
-
-### Exit Criteria After Sprint 2
-
-- [x] ReAct and planner validation runs via a single stable command and CI job.
-- [x] At least two LLM providers are supported with tested failover.
-- [ ] Retrieval and grounding quality gates are required checks on pull requests.
-- [ ] Ontology and policy drift checks block merges when governance constraints fail.
-- [ ] Production promotion includes explicit SLO gates and rollback criteria.
-
-## Multi-Domain Extension Backlog
+| # | Item | Their implementation | Our status |
+|---|------|---------------------|------------|
+| 16 | Citation enforcement in guardrails | Regex-based citation detection + `requires_evidence` flag | We redact evidence but don't enforce its presence in answers |
+| 17 | Pluggable message bus for audit | `MessageBus` interface with 5 backends | JSONL audit logs only; no pluggable backend |
+| 18 | React frontend with streaming | Vite + React + TypeScript + SSE | Static HTML form with synchronous responses |
+| 19 | KPI-gated release pipeline | `EVAL_MIN_TOOL_CALL_ACCURACY`, `EVAL_MIN_GROUNDEDNESS` | Evaluation gates implemented; hard gate promotion pending |
+| 20 | Multi-environment deployment | Databricks Asset Bundles + target configs | Single production bundle; no staged promotion |
 
 ### Supply Chain Domain
 
@@ -1110,58 +1092,3 @@ To add a third domain (e.g., Insurance Claims, Cybersecurity SOC):
 6. Implement graph_writes and pipeline_service for the domain's entity model
 7. Add planner classifier and retrieval plan for domain request types
 8. Create `generate_agent_skills.py` and `validate_agent_skills.py` in `domains/<name>/scripts/`
-
-## AI Trends Gap Backlog
-
-The following backlog items are derived from industry trends analysis comparing this platform against leading-edge AI systems (2025-2026) and peer projects (Multiagent-App-On-Databricks, GenAI-with-MLflow-on-Databricks).
-
-### Stage 6: Advanced Agent Capabilities
-
-| # | Item | Industry trend | Effort | Priority | Status |
-|---|------|---------------|--------|----------|--------|
-| 1 | **Structured output generation** — JSON-mode or schema-constrained decoding for deterministic extraction of interactions, contraindications, and risk assessments | Instructor, OpenAI JSON mode, Pydantic-constrained generation | Low | High | **Implemented**: `domain/structured_output.py` with Pydantic models, JSON-mode prompt, structured response parsing. Activated via `structured: true` in query request. |
-| 2 | **Dynamic model routing** — route to different models based on query complexity, latency target, or cost budget | Martian, Unify, LiteLLM router | Medium | High | **Implemented**: `domain/model_router.py` with `classify_complexity()` (regex-based, 3 tiers: simple/moderate/complex), `ModelTierConfig` (env-driven), and `ModelRouter` (provider-aware). In dev, all tiers default to `OLLAMA_MODEL` (zero config). In production, set `LLM_MODEL_SIMPLE`, `LLM_MODEL_MODERATE`, `LLM_MODEL_COMPLEX` with optional `provider:model` syntax for cross-provider routing. Response includes `model_routing` metadata (tier, score, signals, model). 22 tests. Remaining: latency-based routing, cost budget tracking, token usage metering. |
-| 3 | **Persistent agent memory** — cross-session context retention for longitudinal patient monitoring and escalation tracking | Mem0, Zep, Letta | Medium | High | **Partially implemented**: `domain/memory.py` provides session-scoped TTL memory. Remaining: persistent storage (Redis/Postgres) for cross-session and patient-scoped memory. |
-| 4 | **Input-side guardrails** — prompt injection detection and input validation before agent execution | Lakera Guard, NeMo Guardrails, Rebuff | Low-Medium | High | **Implemented**: `domain/guardrails.py` with classifier-based injection detection, off-topic filtering, output safety checks, and grounding validation. Remaining: dedicated ML model (Llama Guard). |
-| 5 | **Streaming responses (SSE)** — server-sent events for real-time answer streaming to the provider web UI | FastAPI StreamingResponse, LangGraph streaming | Low | Medium | |
-| 6 | **Evaluation-gated CI/CD** — MLflow evaluation scores as release gates that block deployment below thresholds | Mosaic AI Agent Evaluation, KPI-gated pipelines | Medium | High | **Implemented**: `domain/evaluation_gates.py` with `GateThresholds`, CI step in `rag-api-contracts.yml`. Currently `continue-on-error: true`; promote to hard gate when baseline is stable. |
-| 7 | **Adversarial evaluation (red-teaming)** — automated probing for hallucination, safety violations, and edge-case failures | Garak, promptfoo, DeepEval adversarial | Medium | Medium | |
-| 8 | **Confidence calibration** — selective abstention when evidence is insufficient rather than generating low-confidence answers | Conformal prediction, uncertainty quantification | Medium | Medium | |
-
-### Stage 7: Enterprise Governance and Scale
-
-| # | Item | Industry trend | Effort | Priority |
-|---|------|---------------|--------|----------|
-| 9 | **Per-user identity and authorization** — propagate end-user identity through the agent pipeline for fine-grained access control | OBO tokens, Unity Catalog-style governance | Medium | High |
-| 10 | **Neural reranking** — add a cross-encoder or late-interaction reranker between retrieval and synthesis | ColBERT, Cohere Rerank, cross-encoder models | Medium | Medium |
-| 11 | **Inter-agent collaboration** — enable agents to delegate to each other, share intermediate state, or negotiate plans | AutoGen conversations, A2A protocol, CrewAI collaboration | High | Medium |
-| 12 | **Multimodal support** — clinical image analysis (radiology, pathology) and document OCR as retrieval sources | GPT-4o vision, medical imaging models | High | Low |
-| 13 | **Domain-specific fine-tuning** — LoRA or DPO fine-tuning on clinical summarization and medication safety reasoning | QLoRA, ORPO, domain distillation | High | Medium |
-| 14 | **Distributed agent systems** — agent execution across multiple processes or services with shared state coordination | LangGraph Cloud, distributed orchestration | High | Low |
-| 15 | **OpenTelemetry integration** — unified distributed tracing standard for correlation across Kafka, Flink, API, and agent spans | OTel collector, Jaeger, Tempo | Medium | Medium |
-
-### Competitive Parity Items (from Multiagent-App-On-Databricks)
-
-| # | Item | Their implementation | Our gap |
-|---|------|---------------------|---------|
-| 16 | **Citation enforcement in guardrails** — block responses that lack evidence references | Regex-based citation detection + `requires_evidence` flag | We redact evidence but don't enforce its presence in answers |
-| 17 | **Pluggable message bus for audit** — Kafka/RabbitMQ/UC table backends | `MessageBus` interface with 5 backends | We write JSONL audit logs only; no pluggable backend |
-| 18 | **React frontend with streaming** — real-time SSE to a modern UI | Vite + React + TypeScript + streaming | We have a static HTML form with synchronous responses |
-| 19 | **KPI-gated release pipeline** — quantitative thresholds block promotion | `EVAL_MIN_TOOL_CALL_ACCURACY`, `EVAL_MIN_GROUNDEDNESS`, etc. | Evaluation gates implemented (`domain/evaluation_gates.py`); currently `continue-on-error`; hard gate promotion pending |
-| 20 | **Multi-environment deployment** — dev/qa/stg/prod with config isolation | Databricks Asset Bundles + target configs | We have a single production bundle; no staged promotion |
-
-### Suggested Execution Sequence
-
-```text
-Near-term (next sprint):
-  #5 Streaming responses → #7 Adversarial evaluation
-  #16 Citation enforcement → #8 Confidence calibration
-
-Medium-term (next quarter):
-  #9 Per-user identity → #10 Neural reranking → #19 KPI hard gates
-  #3 Persistent memory (Redis/Postgres) → #15 OpenTelemetry
-
-Long-term (roadmap):
-  #11 Inter-agent collaboration → #13 Fine-tuning → #12 Multimodal
-  #14 Distributed agents
-```

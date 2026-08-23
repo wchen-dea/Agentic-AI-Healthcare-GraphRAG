@@ -1,150 +1,150 @@
-version: 0.1.0
-status: draft
+version: 0.2.0
+status: active
 owner: platform-team
-purpose: Expanded local lab name to LOINC terminology coverage for synthetic source generation.
+purpose: Lab name to LOINC terminology mapping for healthcare event normalization.
 local_mappings:
   labs:
   - local_code: Potassium
     standard_system: LOINC
-    standard_code: TBD
-    display: Potassium
+    standard_code: 2823-3
+    display: Potassium [Moles/volume] in Serum or Plasma
   - local_code: Sodium
     standard_system: LOINC
-    standard_code: TBD
-    display: Sodium
+    standard_code: 2951-2
+    display: Sodium [Moles/volume] in Serum or Plasma
   - local_code: Glucose
     standard_system: LOINC
-    standard_code: TBD
-    display: Glucose
+    standard_code: 2345-7
+    display: Glucose [Mass/volume] in Serum or Plasma
   - local_code: Creatinine
     standard_system: LOINC
-    standard_code: TBD
-    display: Creatinine
+    standard_code: 2160-0
+    display: Creatinine [Mass/volume] in Serum or Plasma
   - local_code: BUN
     standard_system: LOINC
-    standard_code: TBD
-    display: Blood urea nitrogen
+    standard_code: 3094-0
+    display: Urea nitrogen [Mass/volume] in Serum or Plasma
   - local_code: HbA1c
     standard_system: LOINC
-    standard_code: TBD
-    display: Hemoglobin A1c
+    standard_code: 4548-4
+    display: Hemoglobin A1c/Hemoglobin.total in Blood
   - local_code: WBC
     standard_system: LOINC
-    standard_code: TBD
-    display: White blood cell count
+    standard_code: 6690-2
+    display: Leukocytes [#/volume] in Blood by Automated count
   - local_code: Hemoglobin
     standard_system: LOINC
-    standard_code: TBD
-    display: Hemoglobin
+    standard_code: 718-7
+    display: Hemoglobin [Mass/volume] in Blood
   - local_code: Platelets
     standard_system: LOINC
-    standard_code: TBD
-    display: Platelet count
+    standard_code: 777-3
+    display: Platelets [#/volume] in Blood by Automated count
   - local_code: TSH
     standard_system: LOINC
-    standard_code: TBD
-    display: Thyroid stimulating hormone
+    standard_code: 3016-3
+    display: Thyrotropin [Units/volume] in Serum or Plasma
   - local_code: eGFR
     standard_system: LOINC
-    standard_code: TBD
-    display: Estimated glomerular filtration rate
+    standard_code: 48642-3
+    display: Glomerular filtration rate/1.73 sq M.predicted
   - local_code: LDL
     standard_system: LOINC
-    standard_code: TBD
-    display: LDL cholesterol
+    standard_code: 2089-1
+    display: Cholesterol in LDL [Mass/volume] in Serum or Plasma
   - local_code: HDL
     standard_system: LOINC
-    standard_code: TBD
-    display: HDL cholesterol
+    standard_code: 2085-9
+    display: Cholesterol in HDL [Mass/volume] in Serum or Plasma
   - local_code: ALT
     standard_system: LOINC
-    standard_code: TBD
-    display: Alanine aminotransferase
+    standard_code: 1742-6
+    display: Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma
   - local_code: AST
     standard_system: LOINC
-    standard_code: TBD
-    display: Aspartate aminotransferase
+    standard_code: 1920-8
+    display: Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma
   - local_code: Troponin I
     standard_system: LOINC
-    standard_code: TBD
-    display: Cardiac troponin I
+    standard_code: 10839-9
+    display: Troponin I.cardiac [Mass/volume] in Serum or Plasma
   - local_code: INR
     standard_system: LOINC
-    standard_code: TBD
-    display: International normalized ratio
+    standard_code: 6301-6
+    display: INR in Platelet poor plasma by Coagulation assay
   - local_code: Procalcitonin
     standard_system: LOINC
-    standard_code: TBD
-    display: Procalcitonin
+    standard_code: 33959-8
+    display: Procalcitonin [Mass/volume] in Serum or Plasma
   - local_code: Calcium
     standard_system: LOINC
-    standard_code: TBD
-    display: Calcium
+    standard_code: 17861-6
+    display: Calcium [Mass/volume] in Serum or Plasma
   - local_code: Magnesium
     standard_system: LOINC
-    standard_code: TBD
-    display: Magnesium
+    standard_code: 19123-9
+    display: Magnesium [Mass/volume] in Serum or Plasma
   - local_code: Phosphate
     standard_system: LOINC
-    standard_code: TBD
-    display: Phosphate
+    standard_code: 2777-1
+    display: Phosphate [Mass/volume] in Serum or Plasma
   - local_code: C-Reactive Protein
     standard_system: LOINC
-    standard_code: TBD
-    display: C-reactive protein
+    standard_code: 1988-5
+    display: C reactive protein [Mass/volume] in Serum or Plasma
   - local_code: ESR
     standard_system: LOINC
-    standard_code: TBD
-    display: Erythrocyte sedimentation rate
+    standard_code: 4537-7
+    display: Erythrocyte sedimentation rate by Westergren method
   - local_code: Lactate
     standard_system: LOINC
-    standard_code: TBD
-    display: Lactate
+    standard_code: 2524-7
+    display: Lactate [Moles/volume] in Serum or Plasma
   - local_code: BNP
     standard_system: LOINC
-    standard_code: TBD
-    display: B-type natriuretic peptide
+    standard_code: 30934-4
+    display: Natriuretic peptide B [Mass/volume] in Serum or Plasma
   - local_code: Total Bilirubin
     standard_system: LOINC
-    standard_code: TBD
-    display: Total bilirubin
+    standard_code: 1975-2
+    display: Bilirubin.total [Mass/volume] in Serum or Plasma
   - local_code: Albumin
     standard_system: LOINC
-    standard_code: TBD
-    display: Albumin
+    standard_code: 1751-7
+    display: Albumin [Mass/volume] in Serum or Plasma
   - local_code: Alkaline Phosphatase
     standard_system: LOINC
-    standard_code: TBD
-    display: Alkaline phosphatase
+    standard_code: 6768-6
+    display: Alkaline phosphatase [Enzymatic activity/volume] in Serum or Plasma
   - local_code: D-Dimer
     standard_system: LOINC
-    standard_code: TBD
-    display: D-dimer
+    standard_code: 48066-5
+    display: Fibrin D-dimer DDU [Mass/volume] in Platelet poor plasma
   - local_code: Ferritin
     standard_system: LOINC
-    standard_code: TBD
-    display: Ferritin
+    standard_code: 2276-4
+    display: Ferritin [Mass/volume] in Serum or Plasma
   - local_code: Uric Acid
     standard_system: LOINC
-    standard_code: TBD
-    display: Uric acid
+    standard_code: 3084-1
+    display: Urate [Mass/volume] in Serum or Plasma
   - local_code: Creatine Kinase
     standard_system: LOINC
-    standard_code: TBD
-    display: Creatine kinase
+    standard_code: 2157-6
+    display: Creatine kinase [Enzymatic activity/volume] in Serum or Plasma
   - local_code: Arterial pH
     standard_system: LOINC
-    standard_code: TBD
-    display: Arterial blood pH
+    standard_code: 2744-1
+    display: pH of Arterial blood
   - local_code: PaCO2
     standard_system: LOINC
-    standard_code: TBD
-    display: Arterial carbon dioxide partial pressure
+    standard_code: 2019-8
+    display: Carbon dioxide [Partial pressure] in Arterial blood
   - local_code: PaO2
     standard_system: LOINC
-    standard_code: TBD
-    display: Arterial oxygen partial pressure
+    standard_code: 2703-7
+    display: Oxygen [Partial pressure] in Arterial blood
   - local_code: Serum Osmolality
     standard_system: LOINC
-    standard_code: TBD
-    display: Serum osmolality
+    standard_code: 2692-2
+    display: Osmolality of Serum or Plasma

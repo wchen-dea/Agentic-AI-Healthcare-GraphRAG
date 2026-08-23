@@ -115,7 +115,7 @@ class RuntimeRulesTests(unittest.TestCase):
         ref_semantics = normalized_payload["semantic"]["reference_context"]
         self.assertEqual(ref_semantics["patient"]["sex_mapping"]["standard_system"], "HL7_ADMINISTRATIVE_SEX")
         self.assertEqual(ref_semantics["patient"]["risk_tier_mapping"]["standard_code"], "high")
-        self.assertEqual(ref_semantics["provider"]["specialty_mapping"]["standard_system"], "NUCC_TAXONOMY_GROUPING")
+        self.assertEqual(ref_semantics["provider"]["specialty_mapping"]["standard_system"], "NUCC_TAXONOMY")
         self.assertEqual(ref_semantics["device"]["device_type_mapping"]["standard_code"], "infusion_pump")
         self.assertEqual(ref_semantics["medication"]["drug_class_mapping"]["standard_code"], "antihypertensive")
         self.assertEqual(ref_semantics["medication"]["safety_tier_mapping"]["standard_code"], "high_alert")
@@ -201,7 +201,7 @@ class RuntimeRulesTests(unittest.TestCase):
                         "sex_mapping": {"standard_system": "HL7_ADMINISTRATIVE_SEX", "standard_code": "F", "display": "Female"},
                         "risk_tier_mapping": {"standard_system": "LOCAL_RISK_TIER", "standard_code": "high", "display": "High"},
                     },
-                    "provider": {"specialty_mapping": {"standard_system": "NUCC_TAXONOMY_GROUPING", "standard_code": "TBD", "display": "Cardiology"}},
+                    "provider": {"specialty_mapping": {"standard_system": "NUCC_TAXONOMY", "standard_code": "207RC0000X", "display": "Cardiovascular Disease"}},
                     "device": {"device_type_mapping": {"standard_system": "LOCAL_DEVICE_TYPE", "standard_code": "infusion_pump", "display": "Infusion Pump"}},
                     "medication": {
                         "drug_class_mapping": {"standard_system": "LOCAL_DRUG_CLASS", "standard_code": "antihypertensive", "display": "Antihypertensive"},
@@ -218,7 +218,7 @@ class RuntimeRulesTests(unittest.TestCase):
         params = tx.run.call_args.args[1]
         self.assertEqual(params["patient_sex_standard_system"], "HL7_ADMINISTRATIVE_SEX")
         self.assertEqual(params["patient_risk_tier_standard_code"], "high")
-        self.assertEqual(params["provider_specialty_standard_system"], "NUCC_TAXONOMY_GROUPING")
+        self.assertEqual(params["provider_specialty_standard_system"], "NUCC_TAXONOMY")
         self.assertEqual(params["device_type_standard_code"], "infusion_pump")
         self.assertEqual(params["medication_drug_class_standard_code"], "antihypertensive")
         self.assertEqual(params["medication_safety_tier_standard_code"], "high_alert")

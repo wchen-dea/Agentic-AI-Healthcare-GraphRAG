@@ -1,8 +1,89 @@
-version: 0.1.0
-status: draft
+version: 0.2.0
+status: active
 owner: platform-team
 purpose: Payer-specific terminology mappings separated from the generic vocabulary inventory.
 local_mappings:
+  payer_names:
+  - local_code: aetna
+    standard_system: NAIC
+    standard_code: "60054"
+    display: Aetna
+  - local_code: united
+    standard_system: NAIC
+    standard_code: "79413"
+    display: UnitedHealthcare
+  - local_code: bcbs
+    standard_system: NAIC
+    standard_code: "54828"
+    display: Blue Cross Blue Shield
+  - local_code: medicare
+    standard_system: CMS
+    standard_code: MEDICARE
+    display: Medicare
+  - local_code: medicaid
+    standard_system: CMS
+    standard_code: MEDICAID
+    display: Medicaid
+  - local_code: cigna
+    standard_system: NAIC
+    standard_code: "67369"
+    display: Cigna
+  - local_code: humana
+    standard_system: NAIC
+    standard_code: "73288"
+    display: Humana
+  - local_code: kaiser
+    standard_system: NAIC
+    standard_code: "91540"
+    display: Kaiser Permanente
+  - local_code: tricare
+    standard_system: DOD
+    standard_code: TRICARE
+    display: TRICARE
+  - local_code: centene
+    standard_system: NAIC
+    standard_code: "15839"
+    display: Centene
+  - local_code: anthem
+    standard_system: NAIC
+    standard_code: "54828"
+    display: Anthem
+  - local_code: molina
+    standard_system: NAIC
+    standard_code: "81124"
+    display: Molina Healthcare
+  - local_code: wellcare
+    standard_system: NAIC
+    standard_code: "14163"
+    display: WellCare
+  - local_code: carefirst
+    standard_system: NAIC
+    standard_code: "52145"
+    display: CareFirst
+  - local_code: highmark
+    standard_system: NAIC
+    standard_code: "54828"
+    display: Highmark
+  - local_code: health net
+    standard_system: NAIC
+    standard_code: "90569"
+    display: Health Net
+  - local_code: oscar
+    standard_system: NAIC
+    standard_code: "10366"
+    display: Oscar Health
+  - local_code: tufts health plan
+    standard_system: NAIC
+    standard_code: "59575"
+    display: Tufts Health Plan
+  - local_code: upmc health plan
+    standard_system: NAIC
+    standard_code: "93689"
+    display: UPMC Health Plan
+  - local_code: emblemhealth
+    standard_system: NAIC
+    standard_code: "52583"
+    display: EmblemHealth
   payer_plan_types:
   - local_code: HMO
     standard_system: LOCAL_PAYER_PLAN_TYPE
