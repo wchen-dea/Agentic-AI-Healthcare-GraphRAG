@@ -25,10 +25,16 @@ AI Client (Copilot, Claude Desktop, custom agent)
   -> domain/ modules:
      - retrieval.py (Neo4j graph_search + Qdrant vector_search)
      - synthesis.py (LLM prompt + generation)
-     - model_router.py (complexity-based model selection)
+     - model_router.py (complexity-based model selection + latency/cost tracking)
+     - guardrails.py (input/output safety classification)
+     - memory.py (session + Redis-backed cross-session memory)
+     - structured_output.py (JSON-mode constrained generation)
+     - evaluation_gates.py (CI quality thresholds)
+     - evidence.py (ranking + fusion reranking)
+     - planner.py (request classification + retrieval planning)
      - response_policy.py (sanitization + budget)
      - harness.py (retry, guards, prompt registry)
-  -> langgraph_agents/ (optional multi-agent routing)
+  -> langgraph_agents/ (optional multi-agent routing + inter-agent delegation)
   -> External stores:
      - Neo4j (platform/healthcare/neo4j)
      - Qdrant (platform/healthcare via flink-app)
@@ -1167,30 +1173,48 @@ State is immutable within each node; updates are returned as dicts.
 domains/healthcare/agents/
 ├── langgraph_agents/
 │   ├── __init__.py          # Public API
-│   ├── state.py             # HealthcareAgentState TypedDict
-│   ├── agents.py            # Agent node functions
-│   ├── graph.py             # StateGraph builder + runner
+│   ├── state.py             # HealthcareAgentState TypedDict (incl. delegation fields)
+│   ├── agents.py            # Agent node functions (with delegation emit/respond)
+│   ├── agent_cards.py       # AgentCard registry, delegation types, capability discovery
+│   ├── graph.py             # StateGraph builder + delegation router + runner
 │   ├── tools.py             # LangChain tool wrappers
 │   ├── evaluation.py        # Lightweight evaluation helpers
 │   ├── mlflow_tracing.py    # MLflow span decorators and trace wrappers
-│   └── mlflow_eval.py       # MLflow evaluation harness (delegates to evaluation.py)
+│   └── mlflow_eval.py       # MLflow evaluation harness
 ├── domain/
-│   ├── retrieval.py         # Embedding, vector search, graph search (Cypher)
+│   ├── __init__.py          # Re-exports all domain modules
+│   ├── retrieval.py         # Domain-routed embedding, vector search, graph search
 │   ├── synthesis.py         # Prompt construction and LLM synthesis
-│   ├── model_router.py      # Complexity classifier and dynamic model routing
+│   ├── model_router.py      # Complexity classifier, latency/cost tracking, model routing
 │   ├── structured_output.py # JSON-mode structured response generation
 │   ├── guardrails.py        # Input/output safety classification
-│   ├── memory.py            # Session-scoped conversation context
+│   ├── memory.py            # Session + cross-session Redis-backed memory
 │   ├── evaluation_gates.py  # CI quality gate thresholds
-│   ├── response_policy.py   # Truncation, sanitization, budget enforcement, confidence
+│   ├── grounding_scorecard.py # Unsupported-claim rate, citation coverage
+│   ├── retrieval_benchmark.py # Precision@k / recall@k scoring with fixtures
+│   ├── response_policy.py   # Truncation, sanitization, budget enforcement
 │   ├── planner.py           # Request classification and retrieval planning
-│   ├── evidence.py          # Deterministic evidence ranking
+│   ├── evidence.py          # Evidence ranking + fusion reranking
 │   ├── react_controller.py  # ReAct loop orchestration
+│   ├── harness.py           # Retry, guards, prompt registry
 │   └── models.py            # Shared types (RequestType, RetrievalPlan)
 ├── app.py                   # Composition root: settings, clients, HTTP routes, MCP tools
+├── llm_provider.py          # Ollama, OpenAI, Anthropic, FallbackProvider
 └── tests/
+    ├── test_agent_delegation.py
+    ├── test_contracts.py
+    ├── test_evaluation_stage4.py
+    ├── test_harness.py
     ├── test_langgraph_agents.py
-    └── test_mlflow_integration.py
+    ├── test_memory.py
+    ├── test_mlflow_integration.py
+    ├── test_model_router.py
+    ├── test_ontology_conformance.py
+    ├── test_planner_edge_cases.py
+    ├── test_planner_evaluation.py
+    ├── test_provider_failover.py
+    ├── test_react_controller.py
+    └── test_retrieval.py
 ```
 
 ## Migration Path

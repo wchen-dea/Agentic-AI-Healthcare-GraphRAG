@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .agent_cards import DelegationRequest, DelegationResponse, discover_agents, resolve_delegation
 from .state import HealthcareAgentState
 
 
@@ -108,15 +109,39 @@ def graph_retrieval_agent(state: HealthcareAgentState) -> dict[str, Any]:
 def medication_safety_agent(state: HealthcareAgentState) -> dict[str, Any]:
     """Deep-dive into medication interactions, contraindications, and adverse events."""
     graph_ctx = state.get("graph_context", [])
+    delegation_responses = state.get("delegation_responses", [])
+
+    # Check for lab delegation responses from prior iterations
+    lab_context: dict[str, Any] = {}
+    for resp in delegation_responses:
+        if resp.get("to_agent") == "medication_safety" and resp.get("capability") == "renal_function":
+            lab_context = resp.get("result", {})
 
     risks: list[dict[str, Any]] = []
+    delegation_requests: list[dict[str, Any]] = []
+
     for patient in graph_ctx:
         pid = patient.get("patient_id", "unknown")
         interactions = patient.get("interactions", [])
         adverse = patient.get("adverse_events", [])
         contras = patient.get("contraindications", [])
+
+        # Delegate to lab agent when contraindicated drugs need renal/hepatic context
+        needs_renal = any(
+            c.get("reason", "").lower() in ("lactic_acidosis_risk", "worsens_hyperkalemia", "nephrotoxic")
+            for c in contras
+        )
+        if needs_renal and not lab_context:
+            delegation_requests.append(DelegationRequest(
+                from_agent="medication_safety",
+                to_agent="lab_interpretation",
+                capability="renal_function",
+                query=f"Assess renal function markers for patient {pid}",
+                context={"patient_id": pid},
+            ).to_dict())
+
         if interactions or adverse or contras:
-            risks.append({
+            risk_entry: dict[str, Any] = {
                 "patient_id": pid,
                 "interaction_count": len(interactions),
                 "adverse_event_count": len(adverse),
@@ -124,16 +149,23 @@ def medication_safety_agent(state: HealthcareAgentState) -> dict[str, Any]:
                 "interactions": interactions,
                 "adverse_events": adverse,
                 "contraindications": contras,
-            })
+            }
+            if lab_context:
+                risk_entry["lab_context"] = lab_context
+            risks.append(risk_entry)
 
-    return {
+    result: dict[str, Any] = {
         "messages": [{
             "agent": "medication_safety",
             "action": "assess",
             "patients_with_risks": len(risks),
+            "delegations_emitted": len(delegation_requests),
             "risks": risks,
         }],
     }
+    if delegation_requests:
+        result["delegation_requests"] = delegation_requests
+    return result
 
 
 # ── Lab Interpretation Agent ───────────────────────────────────────────────
@@ -141,8 +173,11 @@ def medication_safety_agent(state: HealthcareAgentState) -> dict[str, Any]:
 def lab_interpretation_agent(state: HealthcareAgentState) -> dict[str, Any]:
     """Extract and interpret lab signals and abnormal observations."""
     graph_ctx = state.get("graph_context", [])
+    pending_delegations = state.get("delegation_requests", [])
 
     signals: list[dict[str, Any]] = []
+    delegation_responses: list[dict[str, Any]] = []
+
     for patient in graph_ctx:
         pid = patient.get("patient_id", "unknown")
         lab_signals = patient.get("lab_signals", [])
@@ -158,14 +193,56 @@ def lab_interpretation_agent(state: HealthcareAgentState) -> dict[str, Any]:
                 "abnormal_observations": abnormal_obs,
             })
 
-    return {
+    # Respond to delegation requests for specific capabilities
+    for req in pending_delegations:
+        if req.get("to_agent") != "lab_interpretation":
+            continue
+        capability = req.get("capability", "")
+        req_pid = req.get("context", {}).get("patient_id")
+
+        patient_signals = [s for s in signals if s.get("patient_id") == req_pid]
+        if capability == "renal_function":
+            renal_markers = []
+            for ps in patient_signals:
+                for obs in ps.get("abnormal_observations", []):
+                    if obs.get("name", "").lower() in ("creatinine", "bun", "egfr"):
+                        renal_markers.append(obs)
+                for sig in ps.get("lab_signals", []):
+                    if sig.get("indicated_condition", "").lower() in ("chronic kidney disease", "acute kidney injury"):
+                        renal_markers.append(sig)
+            delegation_responses.append(DelegationResponse(
+                from_agent="lab_interpretation",
+                to_agent=req.get("from_agent", ""),
+                capability=capability,
+                result={"patient_id": req_pid, "renal_markers": renal_markers, "marker_count": len(renal_markers)},
+                confidence=0.9 if renal_markers else 0.3,
+            ).to_dict())
+        elif capability == "hepatic_function":
+            hepatic_markers = []
+            for ps in patient_signals:
+                for obs in ps.get("abnormal_observations", []):
+                    if obs.get("name", "").lower() in ("alt", "ast", "total bilirubin", "albumin", "alkaline phosphatase"):
+                        hepatic_markers.append(obs)
+            delegation_responses.append(DelegationResponse(
+                from_agent="lab_interpretation",
+                to_agent=req.get("from_agent", ""),
+                capability=capability,
+                result={"patient_id": req_pid, "hepatic_markers": hepatic_markers, "marker_count": len(hepatic_markers)},
+                confidence=0.9 if hepatic_markers else 0.3,
+            ).to_dict())
+
+    result: dict[str, Any] = {
         "messages": [{
             "agent": "lab_interpretation",
             "action": "analyze",
             "patients_with_signals": len(signals),
+            "delegations_resolved": len(delegation_responses),
             "signals": signals,
         }],
     }
+    if delegation_responses:
+        result["delegation_responses"] = delegation_responses
+    return result
 
 
 # ── Coding Review Agent ───────────────────────────────────────────────────

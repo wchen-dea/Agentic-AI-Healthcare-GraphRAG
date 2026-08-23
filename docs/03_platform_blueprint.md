@@ -49,6 +49,7 @@ What is implemented today:
 - MCP surface includes 10 clinical workflow tools (`skills_plan_get`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`, and others),
 - planner quality checks exist (`test_planner_evaluation.py`, `test_planner_edge_cases.py`) in addition to API contract tests,
 - LangGraph multi-agent orchestration with eight specialized nodes is implemented behind the `RAG_API_LANGGRAPH_ENABLED` feature flag,
+- inter-agent delegation protocol with typed AgentCards, capability discovery, and delegation router (`agent_cards.py`),
 - MLflow tracing with nested span hierarchy and healthcare-specific evaluation harness is implemented behind the `MLFLOW_TRACKING_URI` feature flag,
 - LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`,
 - terminology mappings cover all 6 producer vocabularies at 100% (LAB→LOINC, ICD-10, MED→RxNorm, CPT, Specialty→NUCC, Payer→NAIC),
@@ -1010,7 +1011,7 @@ Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/work
 |---|------|--------|----------|
 | 9 | Per-user identity and authorization | Medium | High |
 | 10 | Neural reranking (cross-encoder) | Medium | Medium |
-| 11 | Inter-agent collaboration (A2A) | High | Medium |
+| 11 | Inter-agent delegation — **Implemented** via `agent_cards.py` | Done | Medium |
 | 12 | Multimodal support (clinical imaging) | High | Low |
 | 13 | Domain-specific fine-tuning (LoRA/DPO) | High | Medium |
 | 14 | Distributed agent systems | High | Low |

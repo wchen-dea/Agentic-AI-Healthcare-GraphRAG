@@ -26,8 +26,72 @@ from .agents import (
     triage_agent,
     vector_retrieval_agent,
 )
+from .agent_cards import resolve_delegation
 from .mlflow_tracing import mlflow_enabled, trace_agent_node
 from .state import HealthcareAgentState
+
+
+# ── Delegation router ───────────────────────────────────────────────────────
+
+_DELEGATION_HANDLERS = {
+    "lab_interpretation": lab_interpretation_agent,
+    "medication_safety": medication_safety_agent,
+    "coding_review": coding_review_agent,
+}
+
+
+def delegation_router(state: HealthcareAgentState) -> dict[str, Any]:
+    """Resolve pending delegation requests by invoking target agents."""
+    pending = state.get("delegation_requests", [])
+    resolved_ids = {
+        (r.get("from_agent"), r.get("capability"))
+        for r in state.get("delegation_responses", [])
+    }
+
+    new_responses: list[dict[str, Any]] = []
+    messages: list[dict[str, Any]] = []
+
+    for req in pending:
+        req_key = (req.get("to_agent"), req.get("capability"))
+        already_resolved = (req.get("from_agent"), req.get("capability")) in resolved_ids
+        if already_resolved:
+            continue
+
+        target = resolve_delegation(type("R", (), req)()) if isinstance(req, dict) else None
+        if target is None:
+            target = req.get("to_agent")
+
+        handler = _DELEGATION_HANDLERS.get(target)
+        if handler:
+            sub_result = handler(state)
+            for resp in sub_result.get("delegation_responses", []):
+                new_responses.append(resp)
+            messages.append({
+                "agent": "delegation_router",
+                "action": "resolve",
+                "from_agent": req.get("from_agent"),
+                "to_agent": target,
+                "capability": req.get("capability"),
+            })
+
+    result: dict[str, Any] = {"messages": messages}
+    if new_responses:
+        result["delegation_responses"] = new_responses
+    return result
+
+
+def _has_pending_delegations(state: HealthcareAgentState) -> str:
+    """Check if there are unresolved delegation requests after specialist."""
+    pending = state.get("delegation_requests", [])
+    resolved = {
+        (r.get("from_agent"), r.get("capability"))
+        for r in state.get("delegation_responses", [])
+    }
+    unresolved = [
+        req for req in pending
+        if (req.get("from_agent"), req.get("capability")) not in resolved
+    ]
+    return "delegate" if unresolved else "evaluate"
 
 
 # ── Conditional edge helpers ────────────────────────────────────────────────
@@ -105,6 +169,7 @@ def build_healthcare_graph() -> StateGraph:
     _coding = trace_agent_node("coding_review", coding_review_agent) if mlflow_enabled() else coding_review_agent
     _conf = trace_agent_node("confidence_evaluator", confidence_evaluator) if mlflow_enabled() else confidence_evaluator
     _synth = trace_agent_node("synthesis", synthesis_agent) if mlflow_enabled() else synthesis_agent
+    _delegate = trace_agent_node("delegation_router", delegation_router) if mlflow_enabled() else delegation_router
 
     graph.add_node("triage", _triage)
     graph.add_node("vector_retrieval", _vector)
@@ -112,6 +177,7 @@ def build_healthcare_graph() -> StateGraph:
     graph.add_node("medication_safety", _med)
     graph.add_node("lab_interpretation", _lab)
     graph.add_node("coding_review", _coding)
+    graph.add_node("delegation_router", _delegate)
     graph.add_node("confidence_evaluator", _conf)
     graph.add_node("synthesis", _synth)
 
@@ -132,10 +198,25 @@ def build_healthcare_graph() -> StateGraph:
         },
     )
 
-    # Specialist agents converge to confidence evaluator
-    graph.add_edge("medication_safety", "confidence_evaluator")
-    graph.add_edge("lab_interpretation", "confidence_evaluator")
-    graph.add_edge("coding_review", "confidence_evaluator")
+    # Specialist agents check for delegations before confidence
+    graph.add_conditional_edges(
+        "medication_safety",
+        _has_pending_delegations,
+        {"delegate": "delegation_router", "evaluate": "confidence_evaluator"},
+    )
+    graph.add_conditional_edges(
+        "lab_interpretation",
+        _has_pending_delegations,
+        {"delegate": "delegation_router", "evaluate": "confidence_evaluator"},
+    )
+    graph.add_conditional_edges(
+        "coding_review",
+        _has_pending_delegations,
+        {"delegate": "delegation_router", "evaluate": "confidence_evaluator"},
+    )
+
+    # Delegation router feeds back to confidence after resolving
+    graph.add_edge("delegation_router", "confidence_evaluator")
 
     # Confidence gate: synthesize or loop back
     graph.add_conditional_edges(
