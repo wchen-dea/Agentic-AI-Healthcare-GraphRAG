@@ -123,13 +123,14 @@ class PipelineServiceTests(unittest.TestCase):
             "app.pipeline_service.build_qdrant_payload",
             return_value={"event_id": "evt-1"},
         ), patch("app.pipeline_service.PointStruct", side_effect=lambda **kwargs: kwargs):
-            svc.write_qdrant(event, payload, "Potassium 5.8", [0.1, 0.2])
+            svc.write_qdrant(event, payload, "Potassium 5.8", [0.1, 0.2], "clinical")
 
         svc.qdrant.upsert.assert_called_once()
         kwargs = svc.qdrant.upsert.call_args.kwargs
         self.assertEqual(kwargs["collection_name"], "healthcare_events")
         self.assertEqual(kwargs["points"][0]["id"], 101)
-        self.assertEqual(kwargs["points"][0]["payload"], {"event_id": "evt-1"})
+        self.assertIn("embedding_domain", kwargs["points"][0]["payload"])
+        self.assertEqual(kwargs["points"][0]["payload"]["embedding_domain"], "clinical")
 
     def test_write_neo4j_dispatches_lab_result_signal_path(self):
         svc = self._make_service()

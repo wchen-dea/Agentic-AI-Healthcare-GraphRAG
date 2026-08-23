@@ -8,8 +8,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FLINK_APP_DIR = REPO_ROOT / "flink-app"
+PLATFORM_DIR = REPO_ROOT.parent
 if str(FLINK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLINK_APP_DIR))
+if str(PLATFORM_DIR) not in sys.path:
+    sys.path.insert(0, str(PLATFORM_DIR))
 
 
 from app.ontology_loader import load_claims_outcome_rules, load_lab_signal_rules, load_ontology_bundle  # noqa: E402

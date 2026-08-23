@@ -7,37 +7,107 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
+import sys
 from typing import Any
 
+_shared_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "platform", "shared")
+if os.path.isdir(_shared_dir) and os.path.dirname(_shared_dir) not in sys.path:
+    sys.path.insert(0, os.path.dirname(_shared_dir))
 
-VECTOR_SIZE = 384
-_EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-_embedding_model = None
+try:
+    from shared.embedding import (
+        ALL_DOMAINS,
+        VECTOR_SIZE,
+        EmbeddingDomain,
+        stable_embedding,
+    )
+except ImportError:
+    VECTOR_SIZE = 384
+    ALL_DOMAINS = ["clinical", "claims", "device"]
+    EmbeddingDomain = str  # type: ignore[misc]
+    _EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    _embedding_model = None
 
-
-def _get_embedding_model():
-    global _embedding_model
-    if _embedding_model is not None:
+    def _get_embedding_model():
+        global _embedding_model
+        if _embedding_model is not None:
+            return _embedding_model
+        try:
+            from sentence_transformers import SentenceTransformer
+            _embedding_model = SentenceTransformer(_EMBEDDING_MODEL_NAME)
+        except Exception:
+            _embedding_model = False
         return _embedding_model
+
+    def stable_embedding(text: str, dim: int = VECTOR_SIZE, *, domain: str = "clinical") -> list[float]:  # type: ignore[misc]
+        model = _get_embedding_model()
+        if model and model is not False:
+            vec = model.encode(text, normalize_embeddings=True).tolist()
+            return vec[:dim] if len(vec) >= dim else vec + [0.0] * (dim - len(vec))
+        vec = [0.0] * dim
+        for token in text.lower().split():
+            token_hash = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
+            vec[token_hash % dim] += 1.0
+        norm = sum(x * x for x in vec) ** 0.5
+        return [x / norm if norm else 0.0 for x in vec]
+
+
+_CLAIMS_PATTERNS = re.compile(
+    r"\b(claim|billed|payer|reimburse|denied|appeal|copay|deductible|coverage|insurance|cpt|hcpcs)\b",
+    re.IGNORECASE,
+)
+_DEVICE_PATTERNS = re.compile(
+    r"\b(vital|heart.?rate|spo2|blood.?pressure|temperature|telemetry|device|monitor|wearable|respiratory.?rate)\b",
+    re.IGNORECASE,
+)
+
+
+def classify_query_domains(question: str) -> list[EmbeddingDomain]:
+    """Return embedding domains relevant to the question, best-match first."""
+    domains: list[EmbeddingDomain] = []
+    if _CLAIMS_PATTERNS.search(question):
+        domains.append("claims")
+    if _DEVICE_PATTERNS.search(question):
+        domains.append("device")
+    if not domains or not (_CLAIMS_PATTERNS.search(question) and _DEVICE_PATTERNS.search(question)):
+        domains.insert(0, "clinical")
+    return domains
+
+
+def _search_single_domain(
+    qdrant_client,
+    collection: str,
+    query_vector: list[float],
+    domain: EmbeddingDomain,
+    query_filter: dict | None,
+    limit: int,
+) -> list[dict[str, Any]]:
     try:
-        from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer(_EMBEDDING_MODEL_NAME)
+        results = qdrant_client.search(
+            collection_name=collection,
+            query_vector=(domain, query_vector),
+            query_filter=query_filter,
+            limit=limit,
+        )
     except Exception:
-        _embedding_model = False
-    return _embedding_model
-
-
-def stable_embedding(text: str, dim: int = VECTOR_SIZE) -> list[float]:
-    model = _get_embedding_model()
-    if model and model is not False:
-        vec = model.encode(text, normalize_embeddings=True).tolist()
-        return vec[:dim] if len(vec) >= dim else vec + [0.0] * (dim - len(vec))
-    vec = [0.0] * dim
-    for token in text.lower().split():
-        token_hash = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
-        vec[token_hash % dim] += 1.0
-    norm = sum(x * x for x in vec) ** 0.5
-    return [x / norm if norm else 0.0 for x in vec]
+        results = qdrant_client.search(
+            collection_name=collection,
+            query_vector=query_vector,
+            query_filter=query_filter,
+            limit=limit,
+        )
+    return [
+        {
+            "score": result.score,
+            "event_id": (result.payload or {}).get("event_id"),
+            "patient_id": (result.payload or {}).get("patient_id"),
+            "event_type": (result.payload or {}).get("event_type"),
+            "text": (result.payload or {}).get("text"),
+            "embedding_domain": (result.payload or {}).get("embedding_domain", "clinical"),
+        }
+        for result in results
+    ]
 
 
 def vector_search(
@@ -47,27 +117,25 @@ def vector_search(
     patient_id: str | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    query_vector = stable_embedding(question)
+    domains = classify_query_domains(question)
     query_filter = None
     if patient_id:
         query_filter = {"must": [{"key": "patient_id", "match": {"value": patient_id}}]}
 
-    results = qdrant_client.search(
-        collection_name=collection,
-        query_vector=query_vector,
-        query_filter=query_filter,
-        limit=limit,
-    )
-    return [
-        {
-            "score": result.score,
-            "event_id": (result.payload or {}).get("event_id"),
-            "patient_id": (result.payload or {}).get("patient_id"),
-            "event_type": (result.payload or {}).get("event_type"),
-            "text": (result.payload or {}).get("text"),
-        }
-        for result in results
-    ]
+    seen_ids: set[str | None] = set()
+    merged: list[dict[str, Any]] = []
+    per_domain = max(limit // len(domains), 1)
+
+    for domain in domains:
+        query_vector = stable_embedding(question, domain=domain)
+        hits = _search_single_domain(qdrant_client, collection, query_vector, domain, query_filter, per_domain)
+        for hit in hits:
+            if hit["event_id"] not in seen_ids:
+                seen_ids.add(hit["event_id"])
+                merged.append(hit)
+
+    merged.sort(key=lambda h: h["score"], reverse=True)
+    return merged[:limit]
 
 
 _GRAPH_QUERY = """

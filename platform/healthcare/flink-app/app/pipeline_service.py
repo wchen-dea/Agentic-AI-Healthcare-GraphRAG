@@ -7,7 +7,7 @@ from app.ontology_loader import provenance_for_source_type
 from app.reference_data import build_reference_data, update_reference_store
 from app.rules_engine import evaluate_claims_outcome_rules, evaluate_lab_signal_rules
 from app.storage import build_qdrant_payload, qdrant_point_id
-from app.text_processing import clinical_text, stable_embedding
+from app.text_processing import clinical_text, domain_for_event_type, stable_embedding
 from qdrant_client.models import PointStruct
 
 
@@ -58,23 +58,26 @@ class HealthcareEventPipelineService:
         event["ontology_version"] = self.ontology.get("version")
         event["payload_json"] = json.dumps(payload)
         text = clinical_text(event)
-        vector = stable_embedding(text)
-        self.write_qdrant(event, payload, text, vector)
+        domain = domain_for_event_type(event["event_type"])
+        vector = stable_embedding(text, domain=domain)
+        self.write_qdrant(event, payload, text, vector, domain)
         self.write_neo4j(event, payload, text)
         print(
             f"Processed event_id={event['event_id']} type={event['event_type']} "
             f"patient={event.get('patient_id')} enrich_hits={event.get('reference_hit_count', 0)}"
         )
 
-    def write_qdrant(self, event: dict[str, Any], payload: dict[str, Any], text: str, vector: list[float]) -> None:
+    def write_qdrant(self, event: dict[str, Any], payload: dict[str, Any], text: str, vector: list[float], domain: str) -> None:
         point_id = qdrant_point_id(event["event_id"])
         provenance = provenance_for_source_type(self.ontology, event.get("source_type"))
+        qdrant_payload = build_qdrant_payload(event, payload, text, provenance)
+        qdrant_payload["embedding_domain"] = domain
         self.qdrant.upsert(
             collection_name=self.qdrant_collection,
             points=[PointStruct(
                 id=point_id,
-                vector=vector,
-                payload=build_qdrant_payload(event, payload, text, provenance),
+                vector={domain: vector},
+                payload=qdrant_payload,
             )],
         )
 

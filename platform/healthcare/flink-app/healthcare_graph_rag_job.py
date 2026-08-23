@@ -25,7 +25,7 @@ from app.ontology_loader import (
 from app.normalization import normalize_event_payload
 from app.pipeline_service import HealthcareEventPipelineService
 from app.runner import run_consumer_loop
-from app.text_processing import VECTOR_SIZE
+from app.text_processing import ALL_DOMAINS, VECTOR_SIZE
 from confluent_kafka import Consumer, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
@@ -74,7 +74,10 @@ class HealthcareGraphRagProcessor:
         if QDRANT_COLLECTION not in existing:
             self.qdrant.create_collection(
                 collection_name=QDRANT_COLLECTION,
-                vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+                vectors_config={
+                    domain: VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
+                    for domain in ALL_DOMAINS
+                },
             )
         self.neo4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
         self.schema_registry = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
