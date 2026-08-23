@@ -261,7 +261,7 @@ Operational Plane
 flowchart LR
   subgraph Infra[Shared Infrastructure]
     K[Kafka]
-    SR[Schema Registry] --> K
+    SR[Schema Registry]
     L[LLM runtime - Ollama]
     PR[Prometheus]
     GF[Grafana]
@@ -272,30 +272,32 @@ flowchart LR
   subgraph DP[platform/]
     subgraph DPHC[healthcare]
       HP[Producer] --> K
-      K --> HF[PyFlink]
-      HF --> HOL[Ontology + Rules]
-      HOL --> HQ[Qdrant]
-      HOL --> HN[Neo4j]
+      SR -. schemas .-> HP
+      K --> HF[PyFlink job]
+      HF --> HQ[Qdrant]
+      HF --> HN[Neo4j]
     end
     subgraph DPSC[supply-chain]
       SP[Producer] --> K
-      K --> SF[PyFlink]
-      SF --> SOL[Ontology + Rules]
-      SOL --> SQ[Qdrant]
-      SOL --> SN[Neo4j]
+      SR -. schemas .-> SP
+      K --> SF[PyFlink job]
+      SF --> SQ[Qdrant]
+      SF --> SN[Neo4j]
     end
   end
 
   subgraph Domains[domains/ - AI Agents]
     subgraph HCA[healthcare/agents]
-      HDOM[domain/ - retrieval, synthesis, harness]
-      HLG[langgraph_agents/ - multi-agent graph]
-      HDOM --> HLG
+      HAPI[FastAPI + embedded FastMCP]
+      HDOM[domain/ - planner, retrieval, policy]
+      HMODES[Single-pass / ReAct / LangGraph]
+      HAPI --> HDOM --> HMODES
     end
     subgraph SCA[supply-chain/agents]
-      SDOM[domain/ - retrieval, synthesis, harness]
-      SLG[langgraph_agents/ - multi-agent graph]
-      SDOM --> SLG
+      SAPI[FastAPI + embedded FastMCP]
+      SDOM[domain/ - planner, retrieval, policy]
+      SMODES[Single-pass / ReAct / LangGraph]
+      SAPI --> SDOM --> SMODES
     end
   end
 
@@ -306,16 +308,18 @@ flowchart LR
     MCPClient --> SCA
   end
 
-  HCA --> HQ
-  HCA --> HN
-  SCA --> SQ
-  SCA --> SN
-  HLG --> L
-  SLG --> L
+  HMODES --> HQ
+  HMODES --> HN
+  SMODES --> SQ
+  SMODES --> SN
+  HMODES --> L
+  SMODES --> L
 
   K -. inspect .-> CDK
-  HCA -. metrics .-> PR
-  HCA -. trace .-> MLF
+  HAPI -. metrics .-> PR
+  SAPI -. metrics .-> PR
+  HMODES -. traces .-> MLF
+  SMODES -. traces .-> MLF
   PR --> GF
 ```
 
@@ -323,37 +327,39 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-  participant UI as Provider Web
+  participant UI as Domain Web App
   participant MCP as MCP Client
-  participant RAG as RAG REST API
-  participant MCPAPI as FastMCP API
-  participant Core as Shared planner and retrieval core
-  participant Planner as Request classifier and planner
-  participant Rank as Evidence ranker and policy shaper
-  participant Adapter as LLM provider adapter
+  participant API as FastAPI agents service
+  participant MCPAPI as Embedded FastMCP endpoint
+  participant Core as Query orchestration core
+  participant Policy as Guardrails, memory, and policy
+  participant Planner as Planner and skills layer
   participant Qdrant
   participant Neo4j
-  participant LLM
+  participant Model as Provider adapter / model router
+  participant LLM as Ollama or managed provider
 
-  UI->>RAG: call query endpoint
-  RAG->>Core: orchestrate query
-  Core->>Planner: classify and select retrieval plan
-  Planner-->>Core: retrieval plan
+  UI->>API: POST /query
+  API->>Core: run_query()
+  Core->>Policy: validate input and load session context
+  Policy-->>Core: authorized request
+  Core->>Planner: classify, plan, and build skills plan
+  Planner-->>Core: retrieval plan and skill actions
   Core->>Qdrant: vector retrieval
   Core->>Neo4j: graph retrieval
-  Core->>Rank: deterministic evidence ranking
-  Rank->>Adapter: grounded synthesis request
-  Adapter->>LLM: provider generate
+  Core->>Policy: rank, sanitize, and ground evidence
+  Policy-->>Core: bounded evidence
+  Core->>Model: grounded synthesis request
+  Model->>LLM: generate with selected provider/model
   LLM-->>Core: answer text
-  Core-->>RAG: evidence and answer
-  RAG-->>UI: JSON response
+  Core->>Policy: validate output and store session turn
+  Core-->>API: evidence, answer, and metadata
+  API-->>UI: JSON response
 
   MCP->>MCPAPI: initialize session
   MCPAPI-->>MCP: handshake and tool list
   MCP->>MCPAPI: call MCP tool
-  MCPAPI->>Core: invoke tool handler
-  Core->>Planner: classify and select plan
-  Core->>Rank: rank and shape outputs
+  MCPAPI->>Core: invoke shared query/tool handler
   Core-->>MCPAPI: tool result
   MCPAPI-->>MCP: MCP tool response
 ```
@@ -362,23 +368,22 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-  A[Generate Event] --> B{Reference payload?}
-  B -->|Yes| C[Update reference state]
-  B -->|No| D[Load transactional payload]
-  C --> E[Next event]
-  D --> F[Ontology loader and normalization]
-  F --> G[Terminology mapping and rules]
+  A[Domain producer] --> B[Kafka topic]
+  B --> C[Native PyFlink DataStream job]
+  C --> D{Reference topic?}
+  D -->|Yes| E[Update shared reference state]
+  D -->|No| F[Load transactional payload]
+  E --> G[Ontology loader, normalization, and rules]
+  F --> G
   G --> H[Canonical event and provenance tags]
   H --> I[Build semantic text and embedding]
   I --> J[Upsert semantic evidence to Qdrant]
   H --> K[Merge ontology-aligned entities and edges in Neo4j]
-  J --> L[Shared retrieval core consumes vector evidence]
-  K --> M[Shared retrieval core consumes graph evidence]
-  L --> N[Planner-selected retrieval and ranking]
+  J --> L[Query service vector retrieval]
+  K --> M[Query service graph retrieval]
+  L --> N[Planner-selected ranking and policy shaping]
   M --> N
-  N --> O[REST response and MCP tool outputs]
-  J --> E
-  K --> E
+  N --> O[REST JSON or MCP tool response]
 ```
 
 ## AI App Process Flow Diagram
@@ -388,23 +393,28 @@ flowchart TD
   E1[Receive Request] --> E2{API Surface}
   E2 -->|RAG REST| E3[RAG Query Endpoint]
   E2 -->|FastMCP| E4[MCP Session and Tool Endpoint]
-  E3 --> C1[Normalize input and scope]
+  E3 --> C1[Normalize input, authorize, load memory]
   E4 --> C1
   C1 --> C2[Classify request type]
   C2 --> C3[Select retrieval plan]
-  C3 --> C4[Vector retrieval from Qdrant]
-  C3 --> C5[Graph retrieval from Neo4j]
-  C4 --> C6[Deterministic evidence ranking]
-  C5 --> C6
-  C6 --> C7[Plan-aware grounded prompt]
-  C7 --> C8[LLM provider adapter]
-  C8 --> C9{Runtime provider}
-  C9 -->|Current| C10[Ollama]
-  C9 -->|Future| C11[Additional providers]
-  C10 --> C12[Unified result with planner metadata]
-  C11 --> C12
-  C12 --> O1[REST JSON response]
-  C12 --> O2[MCP tool response]
+  C3 --> C4{Orchestration mode}
+  C4 -->|Default| C5[Single-pass retrieval]
+  C4 -->|Feature flag| C6[Bounded ReAct loop]
+  C4 -->|Feature flag| C7[LangGraph StateGraph]
+  C5 --> C8[Vector + graph retrieval]
+  C6 --> C8
+  C7 --> C8
+  C8 --> C9[Rank, sanitize, and ground evidence]
+  C9 --> C10[Structured prompt or grounded prompt]
+  C10 --> C11[Provider adapter and model router]
+  C11 --> C12{Configured provider}
+  C12 -->|Local default| C13[Ollama]
+  C12 -->|Configured| C14[OpenAI / Anthropic / fallback]
+  C13 --> C15[Output guardrails and response budget]
+  C14 --> C15
+  C15 --> C16[Store session turn and emit metrics/traces]
+  C16 --> O1[REST JSON response]
+  C16 --> O2[MCP tool response]
 ```
 
 ## LLM Selection Strategy (Local and Production)

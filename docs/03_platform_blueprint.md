@@ -126,58 +126,65 @@ Source Systems / Producers
 ```mermaid
 flowchart LR
   subgraph Infra[Shared Infrastructure]
-    K[Kafka]
-    K --> F[Flink per domain]
+    K[Kafka cluster]
+    SR[Schema Registry]
+    K --> FHC[Healthcare Flink job]
+    K --> FSC[Supply-chain Flink job]
   end
 
-  subgraph Ingestion[Ingestion and Semantics per domain]
-    F --> NORM[Semantic normalization]
-    NORM --> TERM[Terminology mapping]
-    NORM --> ER[Entity resolution]
-    NORM --> RULES[Domain rules]
-    NORM --> PROV[Provenance tagging]
+  subgraph Ingestion[Domain ingestion and enrichment]
+    FHC --> HNORM[Healthcare normalization, mappings, rules]
+    FSC --> SNORM[Supply-chain normalization, mappings, rules]
   end
 
-  subgraph Stores[Dual Evidence Stores per domain]
-    TERM --> Q[Qdrant]
-    ER --> G[Neo4j]
-    RULES --> G
-    PROV --> Q
-    PROV --> G
+  subgraph Stores[Separate dual evidence stores]
+    HNORM --> HQ[Healthcare Qdrant]
+    HNORM --> HG[Healthcare Neo4j]
+    SNORM --> SQ[Supply-chain Qdrant]
+    SNORM --> SG[Supply-chain Neo4j]
   end
 
-  subgraph Query[Query Orchestration]
-    API[REST or MCP request] --> CLS[Request classifier]
-    CLS --> PLAN[Retrieval planner]
-    PLAN --> SK[Skill runner]
-    SK --> Q
-    SK --> G
-    SK --> RANK[Evidence ranker]
-    RANK --> LLM[LLM adapter]
+  subgraph Query[Per-domain query service]
+    API[REST or embedded MCP request] --> AUTH[Auth, guardrails, and memory]
+    AUTH --> CLS[Request classifier]
+    CLS --> PLAN[Retrieval planner and skills]
+    PLAN --> MODE{Single-pass / ReAct / LangGraph}
+    MODE --> RANK[Vector + graph retrieval and ranking]
+    RANK --> LLM[Provider adapter and model router]
   end
 
-  subgraph Delivery[Delivery and Control]
+  subgraph Delivery[Delivery and control]
     LLM --> RESP[Response shaping]
     RESP --> REST[REST]
     RESP --> MCP[MCP tools]
-    RESP --> UI[Domain web apps]
+    REST --> UI[Domain web apps]
   end
 
   subgraph Ops[Quality and Ops]
-    PLAN --> QA[Evaluation suite]
-    RESP --> AUDIT[Audit and policy]
-    Q --> MET[Metrics]
-    G --> MET
+    PLAN --> QA[Contract, planner, and evaluation gates]
+    RESP --> AUDIT[Audit, policy, and response budgets]
+    HQ --> MET[Prometheus metrics]
+    HG --> MET
+    SQ --> MET
+    SG --> MET
     LLM --> MET
+    MET --> GF[Grafana]
+    LLM -. traces .-> MLF[MLflow / LangSmith]
   end
+
+  SR -. schema governance .-> K
+  K -. topics .-> FHC
+  K -. topics .-> FSC
+  HQ --> RANK
+  HG --> RANK
+  SQ --> RANK
+  SG --> RANK
 
    classDef done fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px,color:#1b5e20;
    classDef progress fill:#fff8e1,stroke:#e65100,stroke-width:1px,color:#e65100;
    classDef pending fill:#ffebee,stroke:#b71c1c,stroke-width:1px,color:#b71c1c;
 
-   class NORM,RULES,PROV,Q,G,CLS,PLAN,SK,RANK,LLM,REST,MCP,UI done;
-   class TERM,ER,QA progress;
-   class AUDIT pending;
+  class K,SR,FHC,FSC,HNORM,SNORM,HQ,HG,SQ,SG,AUTH,CLS,PLAN,MODE,RANK,LLM,RESP,REST,MCP,UI,QA,AUDIT,MET,GF,MLF done;
 ```
 
 ## Ontology Model

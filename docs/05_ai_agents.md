@@ -1032,16 +1032,19 @@ graph TD
     C -->|medication_safety| D[medication_safety_agent]
     C -->|lab_interpretation| E[lab_interpretation_agent]
     C -->|coding_review| F[coding_review_agent]
-    C -->|patient_summary/cohort| G[confidence_evaluator]
-    D --> G
-    E --> G
-    F --> G
+    C -->|patient_summary/cohort_triage| G[confidence_evaluator]
+    D --> J{Pending delegation?}
+    E --> J
+    F --> J
+    J -->|yes| K[delegation_router]
+    J -->|no| G
+    K --> G
     G -->|confidence >= 0.75 or max_iter| H[synthesis_agent]
     G -->|low confidence| B
     H --> I[END]
 ```
 
-Eight LangGraph nodes with typed shared state (5 specialist agents + 3 control/infrastructure nodes):
+Nine LangGraph nodes with typed shared state (3 retrieval agents, 3 specialist agents, 2 control agents, and synthesis):
 
 | Agent | Responsibility |
 |-------|---------------|
@@ -1051,6 +1054,7 @@ Eight LangGraph nodes with typed shared state (5 specialist agents + 3 control/i
 | `medication_safety_agent` | Interaction, contraindication, adverse event analysis |
 | `lab_interpretation_agent` | Lab signal and abnormal observation extraction |
 | `coding_review_agent` | Claims gap detection and ICD-10 mapping analysis |
+| `delegation_router` | Resolve specialist-to-specialist capability requests |
 | `confidence_evaluator` | Evidence completeness scoring, loop control |
 | `synthesis_agent` | Grounded answer generation via Ollama |
 
