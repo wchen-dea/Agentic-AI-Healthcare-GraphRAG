@@ -119,9 +119,10 @@ The current deployment uses a simplified Qdrant configuration compared to the ta
 | --- | --- | --- |
 | Collection name | `medical_events_v1` | `healthcare_events` |
 | Vector dimensions | 1,536 (text-embedding-3-small) | 384 (sentence-transformers/all-MiniLM-L6-v2) |
-| Search mode | Dense + sparse hybrid | Dense only |
+| Vector config | Single unnamed vector | Named vectors per domain: `clinical`, `claims`, `device` |
+| Search mode | Dense + sparse hybrid | Dense only (per-domain) |
 | Client protocol | gRPC batched upserts | HTTP QdrantClient |
 | Payload indexes | Explicit `CreateFieldIndex` | Not explicitly created |
-| Lineage fields | `embedding_model`, `model_version`, `source_event_id`, `ingested_at` | `event_id`, `event_ts`, `event_type`, `patient_id` |
+| Lineage fields | `embedding_model`, `model_version`, `source_event_id`, `ingested_at` | `event_id`, `event_ts`, `event_type`, `patient_id`, `embedding_domain` |
 
-The accepted architectural direction remains valid. The current implementation serves the local-first development stack with a lightweight embedding model. Migration to the full ADR-0002 schema is planned alongside neural embedding deployment and collection versioning.
+The accepted architectural direction remains valid. Domain-routed named vectors are now implemented with per-domain model configurability (`EMBEDDING_MODEL_CLINICAL`, `EMBEDDING_MODEL_CLAIMS`, `EMBEDDING_MODEL_DEVICE`). Migration to the full ADR-0002 schema (larger dimensions, sparse hybrid, gRPC batching) is planned alongside domain-tuned model deployment.

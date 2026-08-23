@@ -210,13 +210,19 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 | Property | Value |
 |----------|-------|
-| Algorithm | Stable MD5 bag-of-words |
+| Default model | `sentence-transformers/all-MiniLM-L6-v2` (env `EMBEDDING_MODEL`) |
 | Dimensions | 384 |
 | Normalisation | L2 (unit vector) |
-| Token extraction | Lowercase whitespace split |
+| Fallback | Deterministic MD5 bag-of-words when `sentence-transformers` is unavailable |
+| Domain routing | `clinical`, `claims`, `device` — each configurable via `EMBEDDING_MODEL_CLINICAL`, `EMBEDDING_MODEL_CLAIMS`, `EMBEDDING_MODEL_DEVICE` |
 
-> The stable embedding is a deterministic, dependency-free surrogate. Replace with a neural
-> model (e.g. `sentence-transformers/all-MiniLM-L6-v2`) for production semantic quality.
+| Event Type | Embedding Domain |
+|---|---|
+| `CLINICAL_NOTE`, `LAB_RESULT`, `MEDICATION_ORDER` | `clinical` |
+| `CLAIM_STATUS` | `claims` |
+| `VITAL_SIGN` | `device` |
+
+All three domains default to the same model. Set domain-specific env vars to activate separate models for improved recall.
 
 ---
 
@@ -225,7 +231,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | Property | Value |
 |----------|-------|
 | Collection name | `healthcare_events` (default; env `QDRANT_COLLECTION`) |
-| Vector size | 384 |
+| Vector config | Named vectors: `clinical`, `claims`, `device` (384-dim cosine each) |
 | Distance metric | Cosine |
 | HTTP port | 6333 |
 | gRPC port | 6334 |
@@ -244,6 +250,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `enriched` | bool | — | Whether reference data was injected |
 | `reference_hit_count` | int | — | Number of matched reference entities |
 | `text` | string | — | Rendered clinical text (embedded) |
+| `embedding_domain` | string | — | Which named vector space was used (`clinical`, `claims`, `device`) |
 | `payload` | object | — | Full enriched domain payload |
 
 ---

@@ -239,9 +239,11 @@ docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
 
 ## 3. Vector Retrieval Quality (Semantic Hit Rate)
 
-Vector retrieval uses a deterministic stable-embedding (MD5 bag-of-words) rather than a
-neural model in this repository. Accuracy is therefore bounded by vocabulary overlap
-between the query and the embedded clinical text.
+Vector retrieval uses domain-routed embeddings (clinical, claims, device) with
+`sentence-transformers/all-MiniLM-L6-v2` by default. Each domain can be configured
+with a specialised model via `EMBEDDING_MODEL_CLINICAL`, `EMBEDDING_MODEL_CLAIMS`,
+or `EMBEDDING_MODEL_DEVICE`. Query-time domain classification routes questions to
+the appropriate vector space for improved recall.
 
 ### Hit-rate check against a live stack
 

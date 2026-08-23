@@ -521,7 +521,7 @@ Execution details:
 
 platform/healthcare/flink-app/healthcare_graph_rag_job.py provides:
 
-- stable_embedding for deterministic embeddings,
+- domain-routed embedding (clinical / claims / device) via `platform/shared/embedding.py`,
 - clinical_text rendering with optional reference-data expansion,
 - in-memory reference store updates,
 - event enrichment,

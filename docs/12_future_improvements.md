@@ -206,7 +206,7 @@ The `domains/supply-chain/` scaffold is in place with producer, graph_writes, pi
 - [ ] Supply-chain query examples script (`scripts/sc_query_examples.sh`)
 - [ ] BOM cascade impact analysis: given a disruption, traverse DEPENDS_ON to find all affected assemblies
 - [ ] Supplier scorecard aggregation from quality inspections, shipment lead times, and disruption history
-- [ ] Neural embedding deployment for supply-chain Qdrant collection (shared MiniLM model)
+- [ ] Domain-routed embedding for supply-chain Qdrant collection (reuse `platform/shared/embedding.py` multi-model registry)
 
 ### New Domain Template
 
