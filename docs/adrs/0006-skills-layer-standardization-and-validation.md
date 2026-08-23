@@ -33,8 +33,8 @@ Adopt a standardized Skills layer with generator-plus-validator enforcement.
 3. Generated skill package artifacts under `domains/healthcare/skills/` are maintained by `domains/healthcare/scripts/generate_agent_skills.py`.
 4. Structural validation is enforced by `domains/healthcare/scripts/validate_agent_skills.py`.
 5. Both domains (healthcare and supply-chain) share generator/validator logic via `scripts/lib/`.
-5. CI enforces both checks in a dedicated skills validation job.
-6. Upstream `skills-ref validate` is optional and non-blocking:
+6. CI enforces both checks in a dedicated skills validation job.
+7. Upstream `skills-ref validate` is optional and non-blocking:
    - use it when available,
    - attempt best-effort install when missing,
    - skip gracefully when still unavailable.
@@ -75,7 +75,7 @@ Trade-offs:
 ## Related
 
 - [ADR-0005: Embed FastMCP in rag-api](./0005-embed-fastmcp-in-rag-api.md)
-- [Skills Layer](../08_skills_layer.md)
-- [MCP Layer Design](../07_mcp_layer_design.md)
+- [Skills Layer](../05_ai_agents.md)
+- [MCP Layer Design](../05_ai_agents.md)
 - [Technical Specs](../06_technical_specs.md)
-- [AI QA](../12_ai_qa.md)
+- [AI QA](../07_quality_assurance.md)

@@ -21,10 +21,10 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
 | `healthcare-neodash` | neo4jlabs/neodash | latest | 5005 | Neo4j dashboard UI |
 | `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
-| `infra-flink-jobmanager` | custom (data-platform/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
-| `infra-flink-taskmanager` | custom (data-platform/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
-| `healthcare-flink-app` | custom (data-platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
-| `healthcare-producer` | custom (data-platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
+| `infra-flink-jobmanager` | custom (platform/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
+| `infra-flink-taskmanager` | custom (platform/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
+| `healthcare-flink-app` | custom (platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
+| `healthcare-producer` | custom (platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
 | `healthcare-rag-api` | custom (domains/healthcare/agents/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
 | `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (Nginx) |
 | `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
@@ -43,7 +43,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `supplychain-neo4j-init` | neo4j | 5.26.2 | — | One-shot supply chain Cypher seed |
 | `supplychain-qdrant` | qdrant/qdrant | latest | 6335 (HTTP), 6336 (gRPC) | Supply chain vector store |
 | `supplychain-kafka-init` | confluentinc/cp-kafka | 7.9.0 | — | One-shot supply chain topic creation |
-| `supplychain-producer` | custom (data-platform/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
+| `supplychain-producer` | custom (platform/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
 | `localstack` | localstack/localstack | 3.8.0 | 4566, 4510–4559 | Local AWS-compatible services |
 
 ---
@@ -71,7 +71,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 > **Note:** `pydantic` is pinned with a range (`>=2.11.7,<3.0.0`) rather than an exact version because `mcp==1.28.0` requires `pydantic>=2.12.0` on Python 3.14. The range allows pip to resolve on Python 3.11 (CI/Docker target) and 3.14+ without conflict.
 
-### flink-app (`data-platform/healthcare/flink-app/requirements.txt`)
+### flink-app (`platform/healthcare/flink-app/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -82,7 +82,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | qdrant-client | 1.11.3 | Qdrant upsert client |
 | requests | 2.32.3 | HTTP utilities |
 
-### producer (`data-platform/healthcare/producer/requirements.txt`)
+### producer (`platform/healthcare/producer/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -163,7 +163,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 ## 4. Avro Envelope Schema
 
-**File:** `data-platform/healthcare/schemas/medical_event.avsc`  
+**File:** `platform/healthcare/schemas/medical_event.avsc`  
 **Namespace:** `com.healthcare.graphrag`  
 **Record name:** `MedicalEvent`  
 **Schema version:** `1.0.0`
@@ -178,7 +178,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `patient_id` | `["null","string"]` | `null` | Absent for non-patient reference events |
 | `encounter_id` | `["null","string"]` | `null` | Optional encounter scope |
 | `provider_id` | `["null","string"]` | `null` | Optional attending provider |
-| `payload_json` | `string` | — | Event-type-specific JSON object (see 04_kafka_schema.md) |
+| `payload_json` | `string` | — | Event-type-specific JSON object (see 04_data_platform.md) |
 | `schema_version` | `string` | `"1.0.0"` | Envelope schema version |
 
 ---
@@ -210,13 +210,19 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 | Property | Value |
 |----------|-------|
-| Algorithm | Stable MD5 bag-of-words |
+| Default model | `sentence-transformers/all-MiniLM-L6-v2` (env `EMBEDDING_MODEL`) |
 | Dimensions | 384 |
 | Normalisation | L2 (unit vector) |
-| Token extraction | Lowercase whitespace split |
+| Fallback | Deterministic MD5 bag-of-words when `sentence-transformers` is unavailable |
+| Domain routing | `clinical`, `claims`, `device` — each configurable via `EMBEDDING_MODEL_CLINICAL`, `EMBEDDING_MODEL_CLAIMS`, `EMBEDDING_MODEL_DEVICE` |
 
-> The stable embedding is a deterministic, dependency-free surrogate. Replace with a neural
-> model (e.g. `sentence-transformers/all-MiniLM-L6-v2`) for production semantic quality.
+| Event Type | Embedding Domain |
+|---|---|
+| `CLINICAL_NOTE`, `LAB_RESULT`, `MEDICATION_ORDER` | `clinical` |
+| `CLAIM_STATUS` | `claims` |
+| `VITAL_SIGN` | `device` |
+
+All three domains default to the same model. Set domain-specific env vars to activate separate models for improved recall.
 
 ---
 
@@ -225,7 +231,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | Property | Value |
 |----------|-------|
 | Collection name | `healthcare_events` (default; env `QDRANT_COLLECTION`) |
-| Vector size | 384 |
+| Vector config | Named vectors: `clinical`, `claims`, `device` (384-dim cosine each) |
 | Distance metric | Cosine |
 | HTTP port | 6333 |
 | gRPC port | 6334 |
@@ -244,6 +250,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `enriched` | bool | — | Whether reference data was injected |
 | `reference_hit_count` | int | — | Number of matched reference entities |
 | `text` | string | — | Rendered clinical text (embedded) |
+| `embedding_domain` | string | — | Which named vector space was used (`clinical`, `claims`, `device`) |
 | `payload` | object | — | Full enriched domain payload |
 
 ---
@@ -257,7 +264,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | HTTP port | 7474 |
 | Bolt port | 7687 |
 | Auth | `neo4j / ${NEO4J_PASSWORD:-healthcare123}` |
-| Init script | `data-platform/healthcare/neo4j/init.cypher` (mounted at startup) |
+| Init script | `platform/healthcare/neo4j/init.cypher` (mounted at startup) |
 
 ### Node labels (19)
 
@@ -308,7 +315,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `MANAGED_BY` | Patient → Provider | — |
 | `COVERED_BY` | Patient → Payer | — |
 
-### Seed data (from `data-platform/healthcare/neo4j/init.cypher`)
+### Seed data (from `platform/healthcare/neo4j/init.cypher`)
 
 | Category | Count |
 |----------|-------|
@@ -373,7 +380,32 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `RAG_API_MAX_RESPONSE_BYTES` | 50 000 | Hard byte budget for entire response payload |
 | `LLM_TIMEOUT_SECONDS` | 120 | Ollama request timeout |
 | `LLM_MAX_TOKENS` | 1200 | Ollama `num_predict` |
-| `OLLAMA_MODEL` | `llama3.1` | Model pulled and used for generation |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Default model for generation |
+| `LLM_MODEL_SIMPLE` | (= `OLLAMA_MODEL`) | Model for simple queries (greetings, lookups) |
+| `LLM_MODEL_MODERATE` | (= `OLLAMA_MODEL`) | Model for moderate queries (single-domain clinical) |
+| `LLM_MODEL_COMPLEX` | (= `OLLAMA_MODEL`) | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
+
+### Dynamic model routing (`domain/model_router.py`)
+
+The model router classifies each query into a complexity tier and selects the appropriate model. When all tiers map to the same model (the default), the router is not activated and the standard provider is used directly.
+
+| Tier | Trigger signals | Example queries |
+|------|----------------|-----------------|
+| `simple` | Greeting patterns, short statements, `list` commands | "hello", "list conditions", "thanks" |
+| `moderate` | Single-domain keywords (medication, lab, vitals, claims, diagnosis) | "What medications does the patient take?", "Are there abnormal labs?" |
+| `complex` | Multi-system reasoning, polypharmacy, differential diagnosis, risk stratification, temporal analysis | "Analyze drug interactions and contraindications", "Risk stratify for sepsis deterioration" |
+
+Complexity classification is deterministic (regex-based, no LLM call). Each signal has a weight; the sum determines the tier.
+
+Production configuration example:
+
+| Tier | Env var | Example value | Rationale |
+|------|---------|---------------|-----------|
+| simple | `LLM_MODEL_SIMPLE` | `llama3.2:3b` | Fast, low cost for greetings and lookups |
+| moderate | `LLM_MODEL_MODERATE` | `llama3.1` | Balanced quality for single-domain clinical queries |
+| complex | `LLM_MODEL_COMPLEX` | `openai:gpt-4.1` | Best reasoning for multi-system analysis |
+
+Cross-provider routing uses `provider:model` syntax (e.g. `openai:gpt-4.1`). The router auto-creates the provider if not already instantiated.
 
 ### Response shape (`/query`)
 
@@ -392,6 +424,12 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
   "answer": "...",
   "retrieved_at": "2026-07-02T...",
   "trace_id": "uuid",
+  "model_routing": {
+    "tier": "moderate",
+    "score": 2,
+    "signals": ["medication_query", "diagnosis_query"],
+    "model": "llama3.2:3b"
+  },
   "guardrails": {
     "evidence_text_redacted": true,
     "evidence_access_level": "none",
@@ -514,9 +552,12 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `QDRANT_URL` | `http://qdrant:6333` | flink-app, rag-api | Qdrant HTTP base URL |
 | `QDRANT_COLLECTION` | `healthcare_events` | flink-app, rag-api | Collection name |
 | `OLLAMA_URL` | `http://ollama:11434` | rag-api | Ollama inference endpoint |
-| `OLLAMA_MODEL` | `llama3.1` | rag-api | Model name for Ollama generation |
+| `OLLAMA_MODEL` | `llama3.2:3b` | rag-api | Default model name for generation |
 | `LLM_PROVIDER` | `ollama` | rag-api | Primary LLM provider: `ollama`, `openai`, or `anthropic` |
-| `LLM_MODEL` | `llama3.1` | rag-api | Provider-specific model name |
+| `LLM_MODEL` | `llama3.2:3b` | rag-api | Provider-specific model name |
+| `LLM_MODEL_SIMPLE` | (= `OLLAMA_MODEL`) | rag-api | Model for simple queries (greetings, lookups). Used by `ModelRouter` |
+| `LLM_MODEL_MODERATE` | (= `OLLAMA_MODEL`) | rag-api | Model for moderate queries (single-domain clinical). Used by `ModelRouter` |
+| `LLM_MODEL_COMPLEX` | (= `OLLAMA_MODEL`) | rag-api | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
 | `LLM_FALLBACK_PROVIDER` | (unset) | rag-api | Fallback provider on primary failure |
 | `LLM_FALLBACK_MODEL` | (unset) | rag-api | Model name for fallback provider |
 | `LLM_TIMEOUT_SECONDS` | `120` | rag-api | LLM request timeout |

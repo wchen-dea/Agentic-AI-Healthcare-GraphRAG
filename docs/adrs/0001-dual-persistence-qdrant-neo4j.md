@@ -100,7 +100,7 @@ Trade-offs:
 
 ## Rollout and Verification
 
-1. **Constraint initialization** — `data-platform/healthcare/neo4j/init.cypher` creates uniqueness constraints for all core labels; idempotent on re-run.
+1. **Constraint initialization** — `platform/healthcare/neo4j/init.cypher` creates uniqueness constraints for all core labels; idempotent on re-run.
 2. **Seed reference data** — drug interaction edges (`INTERACTS_WITH`) and seeded condition nodes loaded at init time.
 3. **Flink dual-sink smoke test** — produce a synthetic `CLINICAL_NOTE` event; verify `(Patient)-[:HAS_CONDITION]->` edge in Neo4j and matching embedding in Qdrant within 10 s.
 4. **Drug safety signal test** — produce a synthetic `LAB_RESULT` with Potassium ≥ 5.5; verify `(Observation)-[:MAY_INDICATE]->(Condition {name: "Hyperkalemia"})` edge.
@@ -111,6 +111,6 @@ Trade-offs:
 
 - [ADR-0002: Qdrant as the streaming vector store for real-time RAG](./0002-qdrant-streaming-vector-store.md)
 - [Architecture](../02_architecture.md)
-- [Skills Layer](../08_skills_layer.md)
-- [Neo4j Graph Model](../05_neo4j_model.md)
+- [Skills Layer](../05_ai_agents.md)
+- [Neo4j Graph Model](../04_data_platform.md)
 - [Neo4j — Medical Care Industry Use Cases](https://neo4j.com/developer/industry-use-cases/life-sciences/medical-care/)

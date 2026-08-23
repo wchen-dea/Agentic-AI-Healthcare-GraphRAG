@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "supply-chain"
+DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "platform" / "supply-chain"
 NEO4J_DIR = DATA_PLATFORM_DIR / "neo4j"
 
 INIT_FILE = NEO4J_DIR / "init.cypher"

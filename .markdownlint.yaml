@@ -1,0 +1,14 @@
+# Markdownlint configuration
+
+# Allow compact table style (no spaces around pipes)
+MD060: false
+# Allow bare URLs in tables (service endpoint references)
+MD034: false
+# Allow multiple H1 in merged docs
+MD025: false
+# Allow first line to be frontmatter (skill packages)
+MD041: false
+# Hard tabs in future_improvements.md (backlog table)
+MD010: false
+# Code fences without language are acceptable for plain text blocks
+MD040: false

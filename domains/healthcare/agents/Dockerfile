@@ -8,5 +8,5 @@ COPY domains/healthcare/agents/skills_layer.py .
 COPY domains/healthcare/agents/domain ./domain
 COPY domains/healthcare/agents/langgraph_agents ./langgraph_agents
 COPY domains/healthcare/agents/config ./config
-COPY data-platform/shared ./shared_lib
+COPY platform/shared ./shared_lib
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

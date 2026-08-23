@@ -55,6 +55,7 @@ class OllamaProvider:
         timeout_seconds: int,
         max_tokens: int,
         temperature: float = 0.2,
+        **_extra: object,
     ) -> str:
         selected_model, available_models = self.resolve_model()
         if not selected_model:
@@ -113,6 +114,7 @@ class OpenAIProvider:
         timeout_seconds: int,
         max_tokens: int,
         temperature: float = 0.2,
+        **_extra: object,
     ) -> str:
         if not self.api_key:
             return "LLM error: OPENAI_API_KEY not set."
@@ -154,6 +156,7 @@ class AnthropicProvider:
         timeout_seconds: int,
         max_tokens: int,
         temperature: float = 0.2,
+        **_extra: object,
     ) -> str:
         if not self.api_key:
             return "LLM error: ANTHROPIC_API_KEY not set."

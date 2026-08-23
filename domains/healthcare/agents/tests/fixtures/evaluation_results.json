@@ -1,0 +1,42 @@
+[
+  {
+    "case": "Hyperkalemia risk for patient on spironolactone with CKD",
+    "mode": "single_pass",
+    "routing": {"score": 1.0, "expected": "patient_summary", "actual": "patient_summary"},
+    "agent_coverage": {"score": 1.0},
+    "evidence": {"score": 1.0, "has_vector": true, "has_graph": true},
+    "answer_quality": {"score": 0.75, "has_answer": true, "mentions_evidence": true}
+  },
+  {
+    "case": "Drug interactions for warfarin and metformin",
+    "mode": "single_pass",
+    "routing": {"score": 1.0, "expected": "medication_safety", "actual": "medication_safety"},
+    "agent_coverage": {"score": 1.0},
+    "evidence": {"score": 1.0, "has_vector": true, "has_graph": true},
+    "answer_quality": {"score": 0.75, "has_answer": true, "mentions_evidence": true}
+  },
+  {
+    "case": "Recent lab results showing elevated creatinine",
+    "mode": "single_pass",
+    "routing": {"score": 1.0, "expected": "lab_interpretation", "actual": "lab_interpretation"},
+    "agent_coverage": {"score": 1.0},
+    "evidence": {"score": 0.5, "has_vector": true, "has_graph": false},
+    "answer_quality": {"score": 0.5, "has_answer": true, "mentions_evidence": false}
+  },
+  {
+    "case": "Coding gaps for denied claims",
+    "mode": "single_pass",
+    "routing": {"score": 1.0, "expected": "coding_review", "actual": "coding_review"},
+    "agent_coverage": {"score": 1.0},
+    "evidence": {"score": 1.0, "has_vector": true, "has_graph": true},
+    "answer_quality": {"score": 0.75, "has_answer": true, "mentions_evidence": true}
+  },
+  {
+    "case": "Cohort risk summary for diabetic patients",
+    "mode": "single_pass",
+    "routing": {"score": 1.0, "expected": "cohort_triage", "actual": "cohort_triage"},
+    "agent_coverage": {"score": 1.0},
+    "evidence": {"score": 0.5, "has_vector": true, "has_graph": false},
+    "answer_quality": {"score": 0.5, "has_answer": true, "mentions_evidence": false}
+  }
+]

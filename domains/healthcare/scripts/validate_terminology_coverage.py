@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "data-platform" / "healthcare"
+DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "platform" / "healthcare"
 PRODUCER_FILE = DATA_PLATFORM_DIR / "producer" / "produce_events.py"
 
 LAB_MAPPINGS_FILE = DATA_PLATFORM_DIR / "ontology" / "mappings" / "lab_mappings.yaml"
