@@ -53,12 +53,10 @@ jobs:
             -f deploy/helm/values-production.yaml \
             -n healthcare-ai --create-namespace \
             --set rag-api.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
-            --set rag-api.secrets.OPENAI_API_KEY="$OPENAI_API_KEY" \
             --set rag-api.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
             --wait --timeout 5m
         env:
           NEO4J_PASSWORD: ${{ secrets['NEO4J_PASSWORD'] }}
-          OPENAI_API_KEY: ${{ secrets['OPENAI_API_KEY'] }}
           ANTHROPIC_API_KEY: ${{ secrets['ANTHROPIC_API_KEY'] }}
 
       - name: Wait for rollouts

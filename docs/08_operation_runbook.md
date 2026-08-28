@@ -559,7 +559,7 @@ Fix (Minikube/Helm):
 kubectl -n healthcare-ai-dev exec deploy/ollama -- ollama pull llama3.1
 ```
 
-Note: Production uses OpenAI (primary) with Anthropic (fallback) — Ollama is not deployed. If both cloud providers fail, check `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` secrets.
+Note: Production uses AWS Bedrock (primary) with optional Anthropic fallback — Ollama is not deployed. If cloud generation fails, check the pod IAM role, Bedrock model access in the configured region, and `ANTHROPIC_API_KEY` when fallback is enabled.
 
 ### 6) Conduktor Message Cannot Be Displayed (Bytes Deserializer)
 

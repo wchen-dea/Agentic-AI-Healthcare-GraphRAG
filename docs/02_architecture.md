@@ -438,11 +438,12 @@ MCP delivery in the current implementation:
 
 ### LLM Provider Routing (Implemented)
 
-The repository runtime includes a provider adapter in `domains/healthcare/agents/llm_provider.py` with three implemented providers:
+The repository runtime includes a provider adapter in `domains/healthcare/agents/llm_provider.py` with four implemented generation providers:
 
 - **OllamaProvider** — local inference (default for dev)
-- **OpenAIProvider** — OpenAI Chat Completions API (production primary)
-- **AnthropicProvider** — Anthropic Messages API (production fallback)
+- **BedrockProvider** — AWS Bedrock Runtime (production primary)
+- **OpenAIProvider** — OpenAI Chat Completions API
+- **AnthropicProvider** — Anthropic Messages API (production fallback option)
 - **FallbackProvider** — wraps primary + fallback; auto-retries on error
 
 Routing is environment-driven:
@@ -450,11 +451,11 @@ Routing is environment-driven:
 | Environment | Primary | Fallback |
 |-------------|---------|----------|
 | Dev / Local | Ollama (`llama3.1`) | none |
-| Production | OpenAI (`gpt-4.1-mini`) | Anthropic (`claude-sonnet-4-20250514`) |
+| Production | Bedrock (`anthropic.claude-3-5-haiku-20241022-v1:0`) | Anthropic (`claude-sonnet-4-20250514`) |
 
 Configuration keys:
 
-- `LLM_PROVIDER`: `ollama`, `openai`, or `anthropic`
+- `LLM_PROVIDER`: `ollama`, `openai`, `anthropic`, or `bedrock`
 - `LLM_MODEL`: provider-specific model name
 - `LLM_FALLBACK_PROVIDER`: optional fallback provider name
 - `LLM_FALLBACK_MODEL`: fallback model name

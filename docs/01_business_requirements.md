@@ -322,8 +322,8 @@ dependency. This ensures:
 - Predictable inference costs (no per-token fees)
 - Model selection is operator-controlled via `OLLAMA_MODEL`
 
-OpenAI and Anthropic providers are implemented (ADR-0004) with automatic fallback.
-Production uses OpenAI as primary and Anthropic as fallback via `LLM_FALLBACK_PROVIDER`.
+OpenAI, Anthropic, and AWS Bedrock providers are implemented (ADR-0004) with automatic fallback.
+Production uses AWS Bedrock as primary and can use Anthropic as fallback via `LLM_FALLBACK_PROVIDER`.
 Dev defaults to local Ollama for zero-cost iteration.
 
 Multi-agent orchestration is implemented via LangGraph with specialist agents for

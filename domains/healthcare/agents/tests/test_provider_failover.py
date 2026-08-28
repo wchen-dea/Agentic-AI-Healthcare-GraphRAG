@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llm_provider import OllamaProvider, OpenAIProvider, AnthropicProvider, FallbackProvider
+from llm_provider import AnthropicProvider, BedrockProvider, FallbackProvider, OllamaProvider, OpenAIProvider, create_provider
 
 
 class FallbackProviderTests(unittest.TestCase):
@@ -133,6 +133,59 @@ class AnthropicProviderTests(unittest.TestCase):
         with patch("llm_provider.requests.post", side_effect=requests.Timeout):
             result = provider.generate(prompt="test", timeout_seconds=1, max_tokens=100)
         self.assertIn("timed out", result)
+
+
+class BedrockProviderTests(unittest.TestCase):
+    def _mock_imports(self, client):
+        def import_module(name):
+            if name == "boto3":
+                boto3 = Mock()
+                boto3.client.return_value = client
+                return boto3
+            if name == "botocore.config":
+                config_module = Mock()
+                config_module.Config = Mock(return_value=Mock())
+                return config_module
+            raise ImportError(name)
+
+        return patch("llm_provider.importlib.import_module", side_effect=import_module)
+
+    def test_create_provider_supports_bedrock(self):
+        provider = create_provider("bedrock", base_url="", configured_model="amazon.nova-pro-v1:0")
+
+        self.assertIsInstance(provider, BedrockProvider)
+        self.assertEqual(provider.model, "amazon.nova-pro-v1:0")
+
+    def test_success_extracts_text_from_converse_response(self):
+        client = Mock()
+        client.converse.return_value = {
+            "output": {"message": {"content": [{"text": "Bedrock answer"}]}}
+        }
+        provider = BedrockProvider(configured_model="anthropic.claude-3-5-haiku-20241022-v1:0")
+
+        with self._mock_imports(client):
+            result = provider.generate(prompt="test", timeout_seconds=30, max_tokens=100, temperature=0.1)
+
+        self.assertEqual(result, "Bedrock answer")
+        client.converse.assert_called_once()
+
+    def test_missing_boto3_returns_error(self):
+        provider = BedrockProvider(configured_model="amazon.nova-pro-v1:0")
+
+        with patch("llm_provider.importlib.import_module", side_effect=ImportError("boto3")):
+            result = provider.generate(prompt="test", timeout_seconds=30, max_tokens=100)
+
+        self.assertIn("boto3 is required", result)
+
+    def test_invalid_response_returns_error(self):
+        client = Mock()
+        client.converse.return_value = {"output": {"message": {"content": []}}}
+        provider = BedrockProvider(configured_model="amazon.nova-pro-v1:0")
+
+        with self._mock_imports(client):
+            result = provider.generate(prompt="test", timeout_seconds=30, max_tokens=100)
+
+        self.assertIn("invalid response format", result)
 
 
 if __name__ == "__main__":
