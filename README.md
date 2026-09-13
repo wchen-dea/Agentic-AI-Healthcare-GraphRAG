@@ -2,7 +2,7 @@
 
 End-to-end clinical decision-support system that streams healthcare events through Kafka and Flink, persists them as vector embeddings (Qdrant) and a knowledge graph (Neo4j), and answers clinical questions through multi-agent reasoning with domain-routed retrieval, guardrails, and structured output.
 
-Runs fully local on Ollama, scales to OpenAI/Anthropic in production with complexity-based model routing.
+Runs fully local on Ollama, scales to AWS Bedrock in production with complexity-based model routing and optional fallback providers.
 
 ## Tech Stack
 
@@ -11,7 +11,7 @@ Runs fully local on Ollama, scales to OpenAI/Anthropic in production with comple
 | Streaming | Apache Kafka, Schema Registry, Apache Flink (PyFlink) |
 | Data Stores | Qdrant (vector), Neo4j (graph) |
 | AI & API | FastAPI + embedded MCP, LangGraph, LangChain |
-| LLM | Ollama (dev), OpenAI + Anthropic (prod, with fallback) |
+| LLM | Ollama (dev), AWS Bedrock (prod, with fallback) |
 | Frontend | Nginx-served provider web app |
 | Observability | Prometheus, Grafana, MLflow Tracing, LangSmith |
 | Deployment | Helm, Docker Compose, minikube |

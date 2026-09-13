@@ -143,6 +143,23 @@ class ModelRouterTests(unittest.TestCase):
         self.assertEqual(result, "openai response")
         openai.generate.assert_called_once()
 
+    def test_routes_to_primary_inside_fallback_provider(self):
+        primary = self._make_provider("primary response")
+        primary.model = "default-model"
+        fallback = self._make_provider("fallback response")
+        provider = Mock()
+        provider.primary = primary
+        provider.fallback = fallback
+        provider.generate.side_effect = lambda **kwargs: primary.generate(**kwargs)
+        config = ModelTierConfig(simple="bedrock:small", moderate="bedrock:medium", complex="bedrock:large")
+        router = ModelRouter(providers={"bedrock": provider}, tier_config=config, default_provider_name="bedrock")
+
+        result = router.generate(prompt="test", timeout_seconds=60, max_tokens=100, question="hello")
+
+        self.assertEqual(result, "primary response")
+        primary.generate.assert_called_once()
+        self.assertEqual(primary.model, "default-model")
+
     def test_restores_model_after_generate(self):
         provider = self._make_provider()
         provider.configured_model = "original-model"

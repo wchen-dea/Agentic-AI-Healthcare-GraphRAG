@@ -10,7 +10,7 @@ deploy/
 │   ├── Chart.yaml              Umbrella chart with sub-chart dependencies
 │   ├── values.yaml             Default values
 │   ├── values-dev.yaml         Dev overrides (single replica, Ollama, full infra)
-│   ├── values-production.yaml  Production overrides (multi-replica, OpenAI+Anthropic)
+│   ├── values-production.yaml  Production overrides (multi-replica, Bedrock+fallback)
 │   ├── templates/              Namespace, NetworkPolicy, helpers
 │   └── charts/
 │       ├── rag-api/            Healthcare AI agents with embedded MCP
@@ -50,14 +50,14 @@ deploy/
 | Kafka + Schema Registry | Helm sub-chart | Managed Confluent platform |
 | Neo4j | Helm sub-chart | Managed service |
 | Qdrant | Helm sub-chart | Managed service |
-| Ollama (LLM) | Helm sub-chart | Not deployed (uses OpenAI/Anthropic APIs) |
+| Ollama (LLM) | Helm sub-chart | Not deployed (uses AWS Bedrock) |
 
 ## LLM Provider Routing
 
 | Environment | Primary Provider | Fallback Provider |
 |-------------|-----------------|-------------------|
 | Dev / Local | Ollama (`llama3.1`) | none |
-| Production | OpenAI (`gpt-4.1-mini`) | Anthropic (`claude-sonnet-4-20250514`) |
+| Production | Bedrock (`anthropic.claude-3-5-haiku-20241022-v1:0`) | Anthropic (`claude-sonnet-4-20250514`) |
 
 The `LLM_FALLBACK_PROVIDER` env var enables automatic failover — if the primary returns an error, the request is retried against the fallback.
 

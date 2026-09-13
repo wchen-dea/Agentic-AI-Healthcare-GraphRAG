@@ -62,6 +62,7 @@ class Settings:
     neo4j_password: str
     ollama_url: str
     ollama_model: str
+    llm_model: str
     llm_provider: str
     mcp_server_name: str
     tool_policy_path: Path
@@ -110,6 +111,7 @@ def get_settings() -> Settings:
         neo4j_password=os.getenv("NEO4J_PASSWORD", "healthcare123"),
         ollama_url=os.getenv("OLLAMA_URL", "http://ollama:11434"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.1"),
+        llm_model=os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "llama3.1")),
         llm_provider=os.getenv("LLM_PROVIDER", "ollama"),
         mcp_server_name=os.getenv("MCP_SERVER_NAME", "HealthcareGraphRAG MCP"),
         tool_policy_path=tool_policy_path,
@@ -206,7 +208,7 @@ neo4j = GraphDatabase.driver(
 llm_provider = create_provider(
     settings.llm_provider,
     base_url=settings.ollama_url,
-    configured_model=settings.ollama_model,
+    configured_model=settings.llm_model,
 )
 
 _fallback_provider_name = os.getenv("LLM_FALLBACK_PROVIDER", "")
@@ -218,7 +220,7 @@ if _fallback_provider_name:
     )
     llm_provider = FallbackProvider(llm_provider, _fallback)
 
-_tier_config = ModelTierConfig.from_env(settings.ollama_model)
+_tier_config = ModelTierConfig.from_env(settings.llm_model)
 if not _tier_config.is_uniform():
     _providers: dict[str, object] = {settings.llm_provider: llm_provider}
     for _env_name in ("LLM_MODEL_SIMPLE", "LLM_MODEL_MODERATE", "LLM_MODEL_COMPLEX"):

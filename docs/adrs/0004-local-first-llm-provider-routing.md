@@ -15,17 +15,17 @@ Local development should run without external dependencies, while production sho
 Adopt local-first generation with provider abstraction:
 
 - Default local provider: Ollama.
-- Production providers: OpenAI (primary) with Anthropic (fallback).
+- Production provider: AWS Bedrock, with optional Anthropic/OpenAI fallback.
 - Keep retrieval orchestration stable and swap provider client behind adapter.
 
 Implementation status:
 
-- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider` in `domains/healthcare/agents/llm_provider.py`.
+- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `BedrockProvider`, `FallbackProvider` in `domains/healthcare/agents/llm_provider.py`.
 - Factory: `create_provider()` routes by `LLM_PROVIDER` env var.
 - Fallback: `FallbackProvider` wraps primary + fallback; triggered by `LLM_FALLBACK_PROVIDER` env var.
-- Dynamic model routing: `ModelRouter` in `domains/healthcare/agents/domain/model_router.py` classifies query complexity (simple/moderate/complex) and selects the appropriate model tier. Supports cross-provider routing via `provider:model` syntax (e.g. `openai:gpt-4.1` for complex queries).
+- Dynamic model routing: `ModelRouter` in `domains/healthcare/agents/domain/model_router.py` classifies query complexity (simple/moderate/complex) and selects the appropriate model tier. Supports cross-provider routing via `provider:model` syntax (e.g. `bedrock:anthropic.claude-3-5-sonnet-20240620-v1:0` for complex queries).
 - Prompt construction and synthesis extracted into `domains/healthcare/agents/domain/synthesis.py`.
-- Helm values: dev uses Ollama (uniform model across tiers), production uses OpenAI + Anthropic fallback with optional per-tier model configuration.
+- Helm values: dev uses Ollama (uniform model across tiers), production uses AWS Bedrock with optional per-tier model configuration and fallback.
 
 ## Consequences
 

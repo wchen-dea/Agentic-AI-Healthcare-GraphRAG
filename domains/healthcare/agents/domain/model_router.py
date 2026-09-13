@@ -131,6 +131,7 @@ class ModelTierConfig:
 _DEFAULT_COST_PER_TOKEN: dict[str, float] = {
     "openai": 0.000015,
     "anthropic": 0.000015,
+    "bedrock": 0.000015,
     "ollama": 0.0,
 }
 
@@ -216,6 +217,21 @@ class ModelRouter:
             return model_spec.split(":", 1)[0]
         return self.default_provider_name
 
+    def _get_provider_model(self, provider: Any) -> str | None:
+        target = getattr(provider, "primary", provider)
+        if hasattr(target, "configured_model"):
+            return target.configured_model
+        if hasattr(target, "model"):
+            return target.model
+        return None
+
+    def _set_provider_model(self, provider: Any, model: str) -> None:
+        target = getattr(provider, "primary", provider)
+        if hasattr(target, "configured_model"):
+            target.configured_model = model
+        elif hasattr(target, "model"):
+            target.model = model
+
     def _maybe_downgrade_tier(self, tier: ComplexityTier) -> ComplexityTier:
         """Downgrade tier if latency target exceeded or cost budget exhausted."""
         effective = tier
@@ -240,14 +256,9 @@ class ModelRouter:
         model_spec = self.tier_config.model_for_tier(effective_tier)
         provider, model_override = self._resolve_provider_and_model(model_spec)
 
-        if hasattr(provider, "configured_model"):
-            original_model = provider.configured_model
-            provider.configured_model = model_override
-        elif hasattr(provider, "model"):
-            original_model = provider.model
-            provider.model = model_override
-        else:
-            original_model = None
+        original_model = self._get_provider_model(provider)
+        if original_model is not None:
+            self._set_provider_model(provider, model_override)
 
         start_ms = time.time() * 1000
 
@@ -260,10 +271,7 @@ class ModelRouter:
             )
         finally:
             if original_model is not None:
-                if hasattr(provider, "configured_model"):
-                    provider.configured_model = original_model
-                elif hasattr(provider, "model"):
-                    provider.model = original_model
+                self._set_provider_model(provider, original_model)
 
         latency_ms = time.time() * 1000 - start_ms
         self.latency_tracker.record(effective_tier, latency_ms)

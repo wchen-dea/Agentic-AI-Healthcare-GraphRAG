@@ -1,6 +1,6 @@
-from typing import Any
-
+import importlib
 import os
+from typing import Any
 
 import requests
 
@@ -190,6 +190,55 @@ class AnthropicProvider:
             return "LLM error: invalid response format from Anthropic."
 
 
+class BedrockProvider:
+    def __init__(self, *, configured_model: str) -> None:
+        self.model = configured_model or os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-haiku-20241022-v1:0")
+        self.region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+        self._client: Any | None = None
+
+    def _runtime_client(self, *, timeout_seconds: int) -> Any:
+        if self._client is None:
+            try:
+                boto3 = importlib.import_module("boto3")
+                config_module = importlib.import_module("botocore.config")
+                self._client = boto3.client(
+                    "bedrock-runtime",
+                    region_name=self.region,
+                    config=config_module.Config(connect_timeout=10, read_timeout=timeout_seconds),
+                )
+            except ImportError:
+                raise LLMProviderError("boto3 is required for the Bedrock provider")
+        return self._client
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        timeout_seconds: int,
+        max_tokens: int,
+        temperature: float = 0.2,
+        **_extra: object,
+    ) -> str:
+        try:
+            response = self._runtime_client(timeout_seconds=timeout_seconds).converse(
+                modelId=self.model,
+                messages=[{"role": "user", "content": [{"text": prompt}]}],
+                inferenceConfig={"maxTokens": max_tokens, "temperature": temperature},
+            )
+        except LLMProviderError as exc:
+            return f"LLM error: {exc}."
+        except TimeoutError:
+            return f"LLM error: Bedrock request timed out after {timeout_seconds} seconds."
+        except Exception as exc:
+            error_name = exc.__class__.__name__
+            return f"LLM error: Bedrock request failed ({error_name})."
+
+        try:
+            return response["output"]["message"]["content"][0]["text"]
+        except (KeyError, IndexError, TypeError):
+            return "LLM error: invalid response format from Bedrock."
+
+
 class FallbackProvider:
     """Wraps a primary and fallback provider; falls back on error responses."""
 
@@ -211,4 +260,6 @@ def create_provider(provider_name: str, *, base_url: str, configured_model: str)
         return OpenAIProvider(configured_model=configured_model)
     if provider_name == "anthropic":
         return AnthropicProvider(configured_model=configured_model)
+    if provider_name == "bedrock":
+        return BedrockProvider(configured_model=configured_model)
     raise LLMProviderError(f"Unsupported LLM provider '{provider_name}'")

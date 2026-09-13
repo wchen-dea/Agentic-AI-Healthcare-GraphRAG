@@ -4,10 +4,13 @@ import json
 import os
 import sys
 
-# Make shared embedding module importable
+# Make shared embedding module importable (local dev and container paths)
 _shared_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "shared")
-if os.path.isdir(_shared_dir) and _shared_dir not in sys.path:
-    sys.path.insert(0, os.path.dirname(_shared_dir))
+_container_shared = os.path.join(os.path.dirname(__file__), "..", "shared")
+for _candidate in [_shared_dir, _container_shared]:
+    _parent = os.path.dirname(_candidate)
+    if os.path.isdir(_candidate) and _parent not in sys.path:
+        sys.path.insert(0, _parent)
 
 from shared.embedding import (  # noqa: E402
     ALL_DOMAINS,

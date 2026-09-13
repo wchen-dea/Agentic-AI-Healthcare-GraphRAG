@@ -37,6 +37,10 @@ class HealthcareAgentState(TypedDict, total=False):
     # ── agent reasoning trace (append-only) ─────────────────────────────
     messages: Annotated[list[dict[str, Any]], operator.add]
 
+    # ── inter-agent delegation (append-only) ────────────────────────────
+    delegation_requests: Annotated[list[dict[str, Any]], operator.add]
+    delegation_responses: Annotated[list[dict[str, Any]], operator.add]
+
     # ── synthesis ───────────────────────────────────────────────────────
     answer: str
     confidence: float

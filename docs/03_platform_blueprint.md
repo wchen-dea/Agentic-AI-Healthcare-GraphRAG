@@ -49,6 +49,7 @@ What is implemented today:
 - MCP surface includes 10 clinical workflow tools (`skills_plan_get`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`, and others),
 - planner quality checks exist (`test_planner_evaluation.py`, `test_planner_edge_cases.py`) in addition to API contract tests,
 - LangGraph multi-agent orchestration with eight specialized nodes is implemented behind the `RAG_API_LANGGRAPH_ENABLED` feature flag,
+- inter-agent delegation protocol with typed AgentCards, capability discovery, and delegation router (`agent_cards.py`),
 - MLflow tracing with nested span hierarchy and healthcare-specific evaluation harness is implemented behind the `MLFLOW_TRACKING_URI` feature flag,
 - LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`,
 - terminology mappings cover all 6 producer vocabularies at 100% (LAB→LOINC, ICD-10, MED→RxNorm, CPT, Specialty→NUCC, Payer→NAIC),
@@ -125,58 +126,65 @@ Source Systems / Producers
 ```mermaid
 flowchart LR
   subgraph Infra[Shared Infrastructure]
-    K[Kafka]
-    K --> F[Flink per domain]
+    K[Kafka cluster]
+    SR[Schema Registry]
+    K --> FHC[Healthcare Flink job]
+    K --> FSC[Supply-chain Flink job]
   end
 
-  subgraph Ingestion[Ingestion and Semantics per domain]
-    F --> NORM[Semantic normalization]
-    NORM --> TERM[Terminology mapping]
-    NORM --> ER[Entity resolution]
-    NORM --> RULES[Domain rules]
-    NORM --> PROV[Provenance tagging]
+  subgraph Ingestion[Domain ingestion and enrichment]
+    FHC --> HNORM[Healthcare normalization, mappings, rules]
+    FSC --> SNORM[Supply-chain normalization, mappings, rules]
   end
 
-  subgraph Stores[Dual Evidence Stores per domain]
-    TERM --> Q[Qdrant]
-    ER --> G[Neo4j]
-    RULES --> G
-    PROV --> Q
-    PROV --> G
+  subgraph Stores[Separate dual evidence stores]
+    HNORM --> HQ[Healthcare Qdrant]
+    HNORM --> HG[Healthcare Neo4j]
+    SNORM --> SQ[Supply-chain Qdrant]
+    SNORM --> SG[Supply-chain Neo4j]
   end
 
-  subgraph Query[Query Orchestration]
-    API[REST or MCP request] --> CLS[Request classifier]
-    CLS --> PLAN[Retrieval planner]
-    PLAN --> SK[Skill runner]
-    SK --> Q
-    SK --> G
-    SK --> RANK[Evidence ranker]
-    RANK --> LLM[LLM adapter]
+  subgraph Query[Per-domain query service]
+    API[REST or embedded MCP request] --> AUTH[Auth, guardrails, and memory]
+    AUTH --> CLS[Request classifier]
+    CLS --> PLAN[Retrieval planner and skills]
+    PLAN --> MODE{Single-pass / ReAct / LangGraph}
+    MODE --> RANK[Vector + graph retrieval and ranking]
+    RANK --> LLM[Provider adapter and model router]
   end
 
-  subgraph Delivery[Delivery and Control]
+  subgraph Delivery[Delivery and control]
     LLM --> RESP[Response shaping]
     RESP --> REST[REST]
     RESP --> MCP[MCP tools]
-    RESP --> UI[Domain web apps]
+    REST --> UI[Domain web apps]
   end
 
   subgraph Ops[Quality and Ops]
-    PLAN --> QA[Evaluation suite]
-    RESP --> AUDIT[Audit and policy]
-    Q --> MET[Metrics]
-    G --> MET
+    PLAN --> QA[Contract, planner, and evaluation gates]
+    RESP --> AUDIT[Audit, policy, and response budgets]
+    HQ --> MET[Prometheus metrics]
+    HG --> MET
+    SQ --> MET
+    SG --> MET
     LLM --> MET
+    MET --> GF[Grafana]
+    LLM -. traces .-> MLF[MLflow / LangSmith]
   end
+
+  SR -. schema governance .-> K
+  K -. topics .-> FHC
+  K -. topics .-> FSC
+  HQ --> RANK
+  HG --> RANK
+  SQ --> RANK
+  SG --> RANK
 
    classDef done fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px,color:#1b5e20;
    classDef progress fill:#fff8e1,stroke:#e65100,stroke-width:1px,color:#e65100;
    classDef pending fill:#ffebee,stroke:#b71c1c,stroke-width:1px,color:#b71c1c;
 
-   class NORM,RULES,PROV,Q,G,CLS,PLAN,SK,RANK,LLM,REST,MCP,UI done;
-   class TERM,ER,QA progress;
-   class AUDIT pending;
+  class K,SR,FHC,FSC,HNORM,SNORM,HQ,HG,SQ,SG,AUTH,CLS,PLAN,MODE,RANK,LLM,RESP,REST,MCP,UI,QA,AUDIT,MET,GF,MLF done;
 ```
 
 ## Ontology Model
@@ -1010,7 +1018,7 @@ Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/work
 |---|------|--------|----------|
 | 9 | Per-user identity and authorization | Medium | High |
 | 10 | Neural reranking (cross-encoder) | Medium | Medium |
-| 11 | Inter-agent collaboration (A2A) | High | Medium |
+| 11 | Inter-agent delegation — **Implemented** via `agent_cards.py` | Done | Medium |
 | 12 | Multimodal support (clinical imaging) | High | Low |
 | 13 | Domain-specific fine-tuning (LoRA/DPO) | High | Medium |
 | 14 | Distributed agent systems | High | Low |
