@@ -48,18 +48,12 @@ echo "Waiting for pods..."
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=kafka --timeout=120s 2>/dev/null || true
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=neo4j --timeout=120s 2>/dev/null || true
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=qdrant --timeout=60s 2>/dev/null || true
-kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=ollama --timeout=60s 2>/dev/null || true
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=rag-api --timeout=120s 2>/dev/null || true
-
-# Pull LLM model
-echo "Pulling LLM model (qwen2.5:1.5b)..."
-OLLAMA_POD=$(kubectl -n "$NAMESPACE" get pod -l app=ollama -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-if [[ -n "$OLLAMA_POD" ]]; then
-  kubectl -n "$NAMESPACE" exec "$OLLAMA_POD" -- ollama pull qwen2.5:1.5b 2>/dev/null || echo "Model pull skipped (pod not ready)"
-fi
 
 echo
 echo "=== Dev Environment Ready ==="
+echo
+echo "NOTE: rag-api.secrets.DATABRICKS_TOKEN in $VALUES_FILE is a placeholder — set a real token before querying."
 echo
 echo "Access services (port-forward):"
 echo "  kubectl -n $NAMESPACE port-forward svc/rag-api 8000:8000"

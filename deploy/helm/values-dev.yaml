@@ -1,4 +1,4 @@
-# Dev environment: single replica, local Ollama, no HPA, NodePort access
+# Dev environment: single replica, Databricks foundation model, no HPA, NodePort access
 networkPolicies:
   enabled: false
 rag-api:
@@ -15,13 +15,14 @@ rag-api:
     NEO4J_USER: "neo4j"
     KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
     SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
-    LLM_PROVIDER: "ollama"
-    LLM_MODEL: "qwen2.5:1.5b"
+    LLM_PROVIDER: "databricks"
+    LLM_MODEL: "quickstart_catalog.multi_agent_schema.model_routing_default_model"
     LLM_TIMEOUT_SECONDS: "180"
     LLM_MAX_TOKENS: "1200"
     LLM_TEMPERATURE: "0.2"
-    OLLAMA_URL: "http://ollama:11434"
-    OLLAMA_MODEL: "qwen2.5:1.5b"
+    DATABRICKS_HOST: "change_me"
+    OLLAMA_URL: ""
+    OLLAMA_MODEL: ""
     MCP_SERVER_NAME: "HealthcareGraphRAG MCP (dev)"
     RAG_API_LANGGRAPH_ENABLED: "true"
     LANGGRAPH_MAX_ITERATIONS: "3"
@@ -30,6 +31,7 @@ rag-api:
     RAG_API_ALLOW_ROLE_HEADER: "true"
   secrets:
     NEO4J_PASSWORD: "healthcare123"
+    DATABRICKS_TOKEN: "change_me"
 provider-web:
   replicaCount: 1
   autoscaling:
@@ -49,7 +51,7 @@ neo4j:
 qdrant:
   enabled: true
 ollama:
-  enabled: true
+  enabled: false
 conduktor:
   enabled: true
   service:
