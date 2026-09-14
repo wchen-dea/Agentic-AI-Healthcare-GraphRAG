@@ -132,6 +132,7 @@ _DEFAULT_COST_PER_TOKEN: dict[str, float] = {
     "openai": 0.000015,
     "anthropic": 0.000015,
     "bedrock": 0.000015,
+    "databricks": 0.000015,
     "ollama": 0.0,
 }
 
