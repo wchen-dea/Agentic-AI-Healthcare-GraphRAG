@@ -14,18 +14,18 @@ Local development should run without external dependencies, while production sho
 
 Adopt local-first generation with provider abstraction:
 
-- Default local provider: Ollama.
+- Default local provider: Databricks foundation model.
 - Production provider: AWS Bedrock, with optional Anthropic/OpenAI fallback.
 - Keep retrieval orchestration stable and swap provider client behind adapter.
 
 Implementation status:
 
-- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `BedrockProvider`, `FallbackProvider` in `domains/healthcare/agents/llm_provider.py`.
+- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `BedrockProvider`, `DatabricksProvider`, `FallbackProvider` in `domains/healthcare/agents/llm_provider.py`.
 - Factory: `create_provider()` routes by `LLM_PROVIDER` env var.
 - Fallback: `FallbackProvider` wraps primary + fallback; triggered by `LLM_FALLBACK_PROVIDER` env var.
 - Dynamic model routing: `ModelRouter` in `domains/healthcare/agents/domain/model_router.py` classifies query complexity (simple/moderate/complex) and selects the appropriate model tier. Supports cross-provider routing via `provider:model` syntax (e.g. `bedrock:anthropic.claude-3-5-sonnet-20240620-v1:0` for complex queries).
 - Prompt construction and synthesis extracted into `domains/healthcare/agents/domain/synthesis.py`.
-- Helm values: dev uses Ollama (uniform model across tiers), production uses AWS Bedrock with optional per-tier model configuration and fallback.
+- Docker Compose dev (`deploy/dev/rag-api.env`) uses a Databricks foundation model; Helm dev values still use Ollama (uniform model across tiers); production uses AWS Bedrock with optional per-tier model configuration and fallback.
 
 ## Consequences
 
@@ -48,8 +48,8 @@ Trade-offs:
 
 ## Rollout and Verification
 
-- Set `OLLAMA_MODEL` and `OLLAMA_URL` in `.env`.
-- Verify model availability: `docker exec -it infra-ollama ollama list`
+- Set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` in `deploy/dev/rag-api.env` (or `.env` for the Docker Compose infra stack), and `LLM_MODEL` to the target serving endpoint.
+- Verify the AI Gateway endpoint is reachable: `curl -s -H "Authorization: Bearer $DATABRICKS_TOKEN" "$DATABRICKS_HOST/api/2.0/serving-endpoints"`
 - Test generation: `curl -s -X POST http://localhost:8000/query -H "Content-Type: application/json" -d '{"question":"test","patient_id":"patient-0001"}' | jq .answer`
 
 ## Related
