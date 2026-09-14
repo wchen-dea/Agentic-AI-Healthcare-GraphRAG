@@ -39,6 +39,8 @@ services:
       - qdrant
       - ollama
     env_file:
+      - path: ../../.env
+        required: false
       - ./rag-api.env
     ports:
       - "8000:8000"
