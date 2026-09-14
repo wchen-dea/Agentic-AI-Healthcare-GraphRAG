@@ -118,6 +118,22 @@ class TestTraceLlmCall:
             wrapped = trace_llm_call(my_llm)
             assert wrapped("q", [], []) == "answer"
 
+    @patch("langgraph_agents.mlflow_tracing.mlflow_enabled", return_value=True)
+    @patch("langgraph_agents.mlflow_tracing.mlflow")
+    def test_includes_model_info_when_provided(self, mock_mlflow, mock_enabled):
+        mock_span = MagicMock()
+        mock_mlflow.start_span.return_value.__enter__ = MagicMock(return_value=mock_span)
+        mock_mlflow.start_span.return_value.__exit__ = MagicMock(return_value=False)
+
+        def my_llm(q, v, g):
+            return "answer"
+
+        wrapped = trace_llm_call(my_llm, get_model_info=lambda: {"llm_model": "my-model", "llm_tier": "simple"})
+        assert wrapped("q", [], []) == "answer"
+        attrs = mock_span.set_attributes.call_args[0][0]
+        assert attrs["llm_model"] == "my-model"
+        assert attrs["llm_tier"] == "simple"
+
 
 # ── trace_retriever ──────────────────────────────────────────────────────
 

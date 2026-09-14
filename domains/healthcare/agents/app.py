@@ -419,13 +419,35 @@ def graph_context(patient_ids: list[str]) -> list[dict[str, Any]]:
     return graph_search(neo4j, patient_ids)
 
 
-def ask_ollama(question: str, vector_ctx: list[dict[str, Any]], graph_ctx: list[dict[str, Any]]) -> str:
+def _llm_model_info() -> dict[str, Any]:
+    """Resolve which provider/model/tier actually served the last generate() call."""
+    if hasattr(llm_provider, "last_routing") and llm_provider.last_routing:
+        routing = llm_provider.last_routing
+        return {
+            "llm_provider": settings.llm_provider,
+            "llm_model": routing.get("model", settings.llm_model),
+            "llm_tier": routing.get("tier", ""),
+            "llm_downgraded": routing.get("downgraded", False),
+        }
+    target = getattr(llm_provider, "primary", llm_provider)
+    model = getattr(target, "configured_model", None) or getattr(target, "model", None) or settings.llm_model
+    return {"llm_provider": settings.llm_provider, "llm_model": model}
+
+
+def _ask_ollama_impl(question: str, vector_ctx: list[dict[str, Any]], graph_ctx: list[dict[str, Any]]) -> str:
     return synthesize_answer(
         question, vector_ctx, graph_ctx, llm_provider,
         timeout_seconds=settings.llm_timeout_seconds,
         max_tokens=settings.llm_max_tokens,
         max_items=settings.max_context_items,
     )
+
+
+if os.getenv("MLFLOW_TRACKING_URI"):
+    from langgraph_agents.mlflow_tracing import trace_llm_call
+    ask_ollama = trace_llm_call(_ask_ollama_impl, get_model_info=_llm_model_info)
+else:
+    ask_ollama = _ask_ollama_impl
 
 
 def run_query(question: str, patient_id: str | None = None, top_k: int | None = None, structured: bool = False, session_id: str | None = None) -> dict[str, Any]:

@@ -179,8 +179,13 @@ def trace_agent_node(agent_name: str, fn: Callable) -> Callable:
 
 # ── LLM call tracing ─────────────────────────────────────────────────────
 
-def trace_llm_call(fn: Callable) -> Callable:
-    """Wrap the LLM synthesis function with an MLflow LLM span."""
+def trace_llm_call(fn: Callable, *, get_model_info: Callable[[], dict[str, Any]] | None = None) -> Callable:
+    """Wrap the LLM synthesis function with an MLflow LLM span.
+
+    ``get_model_info`` is invoked after generation completes and its result
+    (e.g. provider/model/tier from ModelRouter) is merged into the span
+    attributes, so which model served the request is visible in the trace.
+    """
     @functools.wraps(fn)
     def wrapper(question, vector_ctx, graph_ctx):
         if not mlflow_enabled():
@@ -195,11 +200,17 @@ def trace_llm_call(fn: Callable) -> Callable:
             started = time.perf_counter()
             answer = fn(question, vector_ctx, graph_ctx)
             elapsed_ms = (time.perf_counter() - started) * 1000
-            span.set_attributes({
+            attrs = {
                 "latency_ms": round(elapsed_ms, 2),
                 "answer_length": len(answer),
                 "is_error": answer.startswith("LLM error:"),
-            })
+            }
+            if get_model_info is not None:
+                try:
+                    attrs.update(get_model_info())
+                except Exception:
+                    pass
+            span.set_attributes(attrs)
             span.set_outputs({"answer": answer[:1000]})
             return answer
 
