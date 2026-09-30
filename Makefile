@@ -16,7 +16,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
         validate-skills generate-skills validate-ontology \
-        test-hc test-sc pull-model fresh \
+        test-hc test-sc web-hc-dev web-hc-test web-hc-build pull-model fresh \
         helm-dev helm-dev-down helm-ports helm-ports-stop helm-prd helm-lint
 
 help: ## Show this help
@@ -104,6 +104,15 @@ shell-kafka: ## Kafka broker shell
 	docker exec -it infra-kafka bash
 
 # ── Validate & test ───────────────────────────────────────────────────────────
+
+HC_WEB := domains/healthcare/webapp
+
+web-hc-dev: ## Healthcare web UI dev server (Vite, proxies /api -> :8000)
+	cd $(HC_WEB) && npm install && VITE_API_BASE_URL=/api npm run dev
+web-hc-test: ## Healthcare web UI unit tests + typecheck
+	cd $(HC_WEB) && npm ci && npm run typecheck && npm test
+web-hc-build: ## Healthcare web UI production bundle
+	cd $(HC_WEB) && npm ci && npm run build
 
 validate: ## Cross-domain stack validation
 	./scripts/validate_all_stacks.sh

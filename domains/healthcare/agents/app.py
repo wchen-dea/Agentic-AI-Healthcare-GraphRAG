@@ -164,6 +164,8 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Browser MCP clients must read the session id returned by `initialize`.
+    expose_headers=["mcp-session-id"],
 )
 
 HTTP_REQUEST_DURATION_SECONDS = Histogram(
@@ -637,6 +639,11 @@ def _build_query_response(
             "response_truncated": False,
         },
     }
+    for flag in ("input_blocked", "output_blocked", "category"):
+        if flag in (result.get("guardrails") or {}):
+            payload["guardrails"][flag] = result["guardrails"][flag]
+    if result.get("structured_response"):
+        payload["structured_response"] = result["structured_response"]
     if result.get("react"):
         payload["react"] = result["react"]
     if result.get("model_routing"):
@@ -1192,4 +1199,6 @@ def skills_plan_get(
     )
 
 
-app.mount("/mcp", mcp_http_app)
+# Register the streamable HTTP route directly so the documented `POST /mcp`
+# endpoint is served as-is (a `/mcp` mount would nest it at `/mcp/mcp`).
+app.router.routes.extend(mcp_http_app.routes)

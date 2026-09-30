@@ -32,3 +32,18 @@ mcp-server/logs/
 .neo4j/
 .ollama/
 volume/
+
+# Frontend (Node / Vite / TypeScript) dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+vite.config.*.timestamp-*
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

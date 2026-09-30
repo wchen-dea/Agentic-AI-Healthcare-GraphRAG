@@ -641,7 +641,15 @@ Secrets should be sourced from a secret manager or runtime environment injection
 
 ### Provider Web
 
-webapp provides a browser interface to submit questions and view API responses without manual curl usage.
+The provider web UI (`domains/healthcare/webapp`) is a React + TypeScript single-page app built with Vite and served by Nginx. It calls the RAG API (`POST /query`) and the MCP streamable-HTTP endpoint (`POST /mcp`) directly from the browser and renders:
+
+- structured clinical summaries (risks, interactions, lab signals, confidence) and guardrail blocks,
+- ranked, filterable vector evidence with redaction notices,
+- an interactive knowledge-graph view of `graph_context` (conditions, medications, labs, interactions, contraindications, adverse events),
+- retrieval plan, guardrail, model-routing and ReAct traces,
+- Markdown/JSON export per result.
+
+Conversation content is held in memory only; the browser persists just the API base URL, mode and theme. See `domains/healthcare/webapp/README.md`.
 
 ### Observability
 

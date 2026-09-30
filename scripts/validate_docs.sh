@@ -10,10 +10,11 @@ MARKDOWN_TARGETS=(
   "deploy/**/*.md"
   "domains/**/*.md"
   "platform/**/*.md"
+  "#**/node_modules"
 )
 
 if command -v markdownlint >/dev/null 2>&1; then
-  markdownlint "${MARKDOWN_TARGETS[@]}"
+  markdownlint --ignore "**/node_modules/**" "${MARKDOWN_TARGETS[@]:0:${#MARKDOWN_TARGETS[@]}-1}"
   exit 0
 fi
 
@@ -31,4 +32,4 @@ docker run --rm \
   -v "$ROOT_DIR:/workdir" \
   -w /workdir \
   node:20-alpine \
-  sh -lc 'npx --yes markdownlint-cli2 README.md "docs/**/*.md" "deploy/**/*.md" "domains/**/*.md"'
+  sh -lc 'npx --yes markdownlint-cli2 README.md "docs/**/*.md" "deploy/**/*.md" "domains/**/*.md" "#**/node_modules"'

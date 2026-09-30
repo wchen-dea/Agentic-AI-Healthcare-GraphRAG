@@ -1,0 +1,123 @@
+// Wire contract mirroring domains/healthcare/agents/app.py (`/query`, MCP tools)
+// and domain/structured_output.py. Keep in sync with the backend envelope.
+
+export type ApiMode = "rag" | "mcp";
+
+export interface QueryRequest {
+  question: string;
+  patient_id?: string;
+  structured?: boolean;
+  session_id?: string;
+}
+
+export interface VectorEvidence {
+  score: number | null;
+  event_id: string | null;
+  patient_id: string | null;
+  event_type: string | null;
+  text?: string;
+  text_redacted?: boolean;
+}
+
+export type GraphEntity = Record<string, unknown> & {
+  patient_id?: string;
+  entity_id?: string;
+};
+
+export interface RetrievalPlan {
+  name?: string;
+  top_k?: number;
+  reason?: string;
+}
+
+export interface Guardrails {
+  evidence_text_redacted?: boolean;
+  evidence_access_level?: string;
+  graph_access_level?: string;
+  response_truncated?: boolean;
+  input_blocked?: boolean;
+  output_blocked?: boolean;
+  category?: string;
+  [key: string]: unknown;
+}
+
+export interface ModelRouting {
+  model?: string;
+  tier?: string;
+  downgraded?: boolean;
+  [key: string]: unknown;
+}
+
+export interface ReactAction {
+  iteration?: number;
+  action?: string;
+  plan_name?: string;
+  top_k?: number;
+  new_event_ids?: number;
+  new_patient_ids?: number;
+  confidence_after?: number;
+}
+
+export interface ReactTrace {
+  iterations?: number;
+  confidence?: number;
+  final_reason?: string;
+  actions: ReactAction[];
+}
+
+export type Severity = "high" | "moderate" | "low" | "unknown";
+
+export interface RiskFinding {
+  category: string;
+  severity: Severity;
+  description: string;
+  evidence_source: string;
+}
+
+export interface MedicationInteraction {
+  drug_a: string;
+  drug_b: string;
+  mechanism: string;
+  severity: Severity;
+}
+
+export interface LabSignal {
+  observation: string;
+  value: string;
+  indicated_condition: string;
+  reason: string;
+}
+
+export interface StructuredClinicalResponse {
+  summary: string;
+  key_findings: string[];
+  risks: RiskFinding[];
+  interactions: MedicationInteraction[];
+  lab_signals: LabSignal[];
+  confidence: number | null;
+  safety_caveat: string;
+}
+
+export interface QueryResponse {
+  answer: string;
+  question?: string;
+  request_type?: string;
+  retrieval_plan?: RetrievalPlan;
+  patients: string[];
+  vector_context: VectorEvidence[];
+  graph_context: GraphEntity[];
+  retrieved_at?: string;
+  trace_id?: string;
+  guardrails?: Guardrails;
+  model_routing?: ModelRouting;
+  react?: ReactTrace;
+  structured_response?: StructuredClinicalResponse;
+  /** Any tool-specific fields not modelled above (MCP tools return varied shapes). */
+  extra: Record<string, unknown>;
+}
+
+export interface HealthStatus {
+  api: "ok" | "error";
+  mcp: "ok" | "error" | "unknown";
+  checkedAt: string;
+}

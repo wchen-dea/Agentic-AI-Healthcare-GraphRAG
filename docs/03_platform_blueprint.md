@@ -330,7 +330,7 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 | `healthcare-flink-app` | custom (platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
 | `healthcare-producer` | custom (platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
 | `healthcare-rag-api` | custom (domains/healthcare/agents/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
-| `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (Nginx) |
+| `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (React + TypeScript/Vite SPA on Nginx) |
 | `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
 | `infra-blackbox-exporter` | prom/blackbox-exporter | latest | 9115 | HTTP probe exporter |
 | `infra-grafana` | grafana/grafana | latest | 3000 | Metrics dashboards |
