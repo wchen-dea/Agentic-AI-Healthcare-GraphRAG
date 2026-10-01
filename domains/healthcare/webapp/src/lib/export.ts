@@ -27,7 +27,7 @@ export function turnToMarkdown(turn: Turn): string {
     "# Healthcare GraphRAG result",
     "",
     `- **Question:** ${turn.request.question || "(tool call)"}`,
-    `- **Mode:** ${turn.request.mode.toUpperCase()} (${turn.request.tool})`,
+    "- **Mode:** RAG",
   ];
   if (turn.request.patientId) lines.push(`- **Patient:** ${turn.request.patientId}`);
   if (r?.trace_id) lines.push(`- **Trace ID:** ${r.trace_id}`);

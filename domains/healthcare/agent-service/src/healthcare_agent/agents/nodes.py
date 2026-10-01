@@ -126,7 +126,7 @@ def medication_safety_agent(state: HealthcareAgentState) -> dict[str, Any]:
 
         # Delegate to lab agent when contraindicated drugs need renal/hepatic context
         needs_renal = any(
-            c.get("reason", "").lower() in ("lactic_acidosis_risk", "worsens_hyperkalemia", "nephrotoxic")
+            (c.get("reason") or "").lower() in ("lactic_acidosis_risk", "worsens_hyperkalemia", "nephrotoxic")
             for c in contras
         )
         if needs_renal and not lab_context:
@@ -203,10 +203,10 @@ def lab_interpretation_agent(state: HealthcareAgentState) -> dict[str, Any]:
             renal_markers = []
             for ps in patient_signals:
                 for obs in ps.get("abnormal_observations", []):
-                    if obs.get("name", "").lower() in ("creatinine", "bun", "egfr"):
+                    if (obs.get("name") or "").lower() in ("creatinine", "bun", "egfr"):
                         renal_markers.append(obs)
                 for sig in ps.get("lab_signals", []):
-                    if sig.get("indicated_condition", "").lower() in ("chronic kidney disease", "acute kidney injury"):
+                    if (sig.get("indicated_condition") or "").lower() in ("chronic kidney disease", "acute kidney injury"):
                         renal_markers.append(sig)
             delegation_responses.append(DelegationResponse(
                 from_agent="lab_interpretation",
@@ -219,7 +219,7 @@ def lab_interpretation_agent(state: HealthcareAgentState) -> dict[str, Any]:
             hepatic_markers = []
             for ps in patient_signals:
                 for obs in ps.get("abnormal_observations", []):
-                    if obs.get("name", "").lower() in ("alt", "ast", "total bilirubin", "albumin", "alkaline phosphatase"):
+                    if (obs.get("name") or "").lower() in ("alt", "ast", "total bilirubin", "albumin", "alkaline phosphatase"):
                         hepatic_markers.append(obs)
             delegation_responses.append(DelegationResponse(
                 from_agent="lab_interpretation",

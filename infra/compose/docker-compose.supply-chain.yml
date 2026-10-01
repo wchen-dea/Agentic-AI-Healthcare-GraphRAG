@@ -99,7 +99,6 @@ services:
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: supplychain123
       OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
 
   sc-flink-jobmanager:
     build:

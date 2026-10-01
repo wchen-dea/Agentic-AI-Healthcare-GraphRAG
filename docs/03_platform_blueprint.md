@@ -685,12 +685,12 @@ All three domains default to the same model. Set domain-specific env vars to act
 | `AGENT_MAX_EVIDENCE_CHARS` | 240 | Max chars per vector evidence text (export role) |
 | `AGENT_MAX_ANSWER_CHARS` | 2000 | Max chars in LLM answer before truncation |
 | `AGENT_MAX_RESPONSE_BYTES` | 50 000 | Hard byte budget for entire response payload |
-| `LLM_TIMEOUT_SECONDS` | 120 | Ollama request timeout |
-| `LLM_MAX_TOKENS` | 1200 | Ollama `num_predict` |
-| `OLLAMA_MODEL` | `llama3.2:3b` | Default model for generation |
-| `LLM_MODEL_SIMPLE` | (= `OLLAMA_MODEL`) | Model for simple queries (greetings, lookups) |
-| `LLM_MODEL_MODERATE` | (= `OLLAMA_MODEL`) | Model for moderate queries (single-domain clinical) |
-| `LLM_MODEL_COMPLEX` | (= `OLLAMA_MODEL`) | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
+| `LLM_TIMEOUT_SECONDS` | 120 | LLM request timeout |
+| `LLM_MAX_TOKENS` | 1200 | Max response tokens (Ollama `num_predict`) |
+| `LLM_MODEL` | provider default | Default model for generation (the only model variable) |
+| `LLM_MODEL_SIMPLE` | (= `LLM_MODEL`) | Model for simple queries (greetings, lookups) |
+| `LLM_MODEL_MODERATE` | (= `LLM_MODEL`) | Model for moderate queries (single-domain clinical) |
+| `LLM_MODEL_COMPLEX` | (= `LLM_MODEL`) | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
 
 ### Dynamic model routing (`domain/model_router.py`)
 
@@ -858,17 +858,15 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `QDRANT_URL` | `http://qdrant:6333` | flink-app, agent-service | Qdrant HTTP base URL |
 | `QDRANT_COLLECTION` | `healthcare_events` | flink-app, agent-service | Collection name |
 | `OLLAMA_URL` | `http://ollama:11434` | agent-service | Ollama inference endpoint |
-| `OLLAMA_MODEL` | `llama3.2:3b` | agent-service | Default model name for generation |
-| `LLM_PROVIDER` | `ollama` | agent-service | Primary LLM provider: `ollama`, `openai`, or `anthropic` |
-| `LLM_MODEL` | `llama3.2:3b` | agent-service | Provider-specific model name |
-| `LLM_MODEL_SIMPLE` | (= `OLLAMA_MODEL`) | agent-service | Model for simple queries (greetings, lookups). Used by `ModelRouter` |
-| `LLM_MODEL_MODERATE` | (= `OLLAMA_MODEL`) | agent-service | Model for moderate queries (single-domain clinical). Used by `ModelRouter` |
-| `LLM_MODEL_COMPLEX` | (= `OLLAMA_MODEL`) | agent-service | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
+| `LLM_PROVIDER` | `ollama` | agent-service | Primary LLM provider: `ollama`, `databricks`, `openai`, `anthropic`, or `bedrock` |
+| `LLM_MODEL` | provider default | agent-service | Model name for the selected provider (the only model variable; `OLLAMA_MODEL`/`DATABRICKS_MODEL`/`BEDROCK_MODEL_ID` are not read) |
+| `LLM_MODEL_SIMPLE` | (= `LLM_MODEL`) | agent-service | Model for simple queries (greetings, lookups). Used by `ModelRouter` |
+| `LLM_MODEL_MODERATE` | (= `LLM_MODEL`) | agent-service | Model for moderate queries (single-domain clinical). Used by `ModelRouter` |
+| `LLM_MODEL_COMPLEX` | (= `LLM_MODEL`) | agent-service | Model for complex queries (multi-system reasoning). Supports `provider:model` syntax (e.g. `openai:gpt-4.1`) |
 | `LLM_FALLBACK_PROVIDER` | (unset) | agent-service | Fallback provider on primary failure |
 | `LLM_FALLBACK_MODEL` | (unset) | agent-service | Model name for fallback provider |
 | `LLM_TIMEOUT_SECONDS` | `120` | agent-service | LLM request timeout |
 | `LLM_MAX_TOKENS` | `1200` | agent-service | Max response tokens |
-| `LLM_TEMPERATURE` | `0.2` | agent-service | Sampling temperature |
 | `OPENAI_API_KEY` | (unset) | agent-service | Required when LLM_PROVIDER=openai |
 | `ANTHROPIC_API_KEY` | (unset) | agent-service | Required when LLM_PROVIDER=anthropic |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092,...` | producer, flink-app | Broker list |

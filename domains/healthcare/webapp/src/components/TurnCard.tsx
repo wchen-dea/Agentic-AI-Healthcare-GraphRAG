@@ -68,7 +68,7 @@ export function TurnCard({ turn, onRemove, onRetry }: { turn: Turn; onRemove: ()
     <article className={`turn status-${turn.status}`} aria-busy={turn.status === "pending"}>
       <header className="turn-head">
         <div className="turn-title">
-          <span className="badge">{turn.request.mode === "rag" ? "RAG" : `MCP · ${turn.request.tool}`}</span>
+          <span className="badge">RAG</span>
           {turn.request.patientId && <span className="badge badge-outline">{turn.request.patientId}</span>}
           {turn.request.structured && <span className="badge badge-outline">structured</span>}
           <p className="turn-question">{turn.request.question || "(tool call)"}</p>

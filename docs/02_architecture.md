@@ -417,7 +417,7 @@ flowchart TD
 Current implementation uses Ollama in domains/healthcare/agent-service/src/healthcare_agent/main.py.
 
 - Local endpoint via OLLAMA_URL.
-- Local model choice via OLLAMA_MODEL.
+- Model choice via LLM_MODEL.
 - Automatic fallback to available local model tags when possible.
 - No per-token API fee for local Ollama inference; cost is primarily local infrastructure (hardware and power).
 - Runtime controls currently wired from env: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
@@ -448,12 +448,12 @@ Routing is environment-driven:
 
 Configuration keys:
 
-- `LLM_PROVIDER`: `ollama`, `openai`, `anthropic`, or `bedrock`
+- `LLM_PROVIDER`: `ollama`, `databricks`, `openai`, `anthropic`, or `bedrock`
 - `LLM_MODEL`: provider-specific model name
 - `LLM_FALLBACK_PROVIDER`: optional fallback provider name
 - `LLM_FALLBACK_MODEL`: fallback model name
-- `LLM_TIMEOUT_SECONDS`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE`
-- `OLLAMA_URL`, `OLLAMA_MODEL` (for ollama mode)
+- `LLM_TIMEOUT_SECONDS`, `LLM_MAX_TOKENS`
+- `OLLAMA_URL` (for ollama mode)
 - `OPENAI_API_KEY` (for openai mode)
 - `ANTHROPIC_API_KEY` (for anthropic mode)
 
@@ -617,13 +617,12 @@ llm_provider = build_llm_provider(service_settings)
 
 Environment-driven routing variables:
 
-- LLM_PROVIDER: ollama, anthropic, or openai
+- LLM_PROVIDER: ollama, databricks, openai, anthropic, or bedrock
 - LLM_FALLBACK_PROVIDER: optional fallback
 - LLM_FALLBACK_MODEL: fallback model name
 - LLM_MODEL: provider-specific model name
 - LLM_TIMEOUT_SECONDS: request timeout
 - LLM_MAX_TOKENS: response token budget
-- LLM_TEMPERATURE: sampling temperature
 - OLLAMA_URL: required for local ollama mode
 - ANTHROPIC_API_KEY: required for anthropic mode
 - OPENAI_API_KEY: required for openai mode

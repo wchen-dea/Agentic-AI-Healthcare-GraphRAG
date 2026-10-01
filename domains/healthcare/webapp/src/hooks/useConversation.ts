@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import { ApiError, runMcpTool, runRagQuery, runRagQueryStreaming, type RequestHandle } from "../api/client";
+import { ApiError, runRagQuery, runRagQueryStreaming, type RequestHandle } from "../api/client";
 import type { QueryRequest, QueryResponse } from "../api/types";
 import { conversationReducer, initialConversation, isBusy, type TurnRequest } from "../lib/conversation";
 
@@ -10,20 +10,18 @@ function newId(): string {
 }
 
 export interface ConversationOptions {
-  /** Stream LangGraph agent progress from `/query/stream` for RAG turns. */
   stream: boolean;
 }
 
 export function useConversation(apiBase: string, { stream }: ConversationOptions = { stream: false }) {
   const [state, dispatch] = useReducer(conversationReducer, undefined, () => initialConversation(newId()));
   const inflight = useRef(new Map<string, RequestHandle<QueryResponse>>());
-  // Remember per API base when the server lacks `/query/stream`, to skip the extra round trip.
   const streamUnsupported = useRef(new Set<string>());
 
   useEffect(() => {
     const handles = inflight.current;
     return () => {
-      for (const h of handles.values()) h.cancel();
+      for (const handle of handles.values()) handle.cancel();
       handles.clear();
     };
   }, []);
@@ -32,36 +30,35 @@ export function useConversation(apiBase: string, { stream }: ConversationOptions
     (request: TurnRequest) => {
       const id = newId();
       dispatch({ type: "start", id, request, at: Date.now() });
-      let handle: RequestHandle<QueryResponse>;
-      if (request.mode === "rag") {
-        const payload: QueryRequest = {
-          question: request.question,
-          ...(request.patientId ? { patient_id: request.patientId } : {}),
-          ...(request.structured ? { structured: true } : {}),
-          session_id: state.sessionId.slice(0, 64),
-        };
-        handle =
-          stream && !streamUnsupported.current.has(apiBase)
-            ? runRagQueryStreaming(
-                apiBase,
-                payload,
-                (step) => dispatch({ type: "progress", id, step }),
-                () => streamUnsupported.current.add(apiBase),
-              )
-            : runRagQuery(apiBase, payload);
-      } else {
-        handle = runMcpTool(apiBase, request.tool, request.args ?? {});
-      }
+
+      const payload: QueryRequest = {
+        question: request.question,
+        ...(request.patientId ? { patient_id: request.patientId } : {}),
+        ...(request.structured ? { structured: true } : {}),
+        ...(request.topK !== undefined ? { top_k: request.topK } : {}),
+        session_id: state.sessionId.slice(0, 64),
+      };
+
+      const handle =
+        stream && !streamUnsupported.current.has(apiBase)
+          ? runRagQueryStreaming(
+              apiBase,
+              payload,
+              (step) => dispatch({ type: "progress", id, step }),
+              () => streamUnsupported.current.add(apiBase),
+            )
+          : runRagQuery(apiBase, payload);
+
       inflight.current.set(id, handle);
       handle.promise
         .then((response) => dispatch({ type: "succeed", id, response, at: Date.now() }))
-        .catch((err: unknown) => {
-          const kind = err instanceof ApiError ? err.kind : "network";
+        .catch((error: unknown) => {
+          const kind = error instanceof ApiError ? error.kind : "network";
           dispatch({
             type: "fail",
             id,
             status: kind === "cancelled" ? "cancelled" : kind === "timeout" ? "timeout" : "error",
-            error: err instanceof Error ? err.message : "Request failed.",
+            error: error instanceof Error ? error.message : "Request failed.",
             at: Date.now(),
           });
         })
@@ -71,7 +68,7 @@ export function useConversation(apiBase: string, { stream }: ConversationOptions
   );
 
   const cancelAll = useCallback(() => {
-    for (const h of inflight.current.values()) h.cancel();
+    for (const handle of inflight.current.values()) handle.cancel();
   }, []);
 
   const reset = useCallback(() => {

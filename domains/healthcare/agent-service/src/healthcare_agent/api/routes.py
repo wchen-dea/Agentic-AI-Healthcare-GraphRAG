@@ -121,7 +121,11 @@ def build_router(
                 scope=scope_for(req.patient_id),
                 fn=lambda trace_id: responses.query_response(
                     queries.run_query(
-                        req.question, req.patient_id, structured=req.structured, session_id=req.session_id
+                        req.question,
+                        req.patient_id,
+                        top_k=req.top_k,
+                        structured=req.structured,
+                        session_id=req.session_id,
                     ),
                     trace_id,
                     caller_role=caller_role,
@@ -166,7 +170,11 @@ def build_router(
             try:
                 yield format_sse("meta", {"trace_id": trace_id, "orchestrator": "langgraph"}, event_id)
                 for kind, data in queries.stream(
-                    req.question, req.patient_id, structured=req.structured, session_id=req.session_id
+                    req.question,
+                    req.patient_id,
+                    top_k=req.top_k,
+                    structured=req.structured,
+                    session_id=req.session_id,
                 ):
                     event_id += 1
                     if kind == "step":

@@ -1,13 +1,14 @@
-// Wire contract mirroring domains/healthcare/agent-service/src/healthcare_agent (api/routes.py `/query`, tools/mcp_server.py)
-// and domain/structured_output.py. Keep in sync with the backend envelope.
+ // Wire contract mirroring the healthcare agent service `/query` contract.
+// Keep in sync with the backend response envelope.
 
-export type ApiMode = "rag" | "mcp";
+export type ApiMode = "rag";
 
 export interface QueryRequest {
   question: string;
   patient_id?: string;
   structured?: boolean;
   session_id?: string;
+  top_k?: number;
 }
 
 export interface VectorEvidence {
@@ -139,12 +140,11 @@ export interface QueryResponse {
   react?: ReactTrace;
   structured_response?: StructuredClinicalResponse;
   langgraph?: LangGraphTrace;
-  /** Any tool-specific fields not modelled above (MCP tools return varied shapes). */
+  /** Additional response fields not explicitly modeled above. */
   extra: Record<string, unknown>;
 }
 
 export interface HealthStatus {
   api: "ok" | "error";
-  mcp: "ok" | "error" | "unknown";
   checkedAt: string;
 }

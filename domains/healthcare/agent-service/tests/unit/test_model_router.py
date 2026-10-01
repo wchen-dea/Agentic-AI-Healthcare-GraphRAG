@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock
 
+from healthcare_agent.config.settings import HealthcareAgentSettings
+from healthcare_agent.generation.factory import tier_config_from_settings
 from healthcare_agent.generation.model_router import (
     CostTracker,
     LatencyTracker,
@@ -67,11 +69,11 @@ class ClassifyComplexityTests(unittest.TestCase):
 
 
 class ModelTierConfigTests(unittest.TestCase):
-    def test_from_env_uses_default_when_no_env(self):
-        config = ModelTierConfig.from_env("llama3.2:3b")
-        self.assertEqual(config.simple, "llama3.2:3b")
-        self.assertEqual(config.moderate, "llama3.2:3b")
-        self.assertEqual(config.complex, "llama3.2:3b")
+    def test_tiers_default_to_llm_model(self):
+        config = tier_config_from_settings(HealthcareAgentSettings(llm_model="m"))
+        self.assertEqual(config.simple, "m")
+        self.assertEqual(config.moderate, "m")
+        self.assertEqual(config.complex, "m")
 
     def test_is_uniform_when_all_same(self):
         config = ModelTierConfig(simple="m1", moderate="m1", complex="m1")

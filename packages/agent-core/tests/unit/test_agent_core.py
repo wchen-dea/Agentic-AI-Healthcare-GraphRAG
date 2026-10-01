@@ -170,8 +170,7 @@ class TestSettings:
         assert settings.audit_log_path == tmp_path / "logs" / "agent_audit.log"
 
     def test_env_overrides(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("LLM_MODEL", raising=False)
-        monkeypatch.setenv("OLLAMA_MODEL", "llama3.2")
+        monkeypatch.setenv("LLM_MODEL", "llama3.2")
         monkeypatch.setenv("AGENT_ALLOW_ORIGINS", "http://a, http://b")
         monkeypatch.setenv("AGENT_ALLOW_ROLE_HEADER", "false")
         monkeypatch.setenv("AGENT_AUDIT_LOG_PATH", "/var/log/audit.log")
@@ -180,6 +179,12 @@ class TestSettings:
         assert settings.allowed_origins == ["http://a", "http://b"]
         assert settings.allow_role_header is False
         assert settings.audit_log_path == Path("/var/log/audit.log")
+
+    def test_provider_model_aliases_are_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LLM_MODEL", raising=False)
+        monkeypatch.setenv("OLLAMA_MODEL", "llama3.2")
+        monkeypatch.setenv("DATABRICKS_MODEL", "databricks-x")
+        assert AgentServiceSettings().llm_model == "llama3.1"
 
     def test_removed_rag_api_names_are_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("AGENT_MAX_CONTEXT_ITEMS", raising=False)

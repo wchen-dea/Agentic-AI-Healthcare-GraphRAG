@@ -9,9 +9,8 @@ export interface TurnRequest {
   patientId: string;
   /** RAG only. */
   structured: boolean;
-  /** MCP tool name, or "query" for the RAG endpoint. */
-  tool: string;
-  args?: Record<string, string | number | boolean>;
+  /** RAG only; maximum evidence items requested from the orchestrator. */
+  topK?: number;
 }
 
 export interface Turn {

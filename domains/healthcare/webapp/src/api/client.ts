@@ -1,9 +1,8 @@
 // Transport layer: the only module that calls fetch().
 import { config, normalizeBaseUrl } from "../config";
-import { errorDetail, isRecord, parseAgents, parseAgentStep, parseQueryResponse } from "./guards";
+import { errorDetail, parseAgents, parseAgentStep, parseQueryResponse } from "./guards";
 import { createSseParser, parseEventJson } from "./sse";
 import type { AgentCard, AgentProgressStep, HealthStatus, QueryRequest, QueryResponse } from "./types";
-import type { ToolArgs } from "./tools";
 
 export type ApiErrorKind = "http" | "timeout" | "cancelled" | "network" | "protocol";
 
@@ -175,13 +174,9 @@ export function runRagQueryStreaming(
 export function checkHealth(apiBase: string): RequestHandle<HealthStatus> {
   return withAbort(async (signal) => {
     const base = normalizeBaseUrl(apiBase);
-    const [api, mcp] = await Promise.allSettled([
-      fetch(`${base}/health`, { signal }),
-      fetch(`${base}/mcp/health`, { signal }),
-    ]);
+    const response = await fetch(`${base}/health`, { signal });
     return {
-      api: api.status === "fulfilled" && api.value.ok ? "ok" : "error",
-      mcp: mcp.status === "fulfilled" ? (mcp.value.ok ? "ok" : "error") : "unknown",
+      api: response.ok ? "ok" : "error",
       checkedAt: new Date().toISOString(),
     };
   }, 10_000);
@@ -193,134 +188,4 @@ export function getAgents(apiBase: string): RequestHandle<AgentCard[]> {
     await ensureOk(response);
     return parseAgents(await readJsonSafe(response));
   }, 10_000);
-}
-
-// ---------------- MCP (streamable HTTP) ----------------
-
-const MCP_ACCEPT = "application/json, text/event-stream";
-
-/** Read a JSON-RPC response with the given id from a JSON or SSE body. */
-export async function readJsonRpcResponse(response: Response, id: string): Promise<Record<string, unknown>> {
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("text/event-stream")) {
-    const body = await readJsonSafe(response);
-    if (isRecord(body)) return body;
-    throw new ApiError("protocol", "MCP response was not a JSON-RPC object.");
-  }
-  if (!response.body) throw new ApiError("protocol", "MCP response had no body.");
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  const parser = createSseParser();
-  const seen = new Set<string>();
-
-  const match = (events: ReturnType<typeof parser.push>): Record<string, unknown> | undefined => {
-    for (const evt of events) {
-      if (evt.id) {
-        if (seen.has(evt.id)) continue;
-        seen.add(evt.id);
-      }
-      const json = parseEventJson(evt);
-      if (isRecord(json) && json.id === id) return json;
-    }
-    return undefined;
-  };
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const found = match(parser.push(decoder.decode(value, { stream: true })));
-      if (found) return found;
-    }
-    const found = match(parser.end());
-    if (found) return found;
-  } finally {
-    reader.cancel().catch(() => undefined);
-  }
-  throw new ApiError("protocol", "MCP stream ended before a response was received.");
-}
-
-/** FastMCP returns either structuredContent or JSON text content. */
-export function normalizeMcpResult(result: unknown): unknown {
-  if (!isRecord(result)) return {};
-  if (result.isError === true) {
-    const text = Array.isArray(result.content)
-      ? result.content.filter(isRecord).map((c) => (typeof c.text === "string" ? c.text : "")).join("\n")
-      : "";
-    throw new ApiError("protocol", text || "MCP tool returned an error.");
-  }
-  const structured = result.structuredContent;
-  if (isRecord(structured)) {
-    const keys = Object.keys(structured);
-    return keys.length === 1 && keys[0] === "result" && isRecord(structured.result) ? structured.result : structured;
-  }
-  if (Array.isArray(result.content)) {
-    const text = result.content
-      .filter(isRecord)
-      .map((c) => (c.type === "text" && typeof c.text === "string" ? c.text : ""))
-      .join("\n")
-      .trim();
-    if (text) {
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        return { answer: text };
-      }
-    }
-  }
-  return result;
-}
-
-function rpcError(json: Record<string, unknown>): string | undefined {
-  const err = json.error;
-  if (!isRecord(err)) return undefined;
-  return typeof err.message === "string" ? err.message : "Unknown MCP error.";
-}
-
-export function runMcpTool(apiBase: string, toolName: string, args: ToolArgs): RequestHandle<QueryResponse> {
-  return withAbort(async (signal) => {
-    const endpoint = `${normalizeBaseUrl(apiBase)}/mcp`;
-    const post = (body: unknown, sessionId?: string) =>
-      fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: MCP_ACCEPT,
-          ...(sessionId ? { "Mcp-Session-Id": sessionId } : {}),
-        },
-        body: JSON.stringify(body),
-        signal,
-      });
-
-    const initResp = await post({
-      jsonrpc: "2.0",
-      id: "init-1",
-      method: "initialize",
-      params: { protocolVersion: config.mcpProtocolVersion, capabilities: {}, clientInfo: config.mcpClientInfo },
-    });
-    await ensureOk(initResp);
-    const sessionId = initResp.headers.get("mcp-session-id") ?? undefined;
-    const initJson = await readJsonRpcResponse(initResp, "init-1");
-    const initErr = rpcError(initJson);
-    if (initErr) throw new ApiError("protocol", `MCP initialize failed: ${initErr}`);
-
-    const notify = await post({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }, sessionId);
-    await notify.body?.cancel().catch(() => undefined);
-
-    const callResp = await post(
-      { jsonrpc: "2.0", id: "call-1", method: "tools/call", params: { name: toolName, arguments: args } },
-      sessionId,
-    );
-    await ensureOk(callResp);
-    const callJson = await readJsonRpcResponse(callResp, "call-1");
-    const callErr = rpcError(callJson);
-    if (callErr) throw new ApiError("protocol", `MCP tool error: ${callErr}`);
-
-    if (sessionId) {
-      // Best-effort session teardown; never block the result on it.
-      fetch(endpoint, { method: "DELETE", headers: { "Mcp-Session-Id": sessionId } }).catch(() => undefined);
-    }
-    return parseQueryResponse(normalizeMcpResult(callJson.result));
-  });
 }

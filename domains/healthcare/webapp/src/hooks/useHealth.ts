@@ -16,7 +16,7 @@ export function useHealth(apiBase: string): { health: HealthStatus | null; check
       setChecking(true);
       handle.promise
         .then((h) => active && setHealth(h))
-        .catch(() => active && setHealth({ api: "error", mcp: "unknown", checkedAt: new Date().toISOString() }))
+        .catch(() => active && setHealth({ api: "error", checkedAt: new Date().toISOString() }))
         .finally(() => active && setChecking(false));
     };
     run();

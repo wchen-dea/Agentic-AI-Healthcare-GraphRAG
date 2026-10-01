@@ -57,6 +57,14 @@ class QueryRequest(_QuestionRequest):
     patient_id: str | None = Field(default=None, min_length=1, max_length=128)
     structured: bool = Field(default=False, description="Return structured JSON response")
     session_id: str | None = Field(default=None, max_length=64)
+    top_k: int = Field(default=5, ge=1)
+
+    @field_validator("top_k")
+    @classmethod
+    def _top_k_within_limit(cls, value: int) -> int:
+        if value > _limits.max_context_items:
+            raise ValueError(f"top_k must be at most {_limits.max_context_items}")
+        return value
 
 
 class PatientContextGetRequest(_Request):

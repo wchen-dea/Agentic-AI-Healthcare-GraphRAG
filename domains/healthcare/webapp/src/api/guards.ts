@@ -171,7 +171,7 @@ const KNOWN_KEYS = new Set([
   "langgraph",
 ]);
 
-/** Converts any `/query` or MCP tool payload into the unified view model. */
+/** Converts the `/query` payload into the unified view model. */
 export function parseQueryResponse(value: unknown): QueryResponse {
   const data = isRecord(value) ? value : {};
   const extra: Record<string, unknown> = {};

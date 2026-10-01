@@ -4,14 +4,16 @@ Domain services subclass ``AgentServiceSettings`` and add their own store and
 model fields. Values come from environment variables.
 
 Service settings use the ``AGENT_`` prefix (ADR-0012). The legacy ``RAG_API_``
-names were removed in Phase 4 and are ignored.
+names were removed in Phase 4 and are ignored. ``LLM_MODEL`` is the only model
+variable; provider-specific aliases (``OLLAMA_MODEL``, ``DATABRICKS_MODEL``) are
+not read.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 ENV_PREFIX = "AGENT_"
@@ -27,7 +29,7 @@ class AgentServiceSettings(BaseSettings):
 
     # LLM gateway
     llm_provider: str = Field(default="ollama", validation_alias="LLM_PROVIDER")
-    llm_model: str = Field(default="llama3.1", validation_alias=AliasChoices("LLM_MODEL", "OLLAMA_MODEL"))
+    llm_model: str = Field(default="llama3.1", validation_alias="LLM_MODEL")
     llm_fallback_provider: str = Field(default="", validation_alias="LLM_FALLBACK_PROVIDER")
     llm_fallback_model: str = Field(default="", validation_alias="LLM_FALLBACK_MODEL")
     llm_timeout_seconds: int = Field(default=120, ge=1, validation_alias="LLM_TIMEOUT_SECONDS")

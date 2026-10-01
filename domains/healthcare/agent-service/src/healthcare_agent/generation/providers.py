@@ -192,7 +192,7 @@ class AnthropicProvider:
 
 class BedrockProvider:
     def __init__(self, *, configured_model: str) -> None:
-        self.model = configured_model or os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-haiku-20241022-v1:0")
+        self.model = configured_model or "anthropic.claude-3-5-haiku-20241022-v1:0"
         self.region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
         self._client: Any | None = None
 
@@ -243,7 +243,7 @@ class DatabricksProvider:
     """Calls a Databricks Model Serving / AI Gateway endpoint (OpenAI-compatible chat format)."""
 
     def __init__(self, *, configured_model: str) -> None:
-        self.model = configured_model or os.getenv("DATABRICKS_MODEL", "databricks-meta-llama-3-1-70b-instruct")
+        self.model = configured_model or "databricks-gpt-5-6-luna"
         self.host = os.getenv("DATABRICKS_HOST", "").rstrip("/")
         self.token = os.getenv("DATABRICKS_TOKEN", "")
 
@@ -260,17 +260,19 @@ class DatabricksProvider:
             return "LLM error: DATABRICKS_HOST not set."
         if not self.token:
             return "LLM error: DATABRICKS_TOKEN not set."
+        url = f"{self.host}/serving-endpoints/{self.model}/invocations"
+        headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        payload: dict[str, Any] = {
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
         try:
-            response = requests.post(
-                f"{self.host}/serving-endpoints/{self.model}/invocations",
-                headers={"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"},
-                json={
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
-                },
-                timeout=timeout_seconds,
-            )
+            response = requests.post(url, headers=headers, json=payload, timeout=timeout_seconds)
+            # Some models (e.g. GPT-5 reasoning endpoints) only accept the default temperature.
+            if response.status_code == 400 and "temperature" in response.text:
+                payload.pop("temperature")
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout_seconds)
         except requests.Timeout:
             return f"LLM error: Databricks request timed out after {timeout_seconds} seconds."
         except requests.RequestException:

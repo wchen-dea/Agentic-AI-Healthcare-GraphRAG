@@ -320,7 +320,7 @@ dependency. This ensures:
 
 - No patient data (even synthetic) is transmitted to a third-party API by default
 - Predictable inference costs (no per-token fees)
-- Model selection is operator-controlled via `OLLAMA_MODEL`
+- Model selection is operator-controlled via `LLM_MODEL`
 
 OpenAI, Anthropic, and AWS Bedrock providers are implemented (ADR-0004) with automatic fallback.
 Production uses AWS Bedrock as primary and can use Anthropic as fallback via `LLM_FALLBACK_PROVIDER`.

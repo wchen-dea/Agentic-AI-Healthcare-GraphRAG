@@ -152,8 +152,8 @@ Healthcare ops identifiers now match the `agent-service` name. Supply-chain name
 | Default audit log | `logs/rag_api_audit.log`, `/var/log/rag-api/audit.log` | `logs/agent_audit.log`, `/var/log/agent-service/audit.log` |
 | Helm subchart / k8s Deployment and Service | `rag-api` | `agent-service` (values key `agent-service:`, `--set agent-service.secrets.*`) |
 | Image repository | `...-graphrag-rag-api` | `...-graphrag-agent-service` |
-| Compose service / containers | `rag-api`, `healthcare-rag-api`, `dev-rag-api` | `agent-service`, `healthcare-agent-service`, `dev-agent-service` |
-| Env files | `infra/environments/*/rag-api.env*` | `infra/environments/*/agent-service.env*` |
+| Compose service / containers | `rag-api`, `healthcare-rag-api`, `dev-rag-api` | `agent-service`, `healthcare-agent-service`, `dev-agent-service` (dev compose later removed) |
+| Env files | `infra/environments/*/rag-api.env*` | `infra/environments/production/agent-service.env.example` (dev env file later removed; local stack uses repo-root `.env`) |
 | Prometheus jobs | `rag_api`, `blackbox_rag_api_health` | `agent_service`, `blackbox_agent_service_health` |
 | CI workflow | `rag-api-contracts.yml` | `agent-service-contracts.yml` |
 | Script base URL | `RAG_API_URL` | `AGENT_SERVICE_URL` (falls back to `RAG_API_URL`) |

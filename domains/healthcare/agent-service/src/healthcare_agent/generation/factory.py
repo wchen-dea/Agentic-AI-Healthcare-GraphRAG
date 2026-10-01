@@ -24,7 +24,9 @@ def build_llm_provider(settings: HealthcareAgentSettings) -> Any:
     Tier models use ``provider:model`` specs; each extra provider is created once.
     """
     provider: Any = create_provider(
-        settings.llm_provider, base_url=settings.ollama_url, configured_model=settings.llm_model
+        settings.llm_provider,
+        base_url=settings.ollama_url,
+        configured_model=settings.llm_model,
     )
     if settings.llm_fallback_provider:
         fallback = create_provider(

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseQueryResponse } from "../api/guards";
 import { conversationReducer, initialConversation, isBusy, type TurnRequest } from "./conversation";
 
-const request: TurnRequest = { mode: "rag", question: "q?", patientId: "", structured: false, tool: "query" };
+const request: TurnRequest = { mode: "rag", question: "q?", patientId: "", structured: false };
 
 describe("conversationReducer", () => {
   it("tracks pending and success", () => {

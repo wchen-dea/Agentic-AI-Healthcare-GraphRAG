@@ -5,7 +5,7 @@ import { turnToJson, turnToMarkdown } from "./export";
 
 const turn: Turn = {
   id: "t1",
-  request: { mode: "rag", question: "Risk?", patientId: "patient-0001", structured: true, tool: "query" },
+  request: { mode: "rag", question: "Risk?", patientId: "patient-0001", structured: true },
   status: "success",
   startedAt: 0,
   finishedAt: 1000,

@@ -21,11 +21,7 @@ deploy/
 │       ├── neo4j/              Neo4j graph database
 │       ├── qdrant/             Qdrant vector database
 │       └── ollama/             Local LLM inference server
-├── dev/                        Local development (Docker Compose)
-│   ├── docker-compose.yml
-│   ├── docker-compose.monitoring.yml
-│   ├── agent-service.env
-│   ├── monitoring/
+├── dev/                        Minikube bootstrap (local Compose lives in infra/compose/)
 │   └── setup-minikube.sh
 └── production/                 Production Docker Compose variant
     ├── docker-compose.ai.yml
@@ -67,10 +63,13 @@ The `LLM_FALLBACK_PROVIDER` env var enables automatic failover — if the primar
 
 ### Option A: Docker Compose (recommended for quick start)
 
+Uses the canonical stacks in `infra/compose/`, configured by the repo-root `.env` (copy `.env.example`).
+
 ```bash
-cd infra/environments/dev
-docker compose up -d                          # agent-service, neo4j, qdrant, ollama, provider-web
-docker compose -f docker-compose.monitoring.yml up -d  # prometheus, grafana, blackbox
+make up-hc    # infra stack (kafka, ollama, prometheus, grafana, blackbox, ...) + healthcare stack
+# Equivalent:
+# docker compose -f infra/compose/docker-compose.infra.yml -p infra up -d
+# docker compose -f infra/compose/docker-compose.healthcare.yml -p healthcare up -d
 ```
 
 Services on localhost:
@@ -81,6 +80,7 @@ Services on localhost:
 | Provider Web | 8088 | `http://localhost:8088` |
 | Neo4j Browser | 7474 | `http://localhost:7474` |
 | Qdrant | 6333 | `http://localhost:6333` |
+| Flink UI | 8082 | `http://localhost:8082` |
 | Ollama | 11434 | `http://localhost:11434` |
 | Prometheus | 9090 | `http://localhost:9090` |
 | Grafana | 3000 | `http://localhost:3000` |
@@ -88,8 +88,7 @@ Services on localhost:
 Tear down:
 
 ```bash
-docker compose down -v
-docker compose -f docker-compose.monitoring.yml down -v
+make down
 ```
 
 ### Option B: Helm on Minikube

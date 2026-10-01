@@ -15,7 +15,6 @@ a configurable hourly budget (COST_BUDGET_HOURLY_USD).
 """
 from __future__ import annotations
 
-import os
 import re
 import time
 from collections import deque
@@ -112,16 +111,6 @@ class ModelTierConfig:
 
     def model_for_tier(self, tier: ComplexityTier) -> str:
         return getattr(self, tier)
-
-    @staticmethod
-    def from_env(default_model: str) -> ModelTierConfig:
-        return ModelTierConfig(
-            simple=os.getenv("LLM_MODEL_SIMPLE", default_model),
-            moderate=os.getenv("LLM_MODEL_MODERATE", default_model),
-            complex=os.getenv("LLM_MODEL_COMPLEX", default_model),
-            latency_target_ms=float(os.getenv("LLM_LATENCY_TARGET_MS", "0")),
-            cost_budget_hourly_usd=float(os.getenv("LLM_COST_BUDGET_HOURLY_USD", "0")),
-        )
 
     def is_uniform(self) -> bool:
         return self.simple == self.moderate == self.complex
