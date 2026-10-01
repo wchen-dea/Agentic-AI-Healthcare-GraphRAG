@@ -31,7 +31,7 @@ Question
 
 **Runner:** `python domains/healthcare/agent-service/tests/test_contracts.py` (stdlib `unittest`, no pytest)
 
-**CI trigger:** push or PR to `dev` touching `domains/healthcare/agent-service/**` — `.github/workflows/rag-api-contracts.yml`
+**CI trigger:** push or PR to `dev` touching `domains/healthcare/agent-service/**` — `.github/workflows/agent-service-contracts.yml`
 
 These tests run entirely in-process using `fastapi.testclient.TestClient`. All three
 external services (Qdrant, Neo4j, Ollama) are mocked with `unittest.mock.patch`, so no
@@ -46,7 +46,7 @@ live stack is required.
 | `test_mcp_export_defaults_to_bounded_text_and_denies_raw_payload` | `export` role returns bounded (truncated) text; `include_raw_payload=True` is silently denied; `graph_access_level` is `broader` |
 | `test_generation_and_export_have_different_evidence_defaults` | `graphrag_answer_generate` redacts text (`access_level: none`); `evidence_bundle_export` returns bounded text (`access_level: bounded`) |
 | `test_query_accepts_explicit_generation_role_header` | `X-Caller-Role: generation` header is respected |
-| `test_query_trims_response_to_configured_budget` | Response byte budget (`RAG_API_MAX_RESPONSE_BYTES`) is enforced; `guardrails.response_truncated` is set when trimmed |
+| `test_query_trims_response_to_configured_budget` | Response byte budget (`AGENT_MAX_RESPONSE_BYTES`) is enforced; `guardrails.response_truncated` is set when trimmed |
 | `test_skills_plan_endpoint_returns_flow_and_tools` | `/skills/plan` resolves the configured skill flow and returns MCP/runtime tool chains |
 | `test_skills_plan_endpoint_rejects_unknown_goal` | `/skills/plan` returns a validation error for unknown business goals |
 | `test_query_includes_planner_metadata` | `/query` response includes deterministic planner metadata (`request_type`, `retrieval_plan`) |
@@ -81,7 +81,7 @@ This suite focuses on negative and edge conditions that are easy to miss in happ
 
 ### How to run locally
 
-The rag-api packages are members of the root **uv workspace** (see
+The agent service packages are members of the root **uv workspace** (see
 [ADR-0011](adrs/0011-uv-workspace-packaging.md)). Run them with Python 3.11 (matching
 Docker and CI); the members declare `requires-python = ">=3.11,<3.14"` because
 `mcp==1.28.0` and `fastapi==0.115.0` cannot co-resolve on Python 3.14+.
@@ -110,7 +110,7 @@ OK
 `importlib.import_module("healthcare_agent.main")` for each test, giving each test a fresh module with its
 own configuration and connections.
 
-**Prometheus registry fix:** `observability/metrics.py` defines the `rag_api_*` Prometheus
+**Prometheus registry fix:** `observability/metrics.py` defines the `agent_service_*` Prometheus
 collectors used by `healthcare_agent.main`. Because `prometheus_client.REGISTRY` is a
 process-wide singleton that survives module reloads, `tearDown` must explicitly unregister
 those collectors after each test, otherwise the second `load_module()` call raises
@@ -121,7 +121,7 @@ those collectors after each test, otherwise the second `load_module()` call rais
 rag_collectors = set(
     c
     for name, c in list(prometheus_client.REGISTRY._names_to_collectors.items())
-    if name.startswith("rag_api_")
+    if name.startswith("agent_service_")
 )
 for collector in rag_collectors:
     try:

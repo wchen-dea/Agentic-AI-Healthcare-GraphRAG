@@ -48,7 +48,7 @@ make helm-ports  # Start port-forwards
 
 | Service | URL |
 |---------|-----|
-| Healthcare RAG API | http://localhost:8000 |
+| Healthcare agent service | http://localhost:8000 |
 | Healthcare Web UI | http://localhost:8088 |
 | Supply-chain RAG API | http://localhost:8001 |
 | Neo4j Browser (HC) | http://localhost:7474 |

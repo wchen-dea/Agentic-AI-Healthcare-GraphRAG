@@ -68,7 +68,7 @@ The platform supports parallel domain deployments sharing infrastructure (Kafka 
 | Healthcare Provider | root (`domains/healthcare/data-pipelines/producer/`, `domains/healthcare/data-pipelines/flink-job/`, `domains/healthcare/agent-service/`) | 7474/7687 | 6333 | `healthcare.*` |
 | Supply Chain Resilience | `domains/supply-chain/` | 7475/7688 | 6335 | `supplychain.*` |
 
-Each domain brings its own: Avro envelope schema, ontology YAML (entities, seeds, rules), graph write functions, producer event generators, and RAG API planner/classifier. The streaming pipeline, embedding infrastructure, and observability stack are reused.
+Each domain brings its own: Avro envelope schema, ontology YAML (entities, seeds, rules), graph write functions, producer event generators, and Agent API planner/classifier. The streaming pipeline, embedding infrastructure, and observability stack are reused.
 
 ## Healthcare Extension Matrix
 
@@ -425,7 +425,7 @@ Current implementation uses Ollama in domains/healthcare/agent-service/src/healt
 
 MCP delivery in the current implementation:
 
-- MCP is embedded in the same rag-api process.
+- MCP is embedded in the same agent-service process.
 - MCP protocol endpoint: `POST /mcp` (streamable HTTP).
 - Human diagnostic endpoint: `GET /mcp/health`.
 
@@ -459,11 +459,11 @@ Configuration keys:
 
 Secrets should be sourced from a secret manager or runtime environment injection, never committed to repository files.
 
-Current rag-api observability metrics for query latency and throughput:
+Current agent-service observability metrics for query latency and throughput:
 
-- rag_api_http_request_duration_seconds
-- rag_api_tool_execution_duration_seconds
-- rag_api_tool_execution_total
+- agent_service_http_request_duration_seconds
+- agent_service_tool_execution_duration_seconds
+- agent_service_tool_execution_total
 
 Use a secret manager for API keys. Do not store credentials in files or compose manifests.
 
@@ -558,7 +558,7 @@ Neo4j stores patient-centric graph entities and lineage, including:
 
 See [04_data_platform.md](04_data_platform.md) for the full model.
 
-### RAG API
+### Agent API
 
 domains/healthcare/agent-service/src/healthcare_agent/main.py exposes:
 
@@ -632,7 +632,7 @@ Secrets should be sourced from a secret manager or runtime environment injection
 
 ### Provider Web
 
-The provider web UI (`domains/healthcare/webapp`) is a React + TypeScript single-page app built with Vite and served by Nginx. It calls the RAG API (`POST /query`) and the MCP streamable-HTTP endpoint (`POST /mcp`) directly from the browser and renders:
+The provider web UI (`domains/healthcare/webapp`) is a React + TypeScript single-page app built with Vite and served by Nginx. It calls the Agent API (`POST /query`) and the MCP streamable-HTTP endpoint (`POST /mcp`) directly from the browser and renders:
 
 - structured clinical summaries (risks, interactions, lab signals, confidence) and guardrail blocks,
 - ranked, filterable vector evidence with redaction notices,
@@ -665,7 +665,7 @@ Producer transactional topic write
   -> HealthcareGraphRagProcessor.process_event
   -> enrichment with in-memory reference cache
   -> Qdrant upsert + Neo4j merge
-  -> RAG API retrieval surface
+  -> Agent API retrieval surface
 ```
 
 ### Reference Event Path

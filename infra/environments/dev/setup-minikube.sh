@@ -31,7 +31,7 @@ fi
 REPO_ROOT="$(cd "$INFRA_DIR/.." && pwd)"
 echo "Building images in minikube Docker..."
 eval $(minikube docker-env)
-docker build -q -f "$REPO_ROOT/domains/healthcare/agent-service/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-rag-api:latest "$REPO_ROOT"
+docker build -q -f "$REPO_ROOT/domains/healthcare/agent-service/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-agent-service:latest "$REPO_ROOT"
 docker build -q -f "$REPO_ROOT/domains/healthcare/data-pipelines/producer/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-producer:latest "$REPO_ROOT"
 docker build -q -f "$REPO_ROOT/domains/healthcare/data-pipelines/flink-job/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-flink-healthcare:latest "$REPO_ROOT"
 docker build -q -f "$REPO_ROOT/domains/healthcare/webapp/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest "$REPO_ROOT"
@@ -48,15 +48,15 @@ echo "Waiting for pods..."
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=kafka --timeout=120s 2>/dev/null || true
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=neo4j --timeout=120s 2>/dev/null || true
 kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=qdrant --timeout=60s 2>/dev/null || true
-kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=rag-api --timeout=120s 2>/dev/null || true
+kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=agent-service --timeout=120s 2>/dev/null || true
 
 echo
 echo "=== Dev Environment Ready ==="
 echo
-echo "NOTE: rag-api.secrets.DATABRICKS_TOKEN in $VALUES_FILE is a placeholder — set a real token before querying."
+echo "NOTE: agent-service.secrets.DATABRICKS_TOKEN in $VALUES_FILE is a placeholder — set a real token before querying."
 echo
 echo "Access services (port-forward):"
-echo "  kubectl -n $NAMESPACE port-forward svc/rag-api 8000:8000"
+echo "  kubectl -n $NAMESPACE port-forward svc/agent-service 8000:8000"
 echo "  kubectl -n $NAMESPACE port-forward svc/provider-web 8088:80"
 echo "  kubectl -n $NAMESPACE port-forward svc/neo4j 7474:7474 7687:7687"
 echo "  kubectl -n $NAMESPACE port-forward svc/qdrant 6333:6333"

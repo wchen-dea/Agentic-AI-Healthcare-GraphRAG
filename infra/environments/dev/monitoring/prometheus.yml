@@ -8,8 +8,8 @@ scrape_configs:
     module: [http_2xx]
   static_configs:
   - targets:
-    - http://dev-rag-api:8000/health
-    - http://dev-rag-api:8000/mcp/health
+    - http://dev-agent-service:8000/health
+    - http://dev-agent-service:8000/mcp/health
     - http://dev-webapp:80/
   relabel_configs:
   - source_labels: [__address__]

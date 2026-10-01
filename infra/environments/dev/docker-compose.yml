@@ -31,9 +31,9 @@ services:
       - ollama_models:/root/.ollama
     restart: unless-stopped
 
-  rag-api:
-    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-rag-api:latest
-    container_name: dev-rag-api
+  agent-service:
+    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-agent-service:latest
+    container_name: dev-agent-service
     depends_on:
       - neo4j
       - qdrant
@@ -41,7 +41,7 @@ services:
     env_file:
       - path: ../../../.env
         required: false
-      - ./rag-api.env
+      - ./agent-service.env
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -50,7 +50,7 @@ services:
     image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest
     container_name: dev-webapp
     depends_on:
-      - rag-api
+      - agent-service
     ports:
       - "8088:80"
     restart: unless-stopped

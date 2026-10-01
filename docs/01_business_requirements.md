@@ -337,8 +337,8 @@ respective tracking backends are configured.
 | Control | Mechanism | Business rationale |
 |---------|-----------|-------------------|
 | Evidence text redaction | `generation` role receives `text_redacted: true` | Prevents raw clinical text from leaking through generation responses |
-| Response byte budget | `RAG_API_MAX_RESPONSE_BYTES` (default 50 KB) | Controls downstream payload size for EHR/workflow system integrations |
-| Answer length cap | `RAG_API_MAX_ANSWER_CHARS` (default 2 000 chars) | Prevents unbounded LLM generation from dominating response payload |
+| Response byte budget | `AGENT_MAX_RESPONSE_BYTES` (default 50 KB) | Controls downstream payload size for EHR/workflow system integrations |
+| Answer length cap | `AGENT_MAX_ANSWER_CHARS` (default 2 000 chars) | Prevents unbounded LLM generation from dominating response payload |
 | LLM timeout | `LLM_TIMEOUT_SECONDS` (default 120 s) | Prevents blocking API calls for slow model inference |
 | Temperature fixed at 0.2 | Hard-coded in `ask_ollama` | Reduces hallucination variance; consistent clinical tone |
 | Safety caveat in prompt | System prompt requires "Safety caveat" in every answer | Explicit advisory disclaimer on all generated clinical text |
@@ -355,7 +355,7 @@ system should be acted upon as a clinical directive without independent clinical
 
 ### Audit trail
 
-Every API call and MCP tool invocation writes a JSONL record to `RAG_API_AUDIT_LOG_PATH`
+Every API call and MCP tool invocation writes a JSONL record to `AGENT_AUDIT_LOG_PATH`
 containing:
 
 | Field | Description |

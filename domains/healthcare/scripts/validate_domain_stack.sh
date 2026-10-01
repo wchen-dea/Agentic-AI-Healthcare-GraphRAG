@@ -2,7 +2,7 @@
 set -euo pipefail
 # Validate healthcare domain stack health.
 
-HC_API="${RAG_API_URL:-http://localhost:8000}"
+HC_API="${AGENT_SERVICE_URL:-${RAG_API_URL:-http://localhost:8000}}"
 HC_NEO4J="${NEO4J_HTTP_URL:-http://localhost:7474}"
 HC_QDRANT="${QDRANT_URL:-http://localhost:6333}"
 

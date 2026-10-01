@@ -46,16 +46,16 @@ Use a minimal toolset while covering high-value workflows.
 
 | Tool Name | Purpose | Backing Service |
 | --- | --- | --- |
-| `skills_plan_get` | Resolve Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools plan | rag-api skills layer |
-| `patient_context_get` | Retrieve patient-centric graph context summary | Neo4j via rag-api or direct adapter |
-| `vector_evidence_search` | Retrieve top-k vector evidence for question/patient | Qdrant via rag-api or direct adapter |
-| `graphrag_answer_generate` | Generate grounded answer from vector + graph evidence | rag-api |
-| `risk_summary_generate` | Generate concise risk summary for one patient | rag-api + prompt policy |
-| `timeline_explain` | Explain patient progression over a bounded time window | rag-api |
-| `medication_risk_assess` | Assess contraindications, interactions, and adverse reaction risks | rag-api + Neo4j context |
-| `coding_gap_detect` | Surface coding and claims consistency gaps | rag-api + Neo4j/Qdrant evidence |
-| `cohort_risk_summary` | Summarize cross-patient risk signals for cohort triage | rag-api + Qdrant/Neo4j |
-| `evidence_bundle_export` | Return traceable evidence bundle for audit/review | rag-api aggregation |
+| `skills_plan_get` | Resolve Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools plan | agent-service skills layer |
+| `patient_context_get` | Retrieve patient-centric graph context summary | Neo4j via agent-service or direct adapter |
+| `vector_evidence_search` | Retrieve top-k vector evidence for question/patient | Qdrant via agent-service or direct adapter |
+| `graphrag_answer_generate` | Generate grounded answer from vector + graph evidence | agent-service |
+| `risk_summary_generate` | Generate concise risk summary for one patient | agent-service + prompt policy |
+| `timeline_explain` | Explain patient progression over a bounded time window | agent-service |
+| `medication_risk_assess` | Assess contraindications, interactions, and adverse reaction risks | agent-service + Neo4j context |
+| `coding_gap_detect` | Surface coding and claims consistency gaps | agent-service + Neo4j/Qdrant evidence |
+| `cohort_risk_summary` | Summarize cross-patient risk signals for cohort triage | agent-service + Qdrant/Neo4j |
+| `evidence_bundle_export` | Return traceable evidence bundle for audit/review | agent-service aggregation |
 
 Notes:
 
@@ -332,7 +332,7 @@ Minimal model that runs locally and scales to production.
 Local demo (embedded mode):
 
 - Run without bearer-token enforcement by default for local simplicity.
-- Enforce role-based authorization through a tool policy in embedded rag-api for both `/query` and MCP tool entrypoints.
+- Enforce role-based authorization through a tool policy in embedded agent-service for both `/query` and MCP tool entrypoints.
 
 Optional standalone mode:
 
@@ -593,7 +593,7 @@ This section documents the current healthcare agent runtime after ADR-0012. The 
 Primary implementation and integration touchpoints:
 
 - `domains/healthcare/agent-service/src/healthcare_agent/main.py` — slim composition root that wires `HealthcareAgentSettings`, Qdrant/Neo4j adapters (`vector_context`, `graph_context`), LLM gateway, LangGraph runtime ports, FastAPI, and MCP.
-- `domains/healthcare/agent-service/src/healthcare_agent/config/settings.py` — `HealthcareAgentSettings`, a `pydantic-settings` class extending `agent_core.settings.AgentServiceSettings`; environment variable names intentionally retain the `RAG_API_*`, `LLM_*`, `QDRANT_URL`, and `NEO4J_*` prefixes.
+- `domains/healthcare/agent-service/src/healthcare_agent/config/settings.py` — `HealthcareAgentSettings`, a `pydantic-settings` class extending `agent_core.settings.AgentServiceSettings`; environment variable names intentionally retain the `AGENT_*`, `LLM_*`, `QDRANT_URL`, and `NEO4J_*` prefixes.
 - `domains/healthcare/agent-service/src/healthcare_agent/api/routes.py` — HTTP routes including `/query` and `/query/stream`.
 - `domains/healthcare/agent-service/src/healthcare_agent/api/governance.py` — `ToolGovernance` role policy, audit logging, and tool metrics.
 - `domains/healthcare/agent-service/src/healthcare_agent/api/responses.py` — `ResponseShaper` response shaping.
@@ -609,7 +609,7 @@ Primary implementation and integration touchpoints:
 - `domains/healthcare/agent-service/src/healthcare_agent/generation/factory.py` — `build_llm_provider`.
 - `domains/healthcare/agent-service/src/healthcare_agent/safety/` — guardrails, harness, and response policy.
 - `domains/healthcare/agent-service/src/healthcare_agent/evaluation/` — gates, LangSmith, MLflow evaluation, retrieval benchmarks, and grounding scorecards.
-- `domains/healthcare/agent-service/src/healthcare_agent/observability/metrics.py` — Prometheus `rag_api_*` collectors.
+- `domains/healthcare/agent-service/src/healthcare_agent/observability/metrics.py` — Prometheus `agent_service_*` collectors.
 - `domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py` — MLflow tracing helpers.
 
 ## LangGraph Flow
@@ -657,7 +657,7 @@ Nine LangGraph nodes share typed state (three retrieval agents, three specialist
 | `MLFLOW_TRACKING_URI` | (none) | Enable MLflow tracing (for example `http://mlflow:5000`) |
 | `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | MLflow experiment name |
 
-Operational names intentionally remain unchanged until a later phase: the environment prefix is still `RAG_API_*`, Prometheus collectors are still `rag_api_*`, the Helm/Kubernetes service is still `rag-api`, the Compose container is still `healthcare-rag-api`, and the CI workflow is still `rag-api-contracts.yml`.
+Operational names were aligned in ADR-0012 Phase 3b: the environment prefix is `AGENT_*` (legacy `RAG_API_*` names are still read and log a deprecation warning), Prometheus collectors are `agent_service_*`, the Helm chart and Kubernetes service are `agent-service`, the Compose service is `agent-service` (container `healthcare-agent-service`), and the CI workflow is `agent-service-contracts.yml`.
 
 ## Test Notes
 

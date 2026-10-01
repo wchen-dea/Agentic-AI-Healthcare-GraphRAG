@@ -1,11 +1,11 @@
-name: rag-api-contracts
+name: agent-service-contracts
 
 on:
   push:
     branches:
       - dev
     paths:
-      - .github/workflows/rag-api-contracts.yml
+      - .github/workflows/agent-service-contracts.yml
       - pyproject.toml
       - uv.lock
       - packages/**
@@ -23,7 +23,7 @@ on:
     branches:
       - dev
     paths:
-      - .github/workflows/rag-api-contracts.yml
+      - .github/workflows/agent-service-contracts.yml
       - pyproject.toml
       - uv.lock
       - packages/**
@@ -102,14 +102,14 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      - name: Sync locked rag-api environment
+      - name: Sync locked agent service environments
         run: uv sync --frozen --package agent-core --package healthcare-agent-service --package supply-chain-rag-api
 
       - name: Run agent-core tests (policy, audit, guardrails, SSE, settings)
         run: uv run --frozen --package agent-core pytest -q
         working-directory: packages/agent-core
 
-      - name: Run healthcare rag-api tests (contracts, planner, runtime, guardrails)
+      - name: Run healthcare agent-service tests (contracts, planner, runtime, guardrails)
         run: uv run --frozen --package healthcare-agent-service pytest -q
         working-directory: domains/healthcare/agent-service
 
@@ -128,8 +128,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build healthcare rag-api container
-        run: docker build -f domains/healthcare/agent-service/Dockerfile -t rag-api-contracts:ci .
+      - name: Build healthcare agent-service container
+        run: docker build -f domains/healthcare/agent-service/Dockerfile -t agent-service-contracts:ci .
 
       - name: Build supply-chain rag-api container
         run: docker build -f domains/supply-chain/rag-api/Dockerfile -t sc-rag-api-contracts:ci .

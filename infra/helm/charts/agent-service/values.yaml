@@ -1,12 +1,12 @@
 enabled: true
 replicaCount: 2
 image:
-  repository: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-rag-api
+  repository: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-agent-service
   tag: latest
   pullPolicy: IfNotPresent
 # The image runs as the non-root `app` user (uid/gid 10001); see ADR-0011.
 # readOnlyRootFilesystem stays off: the Hugging Face model cache (HF_HOME) and
-# the audit log (/var/log/rag-api) are written inside the container.
+# the audit log (/var/log/agent-service) are written inside the container.
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 10001
@@ -49,7 +49,7 @@ config:
   LANGGRAPH_MAX_ITERATIONS: "3"
   MLFLOW_TRACKING_URI: "http://mlflow:5000"
   MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"
-  RAG_API_ALLOW_ROLE_HEADER: "false"
+  AGENT_ALLOW_ROLE_HEADER: "false"
 secrets: {}
 # NEO4J_PASSWORD: ""
 # OPENAI_API_KEY: ""

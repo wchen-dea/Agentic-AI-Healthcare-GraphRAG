@@ -1,6 +1,6 @@
 # ADR-0012: Capability-Oriented Layout and Shared Agent Core
 
-- Status: accepted (Phases 1–3 implemented; Phases 3b–4 planned)
+- Status: accepted (Phases 1–3b implemented; Phase 4 planned)
 - Date: 2026-10-01
 - Deciders: platform team
 - Supersedes: none
@@ -72,7 +72,7 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
    | 1 (done) | Add `agent-core`; healthcare delegates policy, audit, guardrail base, SSE, and runtime contracts to it; audit failures are logged and counted |
    | 2 (done) | `git mv` `rag-api` → `agent-service` and `healthcare_rag_api` → `healthcare_agent`; split `app.py`, `domain/`, and `langgraph_agents/` into the capability folders; adopt `AgentServiceSettings`; remove the legacy non-LangGraph query path |
    | 3 (done) | Move `platform/shared` → `packages/knowledge-core` and switch Flink images to the wheel; move ontology/skills under `knowledge/`; merge infra folders under `infra/` |
-   | 3b | Rename ops identifiers (`RAG_API_*` env prefix, `rag_api_*` metrics, Helm chart/k8s service `rag-api`, compose container, `rag-api-contracts.yml`, `rag-api.env`) with a deprecation window that accepts the old env names |
+   | 3b (done) | Rename ops identifiers (`RAG_API_*` env prefix, `rag_api_*` metrics, Helm chart/k8s service `rag-api`, compose container, `rag-api-contracts.yml`, `rag-api.env`) with a deprecation window that accepts the old env names |
    | 4 | Split tests into `unit`/`integration`/`evals`; make ruff blocking in CI; remove shims; apply the same layout to supply-chain |
 
    Phase 2 moved modules without re-export shims: the service is deployed only as a wheel, and no external code imports the old paths. New code must import from the target location.
@@ -80,7 +80,7 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
 ## Consequences
 
 - Positive: governance primitives (authorization, audit, injection defence, stream contract) have one tested implementation that every domain reuses.
-- Positive: lost audit events are now visible through `rag_api_audit_write_failures_total{tool}` and an error log that includes the trace id. Requests still succeed when the audit sink fails.
+- Positive: lost audit events are now visible through `agent_service_audit_write_failures_total{tool}` (named `rag_api_audit_write_failures_total` before Phase 3b) and an error log that includes the trace id. Requests still succeed when the audit sink fails.
 - Positive: folder names map onto ADR-0010 layers, so ownership and review scope are clear.
 - Negative: renames in Phase 2 touch imports, Dockerfiles, Helm values, CI paths, and docs in one change. Do it in one commit with `git mv` to keep history.
 - Negative: Phase 2 has no import shims, so out-of-tree scripts that imported `healthcare_rag_api.*` must be updated.
@@ -118,7 +118,7 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
 - HTTP and MCP share one path. `QueryService.run_query` / `stream` always run the LangGraph graph. `/query` passes `RAG_API_MAX_CONTEXT_ITEMS` to the triage agent as `context_limit` instead of a hard-coded 5. The default is still 5.
 - Removed: the legacy single-pass query path, the ReAct controller, `RAG_API_LANGGRAPH_ENABLED`, and `RAG_API_REACT_*`. The flags are also removed from the deploy env files and Helm values. There is no rollback flag; roll back by redeploying the previous image.
 - `domains/healthcare/scripts/test_react_planner.sh` → `test_planner.sh`.
-- Ops names are kept until Phase 3b: the `RAG_API_*` env prefix, the `rag_api_*` metrics, the Helm chart and k8s service `rag-api`, the compose container `healthcare-rag-api`, and the CI workflow `rag-api-contracts.yml`.
+- Ops names were kept until Phase 3b (see below): the `RAG_API_*` env prefix, the `rag_api_*` metrics, the Helm chart and k8s service `rag-api`, the compose container `healthcare-rag-api`, and the CI workflow `rag-api-contracts.yml`.
 
 ## Phase 3 Changes
 
@@ -141,7 +141,36 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
 - Compose files, `setup-minikube.sh`, the Makefile, CI workflows, `scripts/validate_docs.sh`, the README, and docs 01–09 use the new paths. Historical ADRs (0004–0011) are not edited.
 - Local data in `container/volume/` is untracked and unchanged.
 
+## Phase 3b Changes
+
+Healthcare ops identifiers now match the `agent-service` name. Supply-chain names are unchanged until Phase 4.
+
+| Area | Before | After |
+|---|---|---|
+| Env prefix | `RAG_API_*` | `AGENT_*` (old names still read, see below) |
+| Prometheus metrics | `rag_api_*` | `agent_service_*` (hard rename; Grafana dashboard updated) |
+| Default audit log | `logs/rag_api_audit.log`, `/var/log/rag-api/audit.log` | `logs/agent_audit.log`, `/var/log/agent-service/audit.log` |
+| Helm subchart / k8s Deployment and Service | `rag-api` | `agent-service` (values key `agent-service:`, `--set agent-service.secrets.*`) |
+| Image repository | `...-graphrag-rag-api` | `...-graphrag-agent-service` |
+| Compose service / containers | `rag-api`, `healthcare-rag-api`, `dev-rag-api` | `agent-service`, `healthcare-agent-service`, `dev-agent-service` |
+| Env files | `infra/environments/*/rag-api.env*` | `infra/environments/*/agent-service.env*` |
+| Prometheus jobs | `rag_api`, `blackbox_rag_api_health` | `agent_service`, `blackbox_agent_service_health` |
+| CI workflow | `rag-api-contracts.yml` | `agent-service-contracts.yml` |
+| Script base URL | `RAG_API_URL` | `AGENT_SERVICE_URL` (falls back to `RAG_API_URL`) |
+
+- Deprecation window: `agent_core.settings.env_alias()` maps each field to `AliasChoices("AGENT_<x>", "RAG_API_<x>")`. The new name wins when both are set. A single warning per process lists every legacy name in use. The aliases are removed in Phase 4.
+- Not renamed: the `runtime_tools` value `"rag_api"` in `skills_layer.json` and generated skills. It is part of the skills contract.
+- Risks at cutover:
+  - The metric rename breaks continuity of dashboards and alerts that query `rag_api_*` history.
+  - Renaming the k8s Deployment and Service creates new objects and deletes the old ones, so there is a short gap. Revert with `helm rollback`.
+  - A branch-protection rule that requires the old `rag-api-contracts` check name must be updated.
+  - Old local logs stay in `rag-api/logs/`.
+
 ## Follow-ups
+
+- Remove the `RAG_API_*` env aliases and the `RAG_API_URL` script fallback in Phase 4.
+- Decide whether to rename the `runtime_tools` value `"rag_api"` (requires regenerating skills and updating the webapp contract test).
+- Rename the supply-chain `rag-api` folder, package, compose services, and CI steps in Phase 4.
 
 - Replace the dev-only role header with verified caller identity (OIDC/JWT claims mapped to roles) behind `ToolPolicy`.
 - Adapt `observability/tracing.py` to the `Tracer` port and the Qdrant/Neo4j clients to `VectorStore`/`GraphStore` (`retrieval/qdrant.py`, `retrieval/neo4j.py`).

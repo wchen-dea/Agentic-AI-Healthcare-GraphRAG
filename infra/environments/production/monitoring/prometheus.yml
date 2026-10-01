@@ -2,14 +2,14 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 scrape_configs:
-- job_name: blackbox_rag_api_health
+- job_name: blackbox_agent_service_health
   metrics_path: /probe
   params:
     module: [http_2xx]
   static_configs:
   - targets:
-    - http://rag-api:8000/health
-    - http://rag-api:8000/mcp/health
+    - http://agent-service:8000/health
+    - http://agent-service:8000/mcp/health
     - http://provider-web/
   relabel_configs:
   - source_labels: [__address__]

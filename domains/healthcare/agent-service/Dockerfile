@@ -44,13 +44,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM ${PYTHON_IMAGE} AS runtime
 RUN groupadd --system --gid 10001 app && \
     useradd --system --uid 10001 --gid app --create-home --home-dir /home/app app && \
-    mkdir -p /app /var/log/rag-api && chown app:app /app /var/log/rag-api
+    mkdir -p /app /var/log/agent-service && chown app:app /app /var/log/agent-service
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HF_HOME=/home/app/.cache/huggingface \
-    RAG_API_AUDIT_LOG_PATH=/var/log/rag-api/audit.log
+    AGENT_AUDIT_LOG_PATH=/var/log/agent-service/audit.log
 WORKDIR /app
 USER 10001:10001
 EXPOSE 8000

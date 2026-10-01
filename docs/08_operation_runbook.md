@@ -74,11 +74,11 @@ Apply compose changes and remove deleted services:
 docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
-If you change `rag-api` source code, rebuild the image before recreating the service:
+If you change `agent-service` source code, rebuild the image before recreating the service:
 
 ```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build rag-api
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
 ```
 
 ### LangGraph Query Path
@@ -89,11 +89,11 @@ ADR-0012 removed the former ReAct and single-pass rollback paths. LangGraph is n
 LANGGRAPH_MAX_ITERATIONS=3
 ```
 
-Rebuild and recreate `rag-api` after source or configuration changes:
+Rebuild and recreate `agent-service` after source or configuration changes:
 
 ```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build rag-api
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
 ```
 
 Verify with a smoke query and ensure a `langgraph` object is present in the response:
@@ -115,11 +115,11 @@ MLFLOW_TRACKING_URI=http://mlflow:5000
 MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
 ```
 
-Rebuild and recreate `rag-api`:
+Rebuild and recreate `agent-service`:
 
 ```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build rag-api
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
 ```
 
 Verify MLflow UI is reachable:
@@ -156,7 +156,7 @@ docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker
 make ps  # or: docker compose -f infra/compose/docker-compose.infra.yml -p infra ps
 ```
 
-Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer, localstack.
+Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, agent-service, producer, localstack.
 
 Note: MCP is embedded in the agents service in the current architecture; MCP is embedded in the agents process.
 
@@ -299,17 +299,17 @@ docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
 
 Expected: rows appear as lab results cross clinical thresholds.
 
-### 9) RAG API Metrics Endpoint
+### 9) Agent API Metrics Endpoint
 
 ```bash
-curl -s http://localhost:8000/metrics | grep -E 'rag_api_(http_request_duration_seconds|tool_execution_duration_seconds|tool_execution_total)'
+curl -s http://localhost:8000/metrics | grep -E 'agent_service_(http_request_duration_seconds|tool_execution_duration_seconds|tool_execution_total)'
 ```
 
 Expected result includes metric families:
 
-- rag_api_http_request_duration_seconds
-- rag_api_tool_execution_duration_seconds
-- rag_api_tool_execution_total
+- agent_service_http_request_duration_seconds
+- agent_service_tool_execution_duration_seconds
+- agent_service_tool_execution_total
 
 ### 10) Grafana Query Latency Panel
 
@@ -613,9 +613,9 @@ helm install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthca
 helm install healthcare infra/helm \
   -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
-  --set rag-api.secrets.NEO4J_PASSWORD=<value> \
-  --set rag-api.secrets.OPENAI_API_KEY=<value> \
-  --set rag-api.secrets.ANTHROPIC_API_KEY=<value>
+  --set agent-service.secrets.NEO4J_PASSWORD=<value> \
+  --set agent-service.secrets.OPENAI_API_KEY=<value> \
+  --set agent-service.secrets.ANTHROPIC_API_KEY=<value>
 ```
 
 ### Upgrade
@@ -634,8 +634,8 @@ helm rollback healthcare 1 -n healthcare-ai
 
 ```bash
 kubectl -n healthcare-ai-dev get pods
-kubectl -n healthcare-ai-dev logs deploy/rag-api --tail=50
-kubectl -n healthcare-ai-dev exec deploy/rag-api -- curl -s localhost:8000/health
+kubectl -n healthcare-ai-dev logs deploy/agent-service --tail=50
+kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000/health
 ```
 
 ### Tear down dev
@@ -656,7 +656,7 @@ make helm-ports-stop  # kill all port-forwards
 
 Services:
 
-- RAG API: `http://localhost:8000`
+- Agent API: `http://localhost:8000`
 - Web UI: `http://localhost:8088`
 - Neo4j: `http://localhost:7474`
 - Qdrant: `http://localhost:6333/dashboard`
@@ -686,7 +686,7 @@ Services:
 | Env | Provider | Symptom | Check |
 |-----|----------|---------|-------|
 | Dev | Ollama | "no models installed" | `ollama pull llama3.1` in the ollama pod/container |
-| Prod | OpenAI | "OPENAI_API_KEY not set" | Verify secret injection via `kubectl get secret rag-api-secrets -o yaml` |
+| Prod | OpenAI | "OPENAI_API_KEY not set" | Verify secret injection via `kubectl get secret agent-service-secrets -o yaml` |
 | Prod | Anthropic (fallback) | "ANTHROPIC_API_KEY not set" | Same — check secret |
 | Prod | Both fail | "LLM error" in answer | Check network egress to `api.openai.com` and `api.anthropic.com` |
 

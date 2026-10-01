@@ -155,11 +155,11 @@ services:
     command: >
       bash -c "sleep 35 && flink run -m flink-jobmanager:8081 -d -Dpython.client.executable=/usr/bin/python3 -Dpython.executable=/usr/bin/python3 -py /app/healthcare_graph_rag_pyflink_job.py && tail -f /dev/null"
 
-  rag-api:
+  agent-service:
     build:
       context: ../..
       dockerfile: domains/healthcare/agent-service/Dockerfile
-    container_name: healthcare-rag-api
+    container_name: healthcare-agent-service
     depends_on:
       - qdrant
       - neo4j
@@ -186,7 +186,7 @@ services:
       dockerfile: domains/healthcare/webapp/Dockerfile
     container_name: healthcare-webapp
     depends_on:
-      - rag-api
+      - agent-service
     ports:
       - "8088:80"
 

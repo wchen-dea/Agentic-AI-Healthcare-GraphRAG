@@ -13,15 +13,15 @@ import prometheus_client
 from fastapi.testclient import TestClient
 
 
-class RagApiContractTests(unittest.TestCase):
+class AgentServiceContractTests(unittest.TestCase):
     managed_env_keys = {
-        "RAG_API_AUDIT_LOG_PATH",
-        "RAG_API_DEFAULT_CALLER_ROLE",
-        "RAG_API_MAX_RESPONSE_BYTES",
-        "RAG_API_MAX_EVIDENCE_CHARS",
-        "RAG_API_MAX_ANSWER_CHARS",
-        "RAG_API_MAX_CONTEXT_ITEMS",
-        "RAG_API_TOOL_POLICY_PATH",
+        "AGENT_AUDIT_LOG_PATH",
+        "AGENT_DEFAULT_CALLER_ROLE",
+        "AGENT_MAX_RESPONSE_BYTES",
+        "AGENT_MAX_EVIDENCE_CHARS",
+        "AGENT_MAX_ANSWER_CHARS",
+        "AGENT_MAX_CONTEXT_ITEMS",
+        "AGENT_TOOL_POLICY_PATH",
         "LLM_MAX_TOKENS",
         "LLM_TIMEOUT_SECONDS",
     }
@@ -62,14 +62,14 @@ class RagApiContractTests(unittest.TestCase):
         if module is not None and hasattr(module, "neo4j"):
             module.neo4j.close()
         # Prometheus REGISTRY is a process-wide singleton that outlives the
-        # module reload.  Unregister rag_api_* collectors so the next
+        # module reload.  Unregister agent_service_* collectors so the next
         # load_module() import can re-register them without collision.
-        rag_collectors = set(
+        service_collectors = set(
             c
             for name, c in list(prometheus_client.REGISTRY._names_to_collectors.items())
-            if name.startswith("rag_api_")
+            if name.startswith("agent_service_")
         )
-        for collector in rag_collectors:
+        for collector in service_collectors:
             try:
                 prometheus_client.REGISTRY.unregister(collector)
             except Exception:
@@ -87,8 +87,8 @@ class RagApiContractTests(unittest.TestCase):
     def test_query_redacts_vector_text_and_writes_audit_log(self) -> None:
         audit_path = Path(self.tmpdir.name) / "query-audit.log"
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(audit_path),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(audit_path),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -130,8 +130,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_enforces_role_policy(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "auth-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "auth-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -160,8 +160,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_returns_structured_response_when_requested(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "structured-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "structured-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
         raw = json.dumps(
@@ -194,8 +194,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_surfaces_input_guardrail_block(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "blocked-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "blocked-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
         blocked = type("Check", (), {"passed": False, "category": "prompt_injection", "reasons": ["test"]})()
@@ -209,8 +209,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_mcp_streamable_http_endpoint_serves_documented_path(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "mcp-http-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "mcp-http-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         headers = {
             "Accept": "application/json, text/event-stream",
@@ -236,10 +236,10 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_mcp_export_defaults_to_bounded_text_and_denies_raw_payload(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "mcp-audit.log"),
-            RAG_API_MAX_EVIDENCE_CHARS="16",
-            RAG_API_MAX_CONTEXT_ITEMS="2",
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "mcp-audit.log"),
+            AGENT_MAX_EVIDENCE_CHARS="16",
+            AGENT_MAX_CONTEXT_ITEMS="2",
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
 
         fake_result = {
@@ -287,9 +287,9 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_generation_and_export_have_different_evidence_defaults(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "role-audit.log"),
-            RAG_API_MAX_EVIDENCE_CHARS="18",
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "role-audit.log"),
+            AGENT_MAX_EVIDENCE_CHARS="18",
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
 
         fake_result = {
@@ -321,8 +321,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_accepts_explicit_generation_role_header(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "header-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "header-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -340,11 +340,11 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_trims_response_to_configured_budget(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "budget-audit.log"),
-            RAG_API_MAX_RESPONSE_BYTES="750",
-            RAG_API_MAX_ANSWER_CHARS="400",
-            RAG_API_MAX_CONTEXT_ITEMS="5",
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "budget-audit.log"),
+            AGENT_MAX_RESPONSE_BYTES="750",
+            AGENT_MAX_ANSWER_CHARS="400",
+            AGENT_MAX_CONTEXT_ITEMS="5",
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -379,8 +379,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_uses_langgraph_by_default(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "default-orchestrator-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "default-orchestrator-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -396,8 +396,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_skills_plan_endpoint_returns_flow_and_tools(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "skills-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "skills-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -416,8 +416,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_skills_plan_endpoint_rejects_unknown_goal(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "skills-error-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "skills-error-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -432,8 +432,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_includes_planner_metadata(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "planner-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "planner-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -454,8 +454,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_response_has_no_react_block(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "react-off-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "react-off-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -473,8 +473,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_agents_endpoint_returns_registry(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "agents-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "agents-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -490,8 +490,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_langgraph_block_present(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "langgraph-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "langgraph-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -535,8 +535,8 @@ class RagApiContractTests(unittest.TestCase):
     def test_query_stream_emits_steps_then_sanitized_result(self) -> None:
         audit_path = Path(self.tmpdir.name) / "stream-audit.log"
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(audit_path),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(audit_path),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -575,9 +575,9 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_stream_rejects_unauthorized_role_before_streaming(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "stream-denied.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
-            RAG_API_DEFAULT_CALLER_ROLE="read_only",
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "stream-denied.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_DEFAULT_CALLER_ROLE="read_only",
         )
         client = TestClient(rag_app.app)
 
@@ -587,8 +587,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_stream_reports_structured_error_event(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "stream-error.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "stream-error.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -602,8 +602,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_expanded_mcp_tools_return_expected_shapes(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "expanded-tools-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "expanded-tools-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
 
         fake_result = {
@@ -648,8 +648,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_handles_lifecycle_event_family_payloads(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "lifecycle-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "lifecycle-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -702,8 +702,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_query_handles_temporal_noise_fields_in_evidence(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "noise-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "noise-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
         client = TestClient(rag_app.app)
 
@@ -733,8 +733,8 @@ class RagApiContractTests(unittest.TestCase):
 
     def test_expanded_mcp_tools_with_claim_lifecycle_context(self) -> None:
         rag_app = self.load_module(
-            RAG_API_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "claim-lc-audit.log"),
-            RAG_API_TOOL_POLICY_PATH=str(self.policy_path),
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "claim-lc-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
         )
 
         fake_result = {

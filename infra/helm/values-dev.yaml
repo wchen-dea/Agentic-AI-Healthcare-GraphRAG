@@ -1,7 +1,7 @@
 # Dev environment: single replica, Databricks foundation model, no HPA, NodePort access
 networkPolicies:
   enabled: false
-rag-api:
+agent-service:
   replicaCount: 1
   autoscaling:
     enabled: false
@@ -27,7 +27,7 @@ rag-api:
     LANGGRAPH_MAX_ITERATIONS: "3"
     MLFLOW_TRACKING_URI: "http://mlflow:5000"
     MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag-dev"
-    RAG_API_ALLOW_ROLE_HEADER: "true"
+    AGENT_ALLOW_ROLE_HEADER: "true"
   secrets:
     NEO4J_PASSWORD: "healthcare123"
     DATABRICKS_TOKEN: "change_me"

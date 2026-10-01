@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
+from agent_core import settings as settings_module
 from agent_core.audit import AuditEvent, JsonlAuditSink, hash_payload
 from agent_core.guardrails import check_length, detect_prompt_injection
 from agent_core.policy import AuthorizationError, ToolPolicy
@@ -93,24 +95,41 @@ class TestStreaming:
 class TestSettings:
     def test_defaults(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.chdir(tmp_path)
-        for name in ("LLM_MODEL", "OLLAMA_MODEL", "RAG_API_ALLOW_ORIGINS", "RAG_API_AUDIT_LOG_PATH"):
+        for name in ("LLM_MODEL", "OLLAMA_MODEL", "AGENT_ALLOW_ORIGINS", "AGENT_AUDIT_LOG_PATH"):
             monkeypatch.delenv(name, raising=False)
+            monkeypatch.delenv(name.replace("AGENT_", "RAG_API_"), raising=False)
         settings = AgentServiceSettings()
         assert settings.llm_model == "llama3.1"
         assert settings.allowed_origins == ["*"]
-        assert settings.audit_log_path == tmp_path / "logs" / "rag_api_audit.log"
+        assert settings.audit_log_path == tmp_path / "logs" / "agent_audit.log"
 
     def test_env_overrides(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("LLM_MODEL", raising=False)
         monkeypatch.setenv("OLLAMA_MODEL", "llama3.2")
-        monkeypatch.setenv("RAG_API_ALLOW_ORIGINS", "http://a, http://b")
-        monkeypatch.setenv("RAG_API_ALLOW_ROLE_HEADER", "false")
-        monkeypatch.setenv("RAG_API_AUDIT_LOG_PATH", "/var/log/audit.log")
+        monkeypatch.setenv("AGENT_ALLOW_ORIGINS", "http://a, http://b")
+        monkeypatch.setenv("AGENT_ALLOW_ROLE_HEADER", "false")
+        monkeypatch.setenv("AGENT_AUDIT_LOG_PATH", "/var/log/audit.log")
         settings = AgentServiceSettings()
         assert settings.llm_model == "llama3.2"
         assert settings.allowed_origins == ["http://a", "http://b"]
         assert settings.allow_role_header is False
         assert settings.audit_log_path == Path("/var/log/audit.log")
+
+    def test_legacy_env_names_still_read_and_warn(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.delenv("AGENT_MAX_CONTEXT_ITEMS", raising=False)
+        monkeypatch.setenv("RAG_API_MAX_CONTEXT_ITEMS", "7")
+        monkeypatch.setattr(settings_module, "_warned_legacy_names", set())
+        with caplog.at_level(logging.WARNING, logger="agent_core.settings"):
+            settings = AgentServiceSettings()
+        assert settings.max_context_items == 7
+        assert "RAG_API_MAX_CONTEXT_ITEMS" in caplog.text
+
+    def test_new_env_name_wins_over_legacy(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("AGENT_MAX_CONTEXT_ITEMS", "3")
+        monkeypatch.setenv("RAG_API_MAX_CONTEXT_ITEMS", "9")
+        assert AgentServiceSettings().max_context_items == 3
 
 
 class TestPorts:

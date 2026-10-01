@@ -56,8 +56,8 @@ jobs:
           helm upgrade --install healthcare infra/helm \
             -f infra/helm/values-production.yaml \
             -n healthcare-ai --create-namespace \
-            --set rag-api.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
-            --set rag-api.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+            --set agent-service.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
+            --set agent-service.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
             --wait --timeout 5m
         env:
           NEO4J_PASSWORD: ${{ secrets['NEO4J_PASSWORD'] }}
@@ -65,7 +65,7 @@ jobs:
 
       - name: Wait for rollouts
         run: |
-          kubectl rollout status deployment/rag-api -n healthcare-ai --timeout=300s
+          kubectl rollout status deployment/agent-service -n healthcare-ai --timeout=300s
           kubectl rollout status deployment/provider-web -n healthcare-ai --timeout=300s
 
       - name: Show deployment status

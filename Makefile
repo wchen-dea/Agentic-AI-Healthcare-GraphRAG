@@ -81,7 +81,7 @@ qdrant-hc: ## Healthcare Qdrant collection info
 qdrant-sc: ## Supply-chain Qdrant collection info
 	@curl -s http://localhost:6335/collections/supplychain_events | python3 -m json.tool
 
-api-hc: ## Healthcare RAG API health
+api-hc: ## Healthcare agent service health
 	@curl -s http://localhost:8000/health | python3 -m json.tool
 api-sc: ## Supply-chain RAG API health
 	@curl -s http://localhost:8001/health | python3 -m json.tool
@@ -138,12 +138,12 @@ sync: ## Sync the full dev venv (root depends on every workspace member)
 
 test-core: ## Provider-neutral agent-core tests (uv workspace)
 	cd packages/agent-core && uv run --package agent-core pytest --tb=short
-test-hc: ## Healthcare rag-api tests (uv workspace)
+test-hc: ## Healthcare agent-service tests (uv workspace)
 	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short
 test-sc: ## Supply-chain rag-api tests (uv workspace)
 	cd domains/supply-chain/rag-api && uv run --package supply-chain-rag-api pytest --tb=short
 
-build-wheels: ## Build rag-api wheels (+ agent-core, knowledge-core) into dist/
+build-wheels: ## Build agent service wheels (+ agent-core, knowledge-core) into dist/
 	uv build --wheel --package agent-core --out-dir dist
 	uv build --wheel --package knowledge-core --out-dir dist
 	uv build --wheel --package healthcare-agent-service --out-dir dist
@@ -164,14 +164,14 @@ helm-dev-down: ## Tear down minikube dev release
 
 helm-ports: ## Start all port-forwards for minikube dev
 	@pkill -f "port-forward" 2>/dev/null || true
-	@kubectl -n healthcare-ai-dev port-forward svc/rag-api 8000:8000 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/agent-service 8000:8000 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/provider-web 8088:80 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/neo4j 7474:7474 7687:7687 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/qdrant 6333:6333 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/conduktor-console 9080:8080 &>/dev/null &
 	@sleep 2
 	@echo "Port-forwards active:"
-	@echo "  RAG API:   http://localhost:8000"
+	@echo "  Agent API: http://localhost:8000"
 	@echo "  Web UI:    http://localhost:8088"
 	@echo "  Neo4j:     http://localhost:7474"
 	@echo "  Qdrant:    http://localhost:6333/dashboard"

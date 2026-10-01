@@ -1,7 +1,8 @@
 """Prometheus metrics for the agent service.
 
-Metric names are an operations contract (dashboards and alerts depend on them)
-and keep the ``rag_api_`` prefix until the infra rename in ADR-0012 Phase 3.
+Metric names are an operations contract (dashboards and alerts depend on them).
+They use the ``agent_service_`` prefix (renamed from ``rag_api_`` in ADR-0012
+Phase 3b).
 """
 from __future__ import annotations
 
@@ -21,25 +22,25 @@ class ServiceMetrics:
     def register(cls, registry: CollectorRegistry = REGISTRY) -> ServiceMetrics:
         return cls(
             http_request_duration_seconds=Histogram(
-                "rag_api_http_request_duration_seconds",
+                "agent_service_http_request_duration_seconds",
                 "HTTP request latency in seconds",
                 ["method", "path", "status"],
                 registry=registry,
             ),
             tool_execution_duration_seconds=Histogram(
-                "rag_api_tool_execution_duration_seconds",
+                "agent_service_tool_execution_duration_seconds",
                 "Tool execution latency in seconds",
                 ["tool", "outcome"],
                 registry=registry,
             ),
             tool_execution_total=Counter(
-                "rag_api_tool_execution_total",
+                "agent_service_tool_execution_total",
                 "Tool execution count",
                 ["tool", "outcome"],
                 registry=registry,
             ),
             audit_write_failures_total=Counter(
-                "rag_api_audit_write_failures_total",
+                "agent_service_audit_write_failures_total",
                 "Audit events that could not be persisted",
                 ["tool"],
                 registry=registry,

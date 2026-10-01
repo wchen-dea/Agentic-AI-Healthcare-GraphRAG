@@ -1,6 +1,6 @@
 networkPolicies:
   enabled: true
-rag-api:
+agent-service:
   enabled: true
 provider-web:
   enabled: true

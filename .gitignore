@@ -26,6 +26,7 @@ env/
 *.pid
 
 rag-api/logs/
+logs/
 mcp-server/logs/
 
 .qdrant/
