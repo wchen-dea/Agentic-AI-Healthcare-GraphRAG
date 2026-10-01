@@ -139,14 +139,14 @@ sync: ## Sync the full dev venv (root depends on every workspace member)
 test-core: ## Provider-neutral agent-core tests (uv workspace)
 	cd packages/agent-core && uv run --package agent-core pytest --tb=short
 test-hc: ## Healthcare rag-api tests (uv workspace)
-	cd domains/healthcare/rag-api && uv run --package healthcare-rag-api pytest --tb=short
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short
 test-sc: ## Supply-chain rag-api tests (uv workspace)
 	cd domains/supply-chain/rag-api && uv run --package supply-chain-rag-api pytest --tb=short
 
 build-wheels: ## Build rag-api wheels (+ agent-core, graphrag-shared) into dist/
 	uv build --wheel --package agent-core --out-dir dist
 	uv build --wheel --package graphrag-shared --out-dir dist
-	uv build --wheel --package healthcare-rag-api --out-dir dist
+	uv build --wheel --package healthcare-agent-service --out-dir dist
 	uv build --wheel --package supply-chain-rag-api --out-dir dist
 
 pull-model: ## Pull Ollama LLM model

@@ -15,7 +15,7 @@ members = [
     "agent-core",
     "agentic-healthcare",
     "graphrag-shared",
-    "healthcare-rag-api",
+    "healthcare-agent-service",
     "supply-chain-rag-api",
 ]
 
@@ -53,7 +53,7 @@ dependencies = [
     { name = "faker" },
     { name = "fastavro" },
     { name = "graphrag-shared" },
-    { name = "healthcare-rag-api", extra = ["bedrock"] },
+    { name = "healthcare-agent-service", extra = ["bedrock"] },
     { name = "pyyaml" },
     { name = "supply-chain-rag-api" },
 ]
@@ -72,7 +72,7 @@ requires-dist = [
     { name = "faker", specifier = ">=25.8.0" },
     { name = "fastavro", specifier = ">=1.9.5" },
     { name = "graphrag-shared", directory = "platform/shared" },
-    { name = "healthcare-rag-api", extras = ["bedrock"], editable = "domains/healthcare/rag-api" },
+    { name = "healthcare-agent-service", extras = ["bedrock"], editable = "domains/healthcare/agent-service" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "supply-chain-rag-api", editable = "domains/supply-chain/rag-api" },
 ]
@@ -920,9 +920,9 @@ wheels = [
 ]
 
 [[package]]
-name = "healthcare-rag-api"
+name = "healthcare-agent-service"
 version = "0.1.0"
-source = { editable = "domains/healthcare/rag-api" }
+source = { editable = "domains/healthcare/agent-service" }
 dependencies = [
     { name = "agent-core" },
     { name = "email-validator" },

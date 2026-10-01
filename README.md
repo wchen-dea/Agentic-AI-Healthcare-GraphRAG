@@ -73,7 +73,7 @@ make helm-ports  # Start port-forwards
 | [02_architecture.md](docs/02_architecture.md) | System architecture, design patterns |
 | [03_platform_blueprint.md](docs/03_platform_blueprint.md) | Platform blueprint, target architecture, specs, and backlog |
 | [04_data_platform.md](docs/04_data_platform.md) | Kafka schema, Neo4j graph model |
-| [05_ai_agents.md](docs/05_ai_agents.md) | MCP, Skills, ReAct, LangGraph agents |
+| [05_ai_agents.md](docs/05_ai_agents.md) | MCP, Skills, LangGraph agents |
 | [06_quality_assurance.md](docs/06_quality_assurance.md) | Testing strategy, contract tests |
 | [07_cicd_automation.md](docs/07_cicd_automation.md) | CI/CD, Helm, Compose, minikube, tech matrix |
 | [08_operation_runbook.md](docs/08_operation_runbook.md) | Operations, troubleshooting, Makefile |

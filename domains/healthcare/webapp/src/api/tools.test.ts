@@ -46,9 +46,9 @@ describe("select fields", () => {
 });
 
 describe("server contract drift", () => {
-  it("business_goal options mirror rag-api/src/healthcare_rag_api/config/skills_layer.json", async () => {
+  it("business_goal options mirror agent-service/src/healthcare_agent/config/skills_layer.json", async () => {
     const { readFile } = await import("node:fs/promises");
-    const raw = await readFile(new URL("../../../rag-api/src/healthcare_rag_api/config/skills_layer.json", import.meta.url), "utf8");
+    const raw = await readFile(new URL("../../../agent-service/src/healthcare_agent/config/skills_layer.json", import.meta.url), "utf8");
     const goals = Object.keys((JSON.parse(raw) as { business_goals: Record<string, unknown> }).business_goals);
     const field = byName("skills_plan_get").fields.find((f) => f.name === "business_goal");
     expect([...(field?.options ?? [])].sort()).toEqual([...goals].sort());

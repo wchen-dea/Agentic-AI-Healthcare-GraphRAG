@@ -21,20 +21,17 @@ Skill composition roadmap strategy and actionable backlog sequencing are describ
 
 ```text
 AI Client (Copilot, Claude Desktop, custom agent)
-  -> Embedded MCP endpoint at /mcp (domains/healthcare/rag-api/src/healthcare_rag_api/app.py)
-  -> domain/ modules:
-     - retrieval.py (Neo4j graph_search + Qdrant vector_search)
-     - synthesis.py (LLM prompt + generation)
-     - model_router.py (complexity-based model selection + latency/cost tracking)
-     - guardrails.py (input/output safety classification)
-     - memory.py (session + Redis-backed cross-session memory)
-     - structured_output.py (JSON-mode constrained generation)
-     - evaluation_gates.py (CI quality thresholds)
-     - evidence.py (ranking + fusion reranking)
-     - planner.py (request classification + retrieval planning)
-     - response_policy.py (sanitization + budget)
-     - harness.py (retry, guards, prompt registry)
-  -> langgraph_agents/ (optional multi-agent routing + inter-agent delegation)
+  -> Embedded MCP endpoint at /mcp (domains/healthcare/agent-service/src/healthcare_agent/main.py)
+  -> healthcare_agent modules:
+     - orchestration/query_service.py (shared REST, SSE, and MCP query path)
+     - orchestration/graph.py, state.py, runtime.py, planner.py, memory.py
+     - agents/nodes.py and agents/registry.py (specialist agent nodes and cards)
+     - retrieval/search.py and retrieval/ranking.py (Qdrant + Neo4j context)
+     - generation/synthesis.py, model_router.py, factory.py, providers.py
+     - safety/guardrails.py, harness.py, response_policy.py
+     - api/governance.py and api/responses.py (tool policy, audit, response shaping)
+     - tools/mcp_server.py, langchain_tools.py, skills.py
+     - evaluation/ and observability/ modules
   -> External stores:
      - Neo4j (platform/healthcare/neo4j)
      - Qdrant (platform/healthcare via flink-app)
@@ -433,9 +430,9 @@ Exit criteria:
 
 ## Current Implementation Note
 
-The embedded MCP layer in `domains/healthcare/rag-api/src/healthcare_rag_api/app.py` ships ten tools and shares the same retrieval + guardrail core used by `POST /query`.
+The embedded MCP layer is wired from `domains/healthcare/agent-service/src/healthcare_agent/main.py`, while the ten healthcare MCP tools live in `tools/mcp_server.py`. They share `QueryService.run_query` and `QueryService.stream` with `POST /query` and `POST /query/stream`.
 
-LangGraph is the default orchestrator (`RAG_API_LANGGRAPH_ENABLED` defaults to `true`; set it to `false` to roll back). MCP tool calls route through the multi-agent StateGraph with specialist agents for medication safety, lab interpretation, and coding review.
+ADR-0012 removed the former ReAct and single-pass query paths. LangGraph is now the only healthcare orchestrator for REST, SSE, and MCP calls, with specialist agents for medication safety, lab interpretation, and coding review.
 
 `POST /query/stream` always runs the LangGraph orchestrator and returns Server-Sent Events: `meta` (trace ID), `step` per graph node (allowlisted scalar fields only, no evidence or answer text), then `result` (same payload as `/query`) or `error` (generic message and trace ID). Authorization is checked before the stream opens, and each stream writes one audit entry. See [ADR-0010](adrs/0010-layered-agentic-architecture.md) for the layered target architecture and phased roadmap.
 
@@ -453,9 +450,9 @@ The standardization and CI validation policy for this layer is formalized in [AD
 
 The layer is runtime-backed (not documentation-only):
 
-- Skill catalog and goal mappings are defined in [rag-api/config/skills_layer.json](../domains/healthcare/rag-api/src/healthcare_rag_api/config/skills_layer.json).
-- Resolution logic is implemented in [rag-api/skills_layer.py](../domains/healthcare/rag-api/src/healthcare_rag_api/skills_layer.py).
-- LangGraph multi-agent orchestration maps skills to specialized agent nodes in [rag-api/langgraph_agents/agents.py](../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/agents.py).
+- Skill catalog and goal mappings are defined in [agent-service/src/healthcare_agent/config/skills_layer.json](../domains/healthcare/agent-service/src/healthcare_agent/config/skills_layer.json).
+- Resolution logic is implemented in [agent-service/src/healthcare_agent/tools/skills.py](../domains/healthcare/agent-service/src/healthcare_agent/tools/skills.py).
+- LangGraph multi-agent orchestration maps skills to specialized agent nodes in [agent-service/src/healthcare_agent/agents/nodes.py](../domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py).
 - Runtime access is exposed through:
   - REST: POST /skills/plan
   - MCP tool: skills_plan_get
@@ -544,11 +541,11 @@ Arguments:
 
 ## Role and Policy
 
-skills_plan_get is authorized in read_only role via [rag-api/config/tool_policies.json](../domains/healthcare/rag-api/src/healthcare_rag_api/config/tool_policies.json).
+skills_plan_get is authorized in read_only role via [agent-service/src/healthcare_agent/config/tool_policies.json](../domains/healthcare/agent-service/src/healthcare_agent/config/tool_policies.json).
 
 ## Validation
 
-Contracts are tested in [rag-api/tests/test_contracts.py](../domains/healthcare/rag-api/tests/test_contracts.py), including:
+Contracts are tested in [agent-service/tests/test_contracts.py](../domains/healthcare/agent-service/tests/test_contracts.py), including:
 
 - successful plan generation for known business goal
 - deterministic flow shape and tool outputs
@@ -585,447 +582,37 @@ python domains/supply-chain/scripts/validate_agent_skills.py
 
 Generated skill packages are stored under [healthcare/skills](../domains/healthcare/skills) and [supply-chain/skills](../domains/supply-chain/skills) and include one `SKILL.md` per skill folder plus supporting references.
 
-# ReAct Controller Specification
+# LangGraph Multi-Agent Query Path
 
 ## Purpose
 
-This specification defines a concrete ReAct-style controller for the current GraphRAG runtime.
+This section documents the current healthcare agent runtime after ADR-0012. The former ReAct controller and single-pass `/query` path were removed; LangGraph is the only query path for `POST /query`, `POST /query/stream`, and MCP tools. There is no rollback environment flag, and `/query` responses do not include a `react` block.
 
-Note: The ReAct controller is one of three query orchestration modes. See the comparison below between single-pass, ReAct, and LangGraph multi-agent modes. The LangGraph multi-agent mode provides a more capable alternative with specialist agents and MLflow tracing.
-
-Design intent:
-
-- keep existing planner, retrieval, and guardrails behavior,
-- add an explicit iterative Reason -> Act -> Observe loop,
-- keep all outputs policy-shaped and auditable,
-- make loop behavior testable with deterministic unit tests.
-
-## Scope
-
-In scope:
-
-- request-time controller state schema,
-- loop execution pseudocode,
-- stop and recovery criteria,
-- test plan mapped to existing test modules.
-
-Out of scope (initial version):
-
-- cross-request long-term memory,
-- autonomous background workflows,
-- major changes to MCP tool contracts.
-
-## Current File Mapping
+## Runtime File Mapping
 
 Primary implementation and integration touchpoints:
 
-- `domains/healthcare/rag-api/src/healthcare_rag_api/app.py`
-  - request handling and `POST /query`
-  - composition root: settings, clients, audit logging, tool metrics
-- `domains/healthcare/rag-api/src/healthcare_rag_api/domain/retrieval.py`
-  - embedding, vector search, graph search (Cypher query)
-- `domains/healthcare/rag-api/src/healthcare_rag_api/domain/synthesis.py`
-  - prompt construction and LLM synthesis
-- `domains/healthcare/rag-api/src/healthcare_rag_api/domain/response_policy.py`
-  - truncation, sanitization, budget enforcement, confidence estimation
-- `domains/healthcare/rag-api/src/healthcare_rag_api/domain/planner.py`
-  - request classification and retrieval plan selection
-- `domains/healthcare/rag-api/src/healthcare_rag_api/domain/evidence.py`
-  - deterministic ranking for vector and graph contexts
-- `domains/healthcare/rag-api/src/healthcare_rag_api/skills_layer.py`
-  - business goal to skill/tool resolution
-- `domains/healthcare/rag-api/src/healthcare_rag_api/config/tool_policies.json`
-  - role to tool authorization policy
-- `domains/healthcare/rag-api/tests/test_contracts.py`
-  - API and tool contract, guardrail, and policy tests
-- `domains/healthcare/rag-api/tests/test_planner_evaluation.py`
-  - planner fixture-driven route/plan assertions
-- `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
-  - deterministic planner/ranking edge assertions
-
-Implemented files:
-
-- `domains/healthcare/rag-api/src/healthcare_rag_api/domain/react_controller.py` — ReAct loop state and execution logic
-- `domains/healthcare/rag-api/tests/test_react_controller.py` — deterministic loop tests
-
-Not yet implemented from this spec:
-
-- Policy-aware action selection (current implementation always uses `vector_and_graph_retrieve`)
-- Observation character budget (`RAG_API_REACT_OBSERVATION_CHAR_BUDGET`)
-- Action authorization via `_authorize` within the loop
-- Retry with downgraded inputs on retrieval failure
-- Detailed observation objects and plan history in state
-- ReAct-specific Prometheus metrics and audit fields
-
-The LangGraph multi-agent mode (ADR-0007) provides the richer specialist routing that the Phase 2 ReAct design proposed. See the multi-agent architecture comparison section above for details.
-
-## Runtime Configuration
-
-Environment settings in `domains/healthcare/rag-api/src/healthcare_rag_api/app.py` `Settings`:
-
-- `RAG_API_REACT_ENABLED` (default: `false`)
-- `RAG_API_REACT_MAX_ITERS` (default: `3`, min: `1`, max: `6`)
-- `RAG_API_REACT_MIN_CONFIDENCE` (default: `0.75`, range: `0.0-1.0`)
-- `RAG_API_REACT_MAX_NO_PROGRESS_STEPS` (default: `1`)
-- `RAG_API_REACT_OBSERVATION_CHAR_BUDGET` (default: `1200`)
-
-Design rule: if `RAG_API_REACT_ENABLED=false`, retain current single-pass behavior.
-
-## State Schema
-
-State is request-scoped only and should not be persisted as mutable memory across requests.
-
-```json
-{
-  "trace_id": "uuid",
-  "started_at": "ISO-8601",
-  "caller_role": "generation|read_only|export",
-  "question": "string",
-  "patient_id": "string|null",
-  "request_type": "patient_summary|medication_safety|lab_interpretation|cohort_triage|...",
-  "iteration": 0,
-  "max_iterations": 3,
-  "status": "running|completed|stopped|failed",
-  "final_reason": "string|null",
-  "confidence": 0.0,
-  "no_progress_count": 0,
-  "seen_event_ids": [],
-  "seen_patient_ids": [],
-  "plan_history": [
-    {
-      "iteration": 0,
-      "plan_name": "string",
-      "reason": "string",
-      "top_k": 5,
-      "query_text": "string"
-    }
-  ],
-  "steps": [
-    {
-      "iteration": 0,
-      "thought": "short deterministic rationale",
-      "selected_action": "vector_evidence_search|patient_context_get|graphrag_answer_generate|...",
-      "action_input": {
-        "question": "string",
-        "patient_id": "string|null",
-        "top_k": 5
-      },
-      "observation": {
-        "vector_hits": 0,
-        "graph_patients": 0,
-        "new_event_ids": 0,
-        "new_patient_ids": 0,
-        "error": "string|null"
-      },
-      "confidence_after": 0.0,
-      "stop_candidate": false,
-      "stop_reason": "string|null"
-    }
-  ],
-  "aggregated_context": {
-    "vector_context": [],
-    "graph_context": []
-  },
-  "guardrails": {
-    "evidence_text_redacted": true,
-    "evidence_access_level": "none|bounded",
-    "graph_access_level": "standard|broader",
-    "max_context_items": 5,
-    "max_response_bytes": 50000,
-    "response_truncated": false,
-    "raw_payload_returned": false
-  }
-}
-```
-
-### Notes on schema fields
-
-- `thought` is deterministic and short. Do not store chain-of-thought style private reasoning.
-- `selected_action` must be authorized by current role policy before execution.
-- `aggregated_context` remains subject to existing response shaping and byte-budget trimming.
-
-## Action Set and Role Constraints
-
-Initial action set should reuse existing runtime call paths:
-
-- `vector_evidence_search` -> calls `vector_context` (+ ranking)
-- `patient_context_get` -> calls `graph_context` (+ ranking)
-- `graphrag_answer_generate` -> calls synthesis over accumulated evidence
-- `skills_plan_get` (optional for business-goal routed flows)
-
-Role policy source of truth remains `domains/healthcare/rag-api/src/healthcare_rag_api/config/tool_policies.json`.
-
-If an action is not allowed for role:
-
-- record observation error `unauthorized_action`,
-- increment `no_progress_count`,
-- select next allowed action in same iteration if available,
-- otherwise stop with `policy_blocked`.
-
-## Loop Pseudocode
-
-```python
-def run_query_react(question: str, patient_id: str | None, caller_role: str) -> dict:
-    state = init_state(question, patient_id, caller_role)
-
-    while state.status == "running" and state.iteration < state.max_iterations:
-        # Reason
-        request_type = classify_request_type(question, patient_id)
-        plan = select_retrieval_plan(
-            request_type=request_type,
-            question=derive_query_text(question, state),
-            patient_id=patient_id,
-            max_top_k=settings.max_context_items,
-        )
-        state.plan_history.append(plan_to_record(plan, state.iteration))
-
-        # Act selection (deterministic policy)
-        action = choose_action(plan, state)
-        if not is_action_authorized(action, caller_role):
-            record_policy_block(state, action)
-            if should_stop(state):
-                break
-            continue
-
-        # Act
-        result = execute_action(action, plan, question, patient_id, state)
-
-        # Observe
-        obs = summarize_observation(result, state)
-        append_step(state, action, plan, obs)
-
-        # Aggregate evidence
-        merge_context(state.aggregated_context, result)
-
-        # Evaluate confidence/progress
-        state.confidence = estimate_confidence(state, obs)
-        if obs.new_event_ids == 0 and obs.new_patient_ids == 0:
-            state.no_progress_count += 1
-        else:
-            state.no_progress_count = 0
-
-        # Stop checks
-        reason = evaluate_stop_reason(state, obs)
-        if reason is not None:
-            state.status = "completed"
-            state.final_reason = reason
-            break
-
-        state.iteration += 1
-
-    if state.status == "running":
-        state.status = "stopped"
-        state.final_reason = "max_iterations_reached"
-
-    answer = synthesize_answer(
-        question=question,
-        vector_ctx=state.aggregated_context["vector_context"],
-        graph_ctx=state.aggregated_context["graph_context"],
-    )
-
-    payload = build_response_payload(state, answer)
-    payload = apply_existing_guardrails_and_budget(payload)
-    write_audit_event(payload, state)
-    return payload
-```
-
-### Deterministic choose_action policy (v1)
-
-1. If request type is cohort and no graph context yet -> `patient_context_get`.
-2. If no vector evidence yet -> `vector_evidence_search`.
-3. If medication safety request and graph context lacks medications/interactions -> `patient_context_get`.
-4. If confidence >= threshold and both evidence channels non-empty -> `graphrag_answer_generate`.
-5. Otherwise alternate between vector and graph action that produced new evidence last iteration.
-
-## Stop Criteria
-
-Stop checks are evaluated after every observation and before next iteration.
-
-Primary stop reasons:
-
-- `confidence_reached`: `confidence >= RAG_API_REACT_MIN_CONFIDENCE` and both evidence channels non-empty.
-- `max_iterations_reached`: `iteration >= RAG_API_REACT_MAX_ITERS`.
-- `no_progress_limit`: `no_progress_count > RAG_API_REACT_MAX_NO_PROGRESS_STEPS`.
-- `policy_blocked`: no authorized action remains for role.
-- `tool_error_budget_exhausted`: repeated action execution errors in same request.
-- `response_budget_guard`: predicted response size would exceed `RAG_API_MAX_RESPONSE_BYTES` unless stopped.
-
-Secondary fail-safe behavior:
-
-- On transient action errors, retry once with downgraded action inputs (`top_k` reduced).
-- On repeated error, switch to alternate evidence source action.
-- If all actions fail, return bounded response with explicit guardrail metadata and `final_reason` set.
-
-## API Contract Changes
-
-Minimal, backward-compatible contract extension for `POST /query` and generation MCP tools:
-
-Add optional `react` block in response:
-
-```json
-{
-  "react": {
-    "enabled": true,
-    "iterations": 2,
-    "final_reason": "confidence_reached",
-    "confidence": 0.82,
-    "actions": [
-      {"iteration": 0, "action": "vector_evidence_search", "new_event_ids": 4},
-      {"iteration": 1, "action": "patient_context_get", "new_patient_ids": 1}
-    ]
-  }
-}
-```
-
-Privacy rule: do not return internal `thought` text by default.
-
-## Metrics and Audit Additions
-
-Add optional metrics labels/counters in `domains/healthcare/rag-api/src/healthcare_rag_api/app.py`:
-
-- `rag_api_react_iterations` (histogram)
-- `rag_api_react_stop_total{reason=...}` (counter)
-- `rag_api_react_action_total{action=..., outcome=...}` (counter)
-
-Audit event additions:
-
-- `react.enabled`
-- `react.iterations`
-- `react.final_reason`
-- `react.action_trace` (action names and outcome summary only)
-
-## Test Plan Mapped to Current Suite
-
-### 1. Unit tests: new `domains/healthcare/rag-api/tests/test_react_controller.py`
-
-Core deterministic tests:
-
-1. `test_stops_on_confidence_after_dual_evidence` — Asserts stop reason `confidence_reached`.
-1. `test_stops_on_max_iterations` — Asserts capped loop and final reason.
-1. `test_no_progress_triggers_stop` — Simulates repeated empty observations.
-1. `test_unauthorized_action_causes_policy_block` — Uses role with restricted tools.
-1. `test_error_fallback_switches_action` — First action fails, second succeeds.
-1. `test_response_remains_within_budget_after_loop` — Verifies byte budget and truncation metadata.
-
-### 2. Contract tests: extend `domains/healthcare/rag-api/tests/test_contracts.py`
-
-Add focused tests:
-
-1. `test_query_react_block_present_when_enabled`
-2. `test_query_react_block_absent_when_disabled`
-3. `test_query_react_respects_role_policy`
-4. `test_query_react_guardrails_match_existing_defaults`
-
-### 3. Planner tests: optional extension in `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
-
-Add action-selection edge assertions:
-
-1. `test_react_choose_action_prefers_missing_channel`
-2. `test_react_choose_action_for_medication_safety_prefers_graph_when_interactions_missing`
-
-### 4. Fixtures: new `domains/healthcare/rag-api/tests/fixtures/react_cases.json`
-
-Fixture fields:
-
-- `id`
-- `question`
-- `patient_id`
-- `mock_vector_result`
-- `mock_graph_result`
-- `expected_actions`
-- `expected_stop_reason`
-- `expected_iterations`
-
-## Rollout Plan
-
-Phase 1 (dark launch):
-
-- implement controller module,
-- keep `RAG_API_REACT_ENABLED=false` by default,
-- run tests in CI.
-
-Phase 2 (limited enablement):
-
-- enable in lower environment,
-- capture metrics and audit traces,
-- validate no regression on latency and response budget.
-
-Phase 3 (general availability):
-
-- set default on for generation role,
-- keep role and policy constraints unchanged,
-- publish runbook updates and troubleshooting notes.
-
-## Acceptance Criteria
-
-Functional:
-
-- ReAct loop executes deterministically with bounded iterations.
-- Existing single-pass path remains available and unchanged when disabled.
-- All role policies and guardrails still apply.
-
-Quality:
-
-- New tests pass plus no regression in existing planner/contract suites.
-- Loop stop reasons are observable through metrics and audit logs.
-- Response budget trimming remains effective under iterative aggregation.
-
-Operational:
-
-- No new required external dependencies.
-- No changes required to existing MCP transport contract.
-- Can be rolled back instantly by setting `RAG_API_REACT_ENABLED=false`.
-
-# Multi-Agent Architecture Comparison
-
-## Overview
-
-This document provides a technical comparison of the three query orchestration modes available in the healthcare agents service. Use it to understand trade-offs for latency, reasoning depth, observability, and deployment complexity when selecting a mode for a given workload.
-
-| Aspect | Single-Pass | ReAct Controller | LangGraph Multi-Agent |
-|--------|------------|-----------------|----------------------|
-| File | `domain/planner.py` | `domain/react_controller.py` | `langgraph_agents/` |
-| Orchestration | Sequential function calls | Bounded iteration loop | StateGraph with conditional edges |
-| Agent count | 0 (procedural) | 0 (single loop) | 8 nodes (5 specialist + 3 control) |
-| Routing | Keyword heuristics | Same heuristics, repeated per iteration | Triage agent → conditional edges |
-| Parallelism | None | None | Sequential today; `Send()` available for future parallel dispatch |
-| Observability | Prometheus metrics + audit log | Iteration metadata in response | LangSmith traces + MLflow spans + agent message trail |
-| Confidence gate | None | Binary (both channels = 1.0) | Same heuristic, with re-retrieval loop |
-| Tool selection | Fixed: vector + graph | Fixed: vector + graph per iteration | Per-agent tool binding |
-
-## Architecture
-
-### Current: Single-Pass Pipeline
-
-```
-Question → classify_request_type() → select_retrieval_plan()
-         → vector_context() → rank_vector_context()
-         → graph_context() → rank_graph_context()
-         → ask_ollama()
-         → response
-```
-
-One linear pass. No agent reasoning, no tool selection, no iteration.
-The planner uses keyword matching, not LLM-based classification.
-
-### Current: ReAct Controller
-
-```
-Question → loop:
-             classify → plan → vector_search → graph_lookup
-             → merge unseen results → estimate_confidence
-             → if confident or no progress: break
-         → ask_ollama(aggregated evidence)
-         → response
-```
-
-Bounded loop (max 3 iterations, capped at 6). Every iteration repeats the
-same vector+graph retrieval. There is no action selection—the action is
-always `vector_and_graph_retrieve`. The spec doc describes richer behavior
-(retries, policy-blocked actions, observation history) that is not
-implemented.
-
-### New: LangGraph Multi-Agent
+- `domains/healthcare/agent-service/src/healthcare_agent/main.py` — slim composition root that wires `HealthcareAgentSettings`, Qdrant/Neo4j adapters (`vector_context`, `graph_context`), LLM gateway, LangGraph runtime ports, FastAPI, and MCP.
+- `domains/healthcare/agent-service/src/healthcare_agent/config/settings.py` — `HealthcareAgentSettings`, a `pydantic-settings` class extending `agent_core.settings.AgentServiceSettings`; environment variable names intentionally retain the `RAG_API_*`, `LLM_*`, `QDRANT_URL`, and `NEO4J_*` prefixes.
+- `domains/healthcare/agent-service/src/healthcare_agent/api/routes.py` — HTTP routes including `/query` and `/query/stream`.
+- `domains/healthcare/agent-service/src/healthcare_agent/api/governance.py` — `ToolGovernance` role policy, audit logging, and tool metrics.
+- `domains/healthcare/agent-service/src/healthcare_agent/api/responses.py` — `ResponseShaper` response shaping.
+- `domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py` — `QueryService.run_query` and `QueryService.stream`, the shared query service used by HTTP and MCP.
+- `domains/healthcare/agent-service/src/healthcare_agent/orchestration/graph.py` — LangGraph `StateGraph` builder.
+- `domains/healthcare/agent-service/src/healthcare_agent/orchestration/runtime.py` — runtime ports for graph execution.
+- `domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py` — specialist agent node functions.
+- `domains/healthcare/agent-service/src/healthcare_agent/agents/registry.py` — agent cards and capability registry.
+- `domains/healthcare/agent-service/src/healthcare_agent/tools/mcp_server.py` — `HealthcareMcpTools` with the ten healthcare MCP tools.
+- `domains/healthcare/agent-service/src/healthcare_agent/tools/langchain_tools.py` — LangChain tool wrappers.
+- `domains/healthcare/agent-service/src/healthcare_agent/tools/skills.py` — skills-plan resolution.
+- `domains/healthcare/agent-service/src/healthcare_agent/retrieval/search.py` and `retrieval/ranking.py` — Qdrant/Neo4j retrieval and deterministic ranking.
+- `domains/healthcare/agent-service/src/healthcare_agent/generation/factory.py` — `build_llm_provider`.
+- `domains/healthcare/agent-service/src/healthcare_agent/safety/` — guardrails, harness, and response policy.
+- `domains/healthcare/agent-service/src/healthcare_agent/evaluation/` — gates, LangSmith, MLflow evaluation, retrieval benchmarks, and grounding scorecards.
+- `domains/healthcare/agent-service/src/healthcare_agent/observability/metrics.py` — Prometheus `rag_api_*` collectors.
+- `domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py` — MLflow tracing helpers.
+
+## LangGraph Flow
 
 ```mermaid
 graph TD
@@ -1041,207 +628,43 @@ graph TD
     J -->|yes| K[delegation_router]
     J -->|no| G
     K --> G
-    G -->|confidence >= 0.75 or max_iter| H[synthesis_agent]
+    G -->|confidence >= threshold or max_iter| H[synthesis_agent]
     G -->|low confidence| B
     H --> I[END]
 ```
 
-Nine LangGraph nodes with typed shared state (3 retrieval agents, 3 specialist agents, 2 control agents, and synthesis):
+Nine LangGraph nodes share typed state (three retrieval agents, three specialist agents, two control agents, and synthesis):
 
 | Agent | Responsibility |
 |-------|---------------|
-| `triage_agent` | Classify question, select retrieval plan |
-| `vector_retrieval_agent` | Qdrant similarity search + evidence ranking |
-| `graph_retrieval_agent` | Neo4j patient graph traversal + evidence ranking |
-| `medication_safety_agent` | Interaction, contraindication, adverse event analysis |
+| `triage_agent` | Classify question and select retrieval plan |
+| `vector_retrieval_agent` | Qdrant similarity search and evidence ranking |
+| `graph_retrieval_agent` | Neo4j patient graph traversal and evidence ranking |
+| `medication_safety_agent` | Interaction, contraindication, and adverse event analysis |
 | `lab_interpretation_agent` | Lab signal and abnormal observation extraction |
 | `coding_review_agent` | Claims gap detection and ICD-10 mapping analysis |
 | `delegation_router` | Resolve specialist-to-specialist capability requests |
-| `confidence_evaluator` | Evidence completeness scoring, loop control |
-| `synthesis_agent` | Grounded answer generation via Ollama |
+| `confidence_evaluator` | Evidence completeness scoring and loop control |
+| `synthesis_agent` | Grounded answer generation through the configured provider |
 
-## Key Differences
-
-### 1. Agent Separation of Concerns
-
-**Single-Pass / ReAct**: All logic in `run_query()` or `run_react_query_loop()`.
-One function handles classification, retrieval, ranking, and synthesis.
-
-**LangGraph**: Each agent is a standalone node with a single responsibility.
-Agents share state through `HealthcareAgentState` TypedDict with reducer
-fields for automatic list merging.
-
-### 2. Conditional Routing
-
-**Single-Pass / ReAct**: Request type affects only the retrieval plan parameters
-(query text prefix, top-k cap). No specialist behavior.
-
-**LangGraph**: After graph retrieval, `_route_specialist()` dispatches to
-domain-specific agents based on `request_type`:
-
-- `medication_safety` → deep interaction/contraindication analysis
-- `lab_interpretation` → abnormal observation and lab signal extraction
-- `coding_review` → claims gap detection, ICD-10 mapping audit
-- Others → skip specialist, go directly to confidence evaluation
-
-### 3. Observability via LangSmith and MLflow
-
-**Single-Pass**: Prometheus counters/histograms + JSON audit log.
-
-**ReAct**: Same as single-pass, plus iteration metadata in the response
-(`react.actions` array).
-
-**LangGraph**: Two complementary tracing backends:
-
-**LangSmith** (when `LANGSMITH_API_KEY` is set):
-
-- Each agent node's execution time and I/O
-- State transitions and conditional edge decisions
-- Retry loops and confidence progression
-- Agent message trail (`messages` field in state)
-
-**MLflow** (when `MLFLOW_TRACKING_URI` is set):
-
-- Nested span hierarchy (`CHAIN` → `AGENT` → `RETRIEVER` / `LLM`)
-- Per-span latency, outcome, and healthcare-specific attributes
-- Cross-mode evaluation with six healthcare scorers
-- Experiment tracking and comparison artifacts
-- MLflow UI at http://localhost:5000
-
-MLflow tracing also works for single-pass and ReAct modes, wrapping the full pipeline in a `healthcare_query_{mode}` root span.
-
-Enable by setting:
-
-```bash
-# LangSmith
-export LANGSMITH_API_KEY=<your-key>
-export LANGSMITH_PROJECT=healthcare-graphrag
-
-# MLflow
-export MLFLOW_TRACKING_URI=http://localhost:5000
-export MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
-
-# LangGraph mode
-export RAG_API_LANGGRAPH_ENABLED=true
-```
-
-### 4. Evaluation Framework
-
-The `langgraph_agents/evaluation.py` module provides four scoring metrics:
-
-| Metric | What it measures |
-|--------|-----------------|
-| `routing_accuracy` | Did triage classify to the expected request type? |
-| `agent_coverage` | Were all expected specialist agents activated? |
-| `evidence_completeness` | Did both vector and graph channels contribute? |
-| `answer_quality` | Non-empty, non-error, reasonable-length answer? |
-
-Run evaluation across all three modes to compare:
-
-```python
-from langgraph_agents.evaluation import run_evaluation_suite
-
-# LangGraph mode
-lg_scores = run_evaluation_suite(run_langgraph_query, mode="langgraph")
-
-# Single-pass mode (requires RAG_API_LANGGRAPH_ENABLED=false and ReAct disabled)
-sp_scores = run_evaluation_suite(run_query, mode="single_pass")
-
-# ReAct mode (requires RAG_API_LANGGRAPH_ENABLED=false and RAG_API_REACT_ENABLED=true)
-react_scores = run_evaluation_suite(run_query, mode="react")
-```
-
-### 5. State Management
-
-**Single-Pass**: Local variables in `_run_query_single_pass()`.
-
-**ReAct**: Mutable `seen_event_ids` / `seen_graph_patient_ids` sets and
-`merged_vector` / `merged_graph` lists inside the loop function.
-
-**LangGraph**: `HealthcareAgentState` TypedDict with `Annotated` reducer
-fields. Lists use `operator.add` for automatic append-merge across nodes.
-State is immutable within each node; updates are returned as dicts.
-
-## Configuration
+## Observability and Configuration
 
 | Environment Variable | Default | Purpose |
 |---------------------|---------|---------|
-| `RAG_API_LANGGRAPH_ENABLED` | `true` | LangGraph multi-agent mode (set `false` to roll back to single-pass/ReAct) |
 | `LANGGRAPH_MAX_ITERATIONS` | `3` | Max confidence re-retrieval loops |
 | `LANGSMITH_API_KEY` | (none) | Enable LangSmith tracing |
 | `LANGSMITH_PROJECT` | `healthcare-graphrag` | LangSmith project name |
-| `MLFLOW_TRACKING_URI` | (none) | Enable MLflow tracing (e.g. `http://mlflow:5000`) |
+| `MLFLOW_TRACKING_URI` | (none) | Enable MLflow tracing (for example `http://mlflow:5000`) |
 | `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | MLflow experiment name |
 
-## File Structure
+Operational names intentionally remain unchanged until a later phase: the environment prefix is still `RAG_API_*`, Prometheus collectors are still `rag_api_*`, the Helm/Kubernetes service is still `rag-api`, the Compose container is still `healthcare-rag-api`, and the CI workflow is still `rag-api-contracts.yml`.
 
-```
-domains/healthcare/rag-api/
-├── langgraph_agents/
-│   ├── __init__.py          # Public API
-│   ├── state.py             # HealthcareAgentState TypedDict (incl. delegation fields)
-│   ├── agents.py            # Agent node functions (with delegation emit/respond)
-│   ├── agent_cards.py       # AgentCard registry, delegation types, capability discovery
-│   ├── graph.py             # StateGraph builder + delegation router + runner
-│   ├── tools.py             # LangChain tool wrappers
-│   ├── evaluation.py        # Lightweight evaluation helpers
-│   ├── mlflow_tracing.py    # MLflow span decorators and trace wrappers
-│   └── mlflow_eval.py       # MLflow evaluation harness
-├── domain/
-│   ├── __init__.py          # Re-exports all domain modules
-│   ├── retrieval.py         # Domain-routed embedding, vector search, graph search
-│   ├── synthesis.py         # Prompt construction and LLM synthesis
-│   ├── model_router.py      # Complexity classifier, latency/cost tracking, model routing
-│   ├── structured_output.py # JSON-mode structured response generation
-│   ├── guardrails.py        # Input/output safety classification
-│   ├── memory.py            # Session + cross-session Redis-backed memory
-│   ├── evaluation_gates.py  # CI quality gate thresholds
-│   ├── grounding_scorecard.py # Unsupported-claim rate, citation coverage
-│   ├── retrieval_benchmark.py # Precision@k / recall@k scoring with fixtures
-│   ├── response_policy.py   # Truncation, sanitization, budget enforcement
-│   ├── planner.py           # Request classification and retrieval planning
-│   ├── evidence.py          # Evidence ranking + fusion reranking
-│   ├── react_controller.py  # ReAct loop orchestration
-│   ├── harness.py           # Retry, guards, prompt registry
-│   └── models.py            # Shared types (RequestType, RetrievalPlan)
-├── app.py                   # Composition root: settings, clients, HTTP routes, MCP tools
-├── llm_provider.py          # Ollama, OpenAI, Anthropic, FallbackProvider
-└── tests/
-    ├── test_agent_delegation.py
-    ├── test_contracts.py
-    ├── test_evaluation_stage4.py
-    ├── test_harness.py
-    ├── test_langgraph_agents.py
-    ├── test_memory.py
-    ├── test_mlflow_integration.py
-    ├── test_model_router.py
-    ├── test_ontology_conformance.py
-    ├── test_planner_edge_cases.py
-    ├── test_planner_evaluation.py
-    ├── test_provider_failover.py
-    ├── test_react_controller.py
-    └── test_retrieval.py
-```
+## Test Notes
 
-## Migration Path
-
-The three modes coexist; LangGraph is the default ([ADR-0010](adrs/0010-layered-agentic-architecture.md)). Set environment variables to select:
+Planner-only local checks run through the renamed script:
 
 ```bash
-# LangGraph (default; takes priority)
-unset RAG_API_LANGGRAPH_ENABLED
-
-# Single-pass (rollback)
-export RAG_API_LANGGRAPH_ENABLED=false
-unset RAG_API_REACT_ENABLED
-
-# ReAct (rollback, only when LangGraph is disabled)
-export RAG_API_LANGGRAPH_ENABLED=false
-export RAG_API_REACT_ENABLED=true
+./domains/healthcare/scripts/test_planner.sh
 ```
 
-The LangGraph path reuses the same retrieval functions (`vector_context`,
-`graph_context`), ranking functions (`rank_vector_context`,
-`rank_graph_context`), and LLM synthesis (`ask_ollama`) as the other modes.
-The response schema is compatible—`langgraph` metadata replaces `react`
-metadata when LangGraph is active.
+Tests patch module-level adapters on `healthcare_agent.main` (`vector_context`, `graph_context`, `ask_ollama`, and `queries.run_query`) and call MCP tools as `main.mcp_tools.<tool>(...)`.

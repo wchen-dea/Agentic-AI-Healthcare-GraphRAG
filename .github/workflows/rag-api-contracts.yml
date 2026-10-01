@@ -10,7 +10,7 @@ on:
       - uv.lock
       - packages/**
       - platform/shared/**
-      - domains/healthcare/rag-api/**
+      - domains/healthcare/agent-service/**
       - domains/healthcare/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
@@ -28,7 +28,7 @@ on:
       - uv.lock
       - packages/**
       - platform/shared/**
-      - domains/healthcare/rag-api/**
+      - domains/healthcare/agent-service/**
       - domains/healthcare/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
@@ -103,23 +103,23 @@ jobs:
           cache-dependency-glob: uv.lock
 
       - name: Sync locked rag-api environment
-        run: uv sync --frozen --package agent-core --package healthcare-rag-api --package supply-chain-rag-api
+        run: uv sync --frozen --package agent-core --package healthcare-agent-service --package supply-chain-rag-api
 
       - name: Run agent-core tests (policy, audit, guardrails, SSE, settings)
         run: uv run --frozen --package agent-core pytest -q
         working-directory: packages/agent-core
 
       - name: Run healthcare rag-api tests (contracts, planner, runtime, guardrails)
-        run: uv run --frozen --package healthcare-rag-api pytest -q
-        working-directory: domains/healthcare/rag-api
+        run: uv run --frozen --package healthcare-agent-service pytest -q
+        working-directory: domains/healthcare/agent-service
 
       - name: Run supply-chain rag-api tests
         run: uv run --frozen --package supply-chain-rag-api pytest -q
         working-directory: domains/supply-chain/rag-api
 
       - name: Run evaluation quality gates (offline, from fixtures)
-        run: uv run --frozen --package healthcare-rag-api python -m healthcare_rag_api.domain.evaluation_gates --results-file tests/fixtures/evaluation_results.json --min-score 0.5
-        working-directory: domains/healthcare/rag-api
+        run: uv run --frozen --package healthcare-agent-service python -m healthcare_agent.evaluation.gates --results-file tests/fixtures/evaluation_results.json --min-score 0.5
+        working-directory: domains/healthcare/agent-service
         continue-on-error: true
 
   container-build:
@@ -129,7 +129,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build healthcare rag-api container
-        run: docker build -f domains/healthcare/rag-api/Dockerfile -t rag-api-contracts:ci .
+        run: docker build -f domains/healthcare/agent-service/Dockerfile -t rag-api-contracts:ci .
 
       - name: Build supply-chain rag-api container
         run: docker build -f domains/supply-chain/rag-api/Dockerfile -t sc-rag-api-contracts:ci .

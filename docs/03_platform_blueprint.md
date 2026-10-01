@@ -44,11 +44,11 @@ What is implemented today:
 - domain-routed embeddings use named Qdrant vectors (`clinical`, `claims`, `device`) with per-domain model configurability (`platform/shared/embedding.py`),
 - structured output generation via JSON-mode constrained prompts (`domain/structured_output.py`) with Pydantic response models,
 - input/output guardrails with classifier-based injection detection, off-topic filtering, and grounding validation (`domain/guardrails.py`),
-- session-scoped and cross-session conversation memory with pluggable Redis persistence (`domain/memory.py`),
-- evaluation-gated CI with configurable quality thresholds (`domain/evaluation_gates.py`),
+- session-scoped and cross-session conversation memory with pluggable Redis persistence (`orchestration/memory.py`),
+- evaluation-gated CI with configurable quality thresholds (`evaluation/gates.py`),
 - MCP surface includes 10 clinical workflow tools (`skills_plan_get`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`, and others),
 - planner quality checks exist (`test_planner_evaluation.py`, `test_planner_edge_cases.py`) in addition to API contract tests,
-- LangGraph multi-agent orchestration with eight specialized nodes is the default `/query` orchestrator (`RAG_API_LANGGRAPH_ENABLED=false` rolls back),
+- LangGraph multi-agent orchestration is the only healthcare `/query`, `/query/stream`, and MCP query path after ADR-0012,
 - inter-agent delegation protocol with typed AgentCards, capability discovery, and delegation router (`agent_cards.py`),
 - MLflow tracing with nested span hierarchy and healthcare-specific evaluation harness is implemented behind the `MLFLOW_TRACKING_URI` feature flag,
 - LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`,
@@ -148,7 +148,7 @@ flowchart LR
     API[REST or embedded MCP request] --> AUTH[Auth, guardrails, and memory]
     AUTH --> CLS[Request classifier]
     CLS --> PLAN[Retrieval planner and skills]
-    PLAN --> MODE{Single-pass / ReAct / LangGraph}
+    PLAN --> MODE[LangGraph StateGraph]
     MODE --> RANK[Vector + graph retrieval and ranking]
     RANK --> LLM[Provider adapter and model router]
   end
@@ -280,13 +280,13 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 | Terminology mapping | 100% coverage: 36 labs→LOINC, 52 ICD-10, 48 meds→RxNorm, 36 CPT, 16 specialties→NUCC, 20 payers→NAIC across 8 mapping files; CI coverage gate enforces thresholds | governed mapping packs with broader SNOMED CT depth and formal governance workflows | `platform/healthcare/ontology/mappings/*.yaml`, `domains/healthcare/scripts/validate_terminology_coverage.py` |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
 | Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/04_data_platform.md`, `platform/healthcare/neo4j/init.cypher`, Flink graph writes |
-| Vector retrieval | domain-routed embedding (clinical / claims / device) with MiniLM-L6-v2, named Qdrant vectors, and query-time domain classification via `domain/retrieval.py` | neural reranking, domain-tuned models, optional cross-encoder | `domains/healthcare/rag-api/src/healthcare_rag_api/domain/retrieval.py`, `platform/shared/embedding.py`, `platform/healthcare/flink-app/app/text_processing.py` |
-| Query orchestration | request classification, retrieval plan selection, evidence ranking, and complexity-based model routing are implemented with deterministic planner logic; `ModelRouter` routes simple/moderate/complex queries to different models; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning, ranking, and model selection | `domains/healthcare/rag-api/src/healthcare_rag_api/app.py`, `domains/healthcare/rag-api/src/healthcare_rag_api/domain/`, `domains/healthcare/rag-api/src/healthcare_rag_api/domain/model_router.py`, `domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/` |
-| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/agents.py` |
-| Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/rag-api/src/healthcare_rag_api/app.py` |
-| MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/05_ai_agents.md`, `domains/healthcare/rag-api/src/healthcare_rag_api/app.py`, `domains/healthcare/rag-api/src/healthcare_rag_api/config/tool_policies.json` |
-| Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/rag-api/src/healthcare_rag_api/app.py`, `domains/healthcare/rag-api/src/healthcare_rag_api/config/tool_policies.json` |
-| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, retrieval benchmarks (25 fixtures), grounding scorecard, evidence fusion reranking, provider failover tests, LangGraph agent tests, MLflow evaluation harness, model router tests, and retrieval domain classification tests (213 agent tests, 58 Flink tests) | evaluation-gated CI, adversarial red-teaming | `domains/healthcare/rag-api/tests/`, `domains/healthcare/scripts/validate_ontology.py`, `docs/06_quality_assurance.md` |
+| Vector retrieval | domain-routed embedding (clinical / claims / device) with MiniLM-L6-v2, named Qdrant vectors, and query-time domain classification via `domain/retrieval.py` | neural reranking, domain-tuned models, optional cross-encoder | `domains/healthcare/agent-service/src/healthcare_agent/retrieval/search.py`, `platform/shared/embedding.py`, `platform/healthcare/flink-app/app/text_processing.py` |
+| Query orchestration | request classification, retrieval plan selection, evidence ranking, and complexity-based model routing are implemented with deterministic planner logic; `ModelRouter` routes simple/moderate/complex queries to different models; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning, ranking, and model selection | `domains/healthcare/agent-service/src/healthcare_agent/main.py`, `domains/healthcare/agent-service/src/healthcare_agent/`, `domains/healthcare/agent-service/src/healthcare_agent/generation/model_router.py`, `domains/healthcare/agent-service/src/healthcare_agent/orchestration/` |
+| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py` |
+| Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agent-service/src/healthcare_agent/main.py` |
+| MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/05_ai_agents.md`, `domains/healthcare/agent-service/src/healthcare_agent/main.py`, `domains/healthcare/agent-service/src/healthcare_agent/config/tool_policies.json` |
+| Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agent-service/src/healthcare_agent/main.py`, `domains/healthcare/agent-service/src/healthcare_agent/config/tool_policies.json` |
+| Quality evaluation | contract tests, planner fixture tests, planner edge-case tests, ontology conformance checks, retrieval benchmarks (25 fixtures), grounding scorecard, evidence fusion reranking, provider failover tests, LangGraph agent tests, MLflow evaluation harness, model router tests, and retrieval domain classification tests (213 agent tests, 58 Flink tests) | evaluation-gated CI, adversarial red-teaming | `domains/healthcare/agent-service/tests/`, `domains/healthcare/scripts/validate_ontology.py`, `docs/06_quality_assurance.md` |
 
 ## Execution Backlog
 
@@ -329,7 +329,7 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 | `infra-flink-taskmanager` | custom (platform/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
 | `healthcare-flink-app` | custom (platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
 | `healthcare-producer` | custom (platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
-| `healthcare-rag-api` | custom (domains/healthcare/rag-api/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
+| `healthcare-rag-api` | custom (domains/healthcare/agent-service/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
 | `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (React + TypeScript/Vite SPA on Nginx) |
 | `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
 | `infra-blackbox-exporter` | prom/blackbox-exporter | latest | 9115 | HTTP probe exporter |
@@ -354,7 +354,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 ## 2. Library Versions
 
-### rag-api (`domains/healthcare/rag-api/pyproject.toml`, locked in root `uv.lock`)
+### rag-api (`domains/healthcare/agent-service/pyproject.toml`, locked in root `uv.lock`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -661,15 +661,15 @@ All three domains default to the same model. Set domain-specific env vars to act
 | `skills_plan_get` | `read_only` | load_skills_layer() + build_skill_plan() |
 | `patient_context_get` | `read_only` | graph_context() |
 | `vector_evidence_search` | `read_only` | vector_context() |
-| `graphrag_answer_generate` | `generation` | run_query() + synthesize_answer() |
-| `risk_summary_generate` | `generation` | run_query() + prompt template |
-| `evidence_bundle_export` | `export` | run_query() + bounded text |
-| `timeline_explain` | `generation` | run_query() + graph context |
-| `medication_risk_assess` | `generation` | run_query() + interaction/contraindication extraction |
-| `coding_gap_detect` | `generation` | run_query() + ICD-10 gap analysis |
-| `cohort_risk_summary` | `generation` | run_query() + cross-patient aggregation |
+| `graphrag_answer_generate` | `generation` | `QueryService.run_query` + synthesis |
+| `risk_summary_generate` | `generation` | `QueryService.run_query` + prompt template |
+| `evidence_bundle_export` | `export` | `QueryService.run_query` + bounded text |
+| `timeline_explain` | `generation` | `QueryService.run_query` + graph context |
+| `medication_risk_assess` | `generation` | `QueryService.run_query` + interaction/contraindication extraction |
+| `coding_gap_detect` | `generation` | `QueryService.run_query` + ICD-10 gap analysis |
+| `cohort_risk_summary` | `generation` | `QueryService.run_query` + cross-patient aggregation |
 
-### Role-based access policy (`domains/healthcare/rag-api/src/healthcare_rag_api/config/tool_policies.json`)
+### Role-based access policy (`domains/healthcare/agent-service/src/healthcare_agent/config/tool_policies.json`)
 
 | Role | Permitted tools |
 |------|----------------|
@@ -830,12 +830,12 @@ When `MLFLOW_TRACKING_URI` is set, MLflow traces every query pipeline as a neste
 ## 11. CI / CD Pipeline
 
 **File:** `.github/workflows/rag-api-contracts.yml`  
-**Trigger:** push or PR to `dev` branch touching `domains/healthcare/rag-api/**`, `domains/healthcare/skills/**`, skill-generation scripts, or the workflow file itself
+**Trigger:** push or PR to `dev` branch touching `domains/healthcare/agent-service/**`, `domains/healthcare/skills/**`, skill-generation scripts, or the workflow file itself
 
 | Job | Runner | Steps |
 |-----|--------|-------|
 | `skills-layer-validation` | ubuntu-latest | Checkout → Python 3.11 → `python domains/healthcare/scripts/generate_agent_skills.py --check` → `python domains/healthcare/scripts/validate_agent_skills.py` → optional `skills-ref validate` pass (best-effort install, skip on unavailable binary) |
-| `contract-tests` | ubuntu-latest | Checkout → `astral-sh/setup-uv` (cached on `uv.lock`) → `uv sync --frozen` for both rag-api packages → `uv run pytest` in each `rag-api/` → offline evaluation gates (`python -m healthcare_rag_api.domain.evaluation_gates`) |
+| `contract-tests` | ubuntu-latest | Checkout → `astral-sh/setup-uv` (cached on `uv.lock`) → `uv sync --frozen` for both rag-api packages → `uv run pytest` in each `rag-api/` → offline evaluation gates (`python -m healthcare_agent.evaluation.gates`) |
 | `container-build` | ubuntu-latest | Checkout → multi-stage uv/wheel `docker build` of both rag-api Dockerfiles |
 
 Both jobs run in parallel. Neither requires live external services (all dependencies mocked in contract tests).
@@ -905,16 +905,13 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `RAG_API_DEFAULT_CALLER_ROLE` | `generation` | rag-api | Role when no header present |
 | `RAG_API_AUDIT_LOG_PATH` | `logs/rag_api_audit.log` | rag-api | Audit JSONL output path |
 | `RAG_API_SKILLS_LAYER_PATH` | `config/skills_layer.json` | rag-api | Skills layer source for plan resolution |
-| `RAG_API_REACT_ENABLED` | `false` | rag-api | Enable ReAct iterative query loop |
-| `RAG_API_REACT_MAX_ITERS` | `3` | rag-api | Max ReAct loop iterations (capped at 6) |
-| `RAG_API_REACT_MIN_CONFIDENCE` | `0.75` | rag-api | Confidence threshold for ReAct loop stop |
-| `RAG_API_REACT_MAX_NO_PROGRESS_STEPS` | `1` | rag-api | Max iterations without new evidence before stop |
-| `RAG_API_LANGGRAPH_ENABLED` | `true` | rag-api | LangGraph multi-agent orchestration (set `false` to roll back) |
-| `LANGGRAPH_MAX_ITERATIONS` | `3` | rag-api | Max confidence re-retrieval loops in LangGraph mode |
+| `LANGGRAPH_MAX_ITERATIONS` | `3` | rag-api | Max confidence re-retrieval loops in the required LangGraph path |
 | `MLFLOW_TRACKING_URI` | (unset) | rag-api | MLflow server URL; enables tracing when set |
 | `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | rag-api | MLflow experiment name for traces and evaluation runs |
 | `LANGSMITH_API_KEY` | (unset) | rag-api | LangSmith API key; enables LangSmith tracing when set |
 | `LANGSMITH_PROJECT` | `healthcare-graphrag` | rag-api | LangSmith project name |
+
+ADR-0012 removed the former healthcare ReAct/single-pass rollback flags; `LANGGRAPH_MAX_ITERATIONS` remains the only LangGraph loop tuning variable.
 
 ---
 
@@ -928,20 +925,20 @@ Completed or largely implemented:
 
 - Stage 0 documentation and baseline architecture references,
 - ontology configuration, ontology loader, and rule-pack integration in Flink modules,
-- shared rag-api domain package (`domain/models.py`, `domain/planner.py`, `domain/evidence.py`, `domain/retrieval.py`, `domain/synthesis.py`, `domain/response_policy.py`),
+- capability-oriented healthcare package (`orchestration/`, `retrieval/`, `generation/`, `safety/`, `api/`, `tools/`),
 - planner-driven query orchestration with deterministic ranking and planner metadata,
 - expanded MCP tools (`timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`),
 - planner quality suites (`test_planner_evaluation.py`, `test_planner_edge_cases.py`),
 - provider adapter abstraction with Ollama, OpenAI, Anthropic, and FallbackProvider,
-- dynamic model routing with complexity-based tier selection (`domain/model_router.py`),
+- dynamic model routing with complexity-based tier selection (`generation/model_router.py`),
 - domain-routed embeddings with named Qdrant vectors and per-domain model configurability (`platform/shared/embedding.py`),
-- structured output generation via JSON-mode constrained prompts (`domain/structured_output.py`),
-- input/output guardrails with classifier-based injection detection and grounding validation (`domain/guardrails.py`),
-- session-scoped and cross-session conversation memory with pluggable Redis persistence (`domain/memory.py`),
-- evaluation-gated CI with configurable quality thresholds (`domain/evaluation_gates.py`),
-- LangGraph multi-agent orchestration with eight specialized nodes and conditional routing (feature-flagged),
-- MLflow tracing with nested span hierarchy across agent nodes, retrievers, and LLM calls (feature-flagged),
-- MLflow evaluation harness with six healthcare-specific scorers and cross-mode comparison,
+- structured output generation via JSON-mode constrained prompts (`generation/structured_output.py`),
+- input/output guardrails with classifier-based injection detection and grounding validation (`safety/guardrails.py`),
+- session-scoped and cross-session conversation memory with pluggable Redis persistence (`orchestration/memory.py`),
+- evaluation-gated CI with configurable quality thresholds (`evaluation/gates.py`),
+- LangGraph multi-agent orchestration with specialist nodes and conditional routing as the required healthcare query path,
+- MLflow tracing with nested span hierarchy across agent nodes, retrievers, and LLM calls,
+- MLflow evaluation harness with healthcare-specific scorers,
 - LangSmith integration for LangGraph pipeline tracing.
 
 Terminology and governance:
@@ -986,7 +983,7 @@ flowchart LR
 | 1 | Ontology externalization and normalization | Completed | — |
 | 2 | Query planner and evidence ranking | Completed | — |
 | 3 | Skill-composed MCP expansion | Completed | — |
-| 3.5 | Multi-agent orchestration and tracing | Implemented (feature-flagged) | Production hardening |
+| 3.5 | Multi-agent orchestration and tracing | Implemented | Production hardening |
 | 4 | Multi-domain support and provider abstraction | Completed | — |
 | 5 | Production controls | In progress | Policy-as-code, PHI boundaries, SLO gates |
 | 6 | Advanced agent capabilities | Partially implemented | See Stage 6 backlog below |

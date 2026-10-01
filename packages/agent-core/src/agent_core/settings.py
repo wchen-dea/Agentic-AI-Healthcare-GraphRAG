@@ -39,9 +39,6 @@ class AgentServiceSettings(BaseSettings):
     max_answer_chars: int = Field(default=2000, ge=1, validation_alias="RAG_API_MAX_ANSWER_CHARS")
     max_response_bytes: int = Field(default=50000, ge=1, validation_alias="RAG_API_MAX_RESPONSE_BYTES")
 
-    # Orchestration
-    langgraph_enabled: bool = Field(default=True, validation_alias="RAG_API_LANGGRAPH_ENABLED")
-
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:

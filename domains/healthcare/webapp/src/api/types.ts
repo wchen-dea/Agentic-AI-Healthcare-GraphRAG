@@ -1,4 +1,4 @@
-// Wire contract mirroring domains/healthcare/rag-api/src/healthcare_rag_api/app.py (`/query`, MCP tools)
+// Wire contract mirroring domains/healthcare/agent-service/src/healthcare_agent (api/routes.py `/query`, tools/mcp_server.py)
 // and domain/structured_output.py. Keep in sync with the backend envelope.
 
 export type ApiMode = "rag" | "mcp";

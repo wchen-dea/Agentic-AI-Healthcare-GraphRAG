@@ -81,44 +81,15 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
-### Optional: Enable ReAct Loop In Local `rag-api`
+### LangGraph Query Path
 
-Add or update these variables in `.env`:
-
-```bash
-RAG_API_REACT_ENABLED=true
-RAG_API_REACT_MAX_ITERS=3
-RAG_API_REACT_MIN_CONFIDENCE=0.75
-RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
-```
-
-Rebuild and recreate `rag-api`:
+ADR-0012 removed the former ReAct and single-pass rollback paths. LangGraph is now the only healthcare query path for `/query`, `/query/stream`, and MCP tools. To tune the bounded re-retrieval loop, set:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
-```
-
-Verify with a smoke query and ensure a `react` object is present in the response:
-
-```bash
-curl -s -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Summarize hyperkalemia risk","patient_id":"patient-0001"}' | jq '.react'
-```
-
-Expected: non-null object with `enabled`, `iterations`, and `final_reason`.
-
-### LangGraph Multi-Agent Mode (Default)
-
-LangGraph is enabled by default. To tune it, or to roll back with `RAG_API_LANGGRAPH_ENABLED=false`, add or update these variables in `.env`:
-
-```bash
-RAG_API_LANGGRAPH_ENABLED=true
 LANGGRAPH_MAX_ITERATIONS=3
 ```
 
-Rebuild and recreate `rag-api`:
+Rebuild and recreate `rag-api` after source or configuration changes:
 
 ```bash
 docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
@@ -134,8 +105,6 @@ curl -s -X POST "http://localhost:8000/query" \
 ```
 
 Expected: non-null object with `enabled`, `iterations`, `final_reason`, `confidence`, and `agent_trace`.
-
-LangGraph takes priority over ReAct when both are enabled. See [05_ai_agents.md](05_ai_agents.md) for details.
 
 ### Optional: Enable MLflow Tracing
 
@@ -159,12 +128,12 @@ Verify MLflow UI is reachable:
 curl -s http://localhost:5000/health
 ```
 
-After running queries, traces appear in the MLflow Tracing UI at http://localhost:5000. Tracing works for all three query modes (single-pass, ReAct, LangGraph).
+After running queries, LangGraph traces appear in the MLflow Tracing UI at http://localhost:5000.
 
-Run only ReAct and planner test suites (CI-safe shortcut):
+Run planner test suites (CI-safe shortcut):
 
 ```bash
-./domains/healthcare/scripts/test_react_planner.sh
+./domains/healthcare/scripts/test_planner.sh
 ```
 
 Stop all services:
@@ -485,7 +454,7 @@ Fix:
 curl -s -X PATCH http://localhost:8082/jobs/<demo_job_id>
 ```
 
-2. Ensure no legacy submitter container exists:
+2. Ensure no old submitter container exists:
 
 ```bash
 make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps

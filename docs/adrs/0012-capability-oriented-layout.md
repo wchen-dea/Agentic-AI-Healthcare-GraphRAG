@@ -1,6 +1,6 @@
 # ADR-0012: Capability-Oriented Layout and Shared Agent Core
 
-- Status: accepted (Phase 1 implemented; Phases 2–4 planned)
+- Status: accepted (Phases 1–2 implemented; Phases 3–4 planned)
 - Date: 2026-10-01
 - Deciders: platform team
 - Supersedes: none
@@ -70,11 +70,11 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
    | Phase | Scope |
    | --- | --- |
    | 1 (done) | Add `agent-core`; healthcare delegates policy, audit, guardrail base, SSE, and runtime contracts to it; audit failures are logged and counted |
-   | 2 | `git mv` `rag-api` → `agent-service` and `healthcare_rag_api` → `healthcare_agent`; split `app.py`, `domain/`, and `langgraph_agents/` into the capability folders; adopt `AgentServiceSettings`; remove the legacy non-LangGraph query path |
+   | 2 (done) | `git mv` `rag-api` → `agent-service` and `healthcare_rag_api` → `healthcare_agent`; split `app.py`, `domain/`, and `langgraph_agents/` into the capability folders; adopt `AgentServiceSettings`; remove the legacy non-LangGraph query path |
    | 3 | Move `platform/shared` → `packages/knowledge-core` and switch Flink images to the wheel; move ontology/skills under `knowledge/`; merge infra folders under `infra/` |
    | 4 | Split tests into `unit`/`integration`/`evals`; make ruff blocking in CI; remove shims; apply the same layout to supply-chain |
 
-   Old import paths remain as thin re-export modules until Phase 4. New code must import from the target location.
+   Phase 2 moved modules without re-export shims: the service is deployed only as a wheel, and no external code imports the old paths. New code must import from the target location.
 
 ## Consequences
 
@@ -82,20 +82,46 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
 - Positive: lost audit events are now visible through `rag_api_audit_write_failures_total{tool}` and an error log that includes the trace id. Requests still succeed when the audit sink fails.
 - Positive: folder names map onto ADR-0010 layers, so ownership and review scope are clear.
 - Negative: renames in Phase 2 touch imports, Dockerfiles, Helm values, CI paths, and docs in one change. Do it in one commit with `git mv` to keep history.
-- Negative: shims add temporary indirection until Phase 4.
+- Negative: Phase 2 has no import shims, so out-of-tree scripts that imported `healthcare_rag_api.*` must be updated.
 - Neutral: the audit JSON key set is unchanged. Key order differs (`timestamp` is now last), which JSON consumers must not rely on.
 
 ## Phase 1 Changes
 
-- New workspace member `packages/agent-core`, registered in the root `pyproject.toml` and required by `healthcare-rag-api`, with unit tests (`make test-core`).
-- `healthcare_rag_api.langgraph_agents.runtime` re-exports the runtime contract from `agent_core.runtime` and keeps the process-wide binding.
-- `healthcare_rag_api.domain.guardrails` uses core injection and length checks and keeps the healthcare topic and output rules.
+- New workspace member `packages/agent-core`, registered in the root `pyproject.toml` and required by the healthcare service, with unit tests (`make test-core`).
+- `healthcare_rag_api.langgraph_agents.runtime` (now `healthcare_agent.orchestration.runtime`) re-exports the runtime contract from `agent_core.runtime` and keeps the process-wide binding.
+- `healthcare_rag_api.domain.guardrails` (now `healthcare_agent.safety.guardrails`) uses core injection and length checks and keeps the healthcare topic and output rules.
 - `healthcare_rag_api.app` uses `ToolPolicy`, `JsonlAuditSink`, `hash_payload`, `format_sse`, and `SSE_HEADERS` from core.
 - Both rag-api Dockerfiles mount the agent-core `pyproject.toml` for workspace discovery. The healthcare image builds and installs the `agent-core` wheel.
 - CI (`rag-api-contracts.yml`) runs agent-core tests and triggers on `packages/**`. `deploy-ai-prd.yml` also triggers on `packages/**`.
 
+## Phase 2 Changes
+
+- `domains/healthcare/rag-api` → `domains/healthcare/agent-service` and `healthcare_rag_api` → `healthcare_agent`, with `git mv` so history is kept. The distribution is `healthcare-agent-service`, with `[tool.uv.build-backend] module-name = "healthcare_agent"` because the names differ. The ASGI entry is `healthcare_agent.main:app`.
+- Module moves:
+
+  | New location | Old location |
+  | --- | --- |
+  | `main.py` (composition root only) | `app.py` |
+  | `config/settings.py` (`HealthcareAgentSettings`) | `Settings` in `app.py` |
+  | `api/schemas.py`, `api/routes.py`, `api/governance.py`, `api/responses.py` | request models, routes, policy/audit, and response shaping in `app.py` |
+  | `tools/mcp_server.py` (`HealthcareMcpTools`) | `@mcp.tool()` functions in `app.py` |
+  | `orchestration/query_service.py` (`QueryService`) | `run_query` in `app.py` |
+  | `observability/metrics.py`, `observability/tracing.py` | Prometheus collectors in `app.py`, `langgraph_agents/mlflow_tracing.py` |
+  | `generation/factory.py` | provider and router construction in `app.py` |
+  | `orchestration/{graph,state,runtime}.py`, `agents/nodes.py`, `agents/registry.py`, `tools/langchain_tools.py` | `langgraph_agents/` |
+  | `orchestration/{planner,memory,plan_types}.py`, `retrieval/{search,ranking}.py`, `generation/{model_router,synthesis,structured_output}.py`, `safety/{guardrails,harness,response_policy}.py`, `evaluation/{gates,grounding_scorecard,retrieval_benchmark}.py` | `domain/` |
+  | `generation/providers.py`, `tools/skills.py`, `evaluation/{langsmith,mlflow_eval}.py` | `llm_provider.py`, `skills_layer.py`, `langgraph_agents/{evaluation,mlflow_eval}.py` |
+
+- `HealthcareAgentSettings` extends `agent_core.settings.AgentServiceSettings` with store, model-gateway, MCP, skills, and MLflow fields. `neo4j_password` is a `SecretStr`. `tool_policy_path` and `skills_layer_path` default to the files packaged in `healthcare_agent/config/`, and relative paths resolve against the package. Environment variable names are unchanged.
+- Request-size limits that depend on settings (`max_question_chars`, `max_context_items`) are checked by field validators against `RequestLimits`, which the composition root sets. This keeps the schemas importable without settings. As a result, OpenAPI no longer shows `maxLength` for `question` or the maximum for `top_k`.
+- HTTP and MCP share one path. `QueryService.run_query` / `stream` always run the LangGraph graph. `/query` passes `RAG_API_MAX_CONTEXT_ITEMS` to the triage agent as `context_limit` instead of a hard-coded 5. The default is still 5.
+- Removed: the legacy single-pass query path, the ReAct controller, `RAG_API_LANGGRAPH_ENABLED`, and `RAG_API_REACT_*`. The flags are also removed from the deploy env files and Helm values. There is no rollback flag; roll back by redeploying the previous image.
+- `domains/healthcare/scripts/test_react_planner.sh` → `test_planner.sh`.
+- Ops names are kept until Phase 3: the `RAG_API_*` env prefix, the `rag_api_*` metrics, the Helm chart and k8s service `rag-api`, the compose container `healthcare-rag-api`, and the CI workflow `rag-api-contracts.yml`.
+
 ## Follow-ups
 
 - Replace the dev-only role header with verified caller identity (OIDC/JWT claims mapped to roles) behind `ToolPolicy`.
-- Adapt `mlflow_tracing` to the `Tracer` port and Qdrant/Neo4j clients to `VectorStore`/`GraphStore` (Phase 2).
-- Unify the duplicate injection rules in `domain/harness.py` with `agent_core.guardrails` (Phase 2).
+- Adapt `observability/tracing.py` to the `Tracer` port and the Qdrant/Neo4j clients to `VectorStore`/`GraphStore` (`retrieval/qdrant.py`, `retrieval/neo4j.py`).
+- Unify the duplicate injection rules in `safety/harness.py` with `agent_core.guardrails`.
+- Move the remaining library-level `os.getenv` reads into `HealthcareAgentSettings`. They are in `retrieval/search.py` (`EMBEDDING_MODEL`), `orchestration/memory.py`, `orchestration/graph.py` (`LANGGRAPH_MAX_ITERATIONS`, LangSmith), `generation/model_router.py` (`ModelTierConfig.from_env`), `generation/providers.py`, and `observability/tracing.py`.

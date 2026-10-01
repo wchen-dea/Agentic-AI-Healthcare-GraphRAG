@@ -158,7 +158,7 @@ services:
   rag-api:
     build:
       context: ..
-      dockerfile: domains/healthcare/rag-api/Dockerfile
+      dockerfile: domains/healthcare/agent-service/Dockerfile
     container_name: healthcare-rag-api
     depends_on:
       - qdrant

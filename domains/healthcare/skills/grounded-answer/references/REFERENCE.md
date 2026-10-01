@@ -9,9 +9,9 @@ Source skill id: grounded_answer
 
 ## Source Mapping
 
-- Flow definition: rag-api/src/healthcare_rag_api/config/skills_layer.json
-- Runtime planner: rag-api/src/healthcare_rag_api/skills_layer.py
-- Runtime endpoint: rag-api/src/healthcare_rag_api/app.py (/skills/plan and skills_plan_get)
+- Flow definition: agent-service/src/healthcare_agent/config/skills_layer.json
+- Runtime planner: agent-service/src/healthcare_agent/tools/skills.py
+- Runtime endpoint: agent-service/src/healthcare_agent/api/routes.py (/skills/plan) and tools/mcp_server.py (skills_plan_get)
 
 ## Tool and Context Summary
 

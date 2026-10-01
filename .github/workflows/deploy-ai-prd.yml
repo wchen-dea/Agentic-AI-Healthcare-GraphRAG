@@ -7,7 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-ai-prd.yml
       - deploy/helm/**
-      - domains/healthcare/rag-api/**
+      - domains/healthcare/agent-service/**
       - packages/**
       - platform/shared/**
       - pyproject.toml

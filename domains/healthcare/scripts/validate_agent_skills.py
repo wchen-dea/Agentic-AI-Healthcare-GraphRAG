@@ -8,7 +8,7 @@ sys.path.insert(0, str(DOMAIN_ROOT.parents[1] / "scripts"))
 
 from lib.skill_validator import validate_skills  # noqa: E402
 
-SKILLS_LAYER_PATH = DOMAIN_ROOT / "rag-api" / "src" / "healthcare_rag_api" / "config" / "skills_layer.json"
+SKILLS_LAYER_PATH = DOMAIN_ROOT / "agent-service" / "src" / "healthcare_agent" / "config" / "skills_layer.json"
 SKILLS_ROOT = DOMAIN_ROOT / "skills"
 
 

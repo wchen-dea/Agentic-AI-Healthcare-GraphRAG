@@ -10,7 +10,7 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "agent-core",
     "graphrag-shared",
-    "healthcare-rag-api[bedrock]",
+    "healthcare-agent-service[bedrock]",
     "supply-chain-rag-api",
     # Platform tooling (producers, Flink job tests, ontology scripts)
     "pyyaml>=6.0.2",
@@ -31,12 +31,12 @@ dev = [
 managed = true
 
 # Deployable Python packages share one lockfile (uv.lock). Each member builds a
-# wheel that is installed into the rag-api container images (see ADR-0011).
+# wheel that is installed into the service container images (see ADR-0011).
 [tool.uv.workspace]
 members = [
     "packages/agent-core",
     "platform/shared",
-    "domains/healthcare/rag-api",
+    "domains/healthcare/agent-service",
     "domains/supply-chain/rag-api",
 ]
 
@@ -50,7 +50,7 @@ explicit = true
 [tool.uv.sources]
 agent-core = { workspace = true }
 graphrag-shared = { workspace = true, editable = false }
-healthcare-rag-api = { workspace = true }
+healthcare-agent-service = { workspace = true }
 supply-chain-rag-api = { workspace = true }
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 

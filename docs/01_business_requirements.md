@@ -327,9 +327,10 @@ Production uses AWS Bedrock as primary and can use Anthropic as fallback via `LL
 Dev defaults to local Ollama for zero-cost iteration.
 
 Multi-agent orchestration is implemented via LangGraph with specialist agents for
-medication safety, lab interpretation, and coding review (default orchestrator; rollback via
-`RAG_API_LANGGRAPH_ENABLED=false`). Agent execution is traceable through MLflow spans and
-LangSmith traces when the respective tracking backends are configured.
+medication safety, lab interpretation, and coding review. ADR-0012 removed the former
+ReAct and single-pass query paths, so LangGraph is the only query path for REST, SSE, and
+MCP. Agent execution is traceable through MLflow spans and LangSmith traces when the
+respective tracking backends are configured.
 
 ### Guardrails enforced at the API layer
 
