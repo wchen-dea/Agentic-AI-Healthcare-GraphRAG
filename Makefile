@@ -16,7 +16,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
         validate-skills generate-skills validate-ontology \
-        sync test-hc test-sc build-wheels web-hc-dev web-hc-test web-hc-build pull-model fresh \
+        sync test-core test-hc test-sc build-wheels web-hc-dev web-hc-test web-hc-build pull-model fresh \
         helm-dev helm-dev-down helm-ports helm-ports-stop helm-prd helm-lint
 
 help: ## Show this help
@@ -136,12 +136,15 @@ validate-ontology: ## Validate ontology configs for both domains
 sync: ## Sync the full dev venv (root depends on every workspace member)
 	uv sync
 
+test-core: ## Provider-neutral agent-core tests (uv workspace)
+	cd packages/agent-core && uv run --package agent-core pytest --tb=short
 test-hc: ## Healthcare rag-api tests (uv workspace)
 	cd domains/healthcare/rag-api && uv run --package healthcare-rag-api pytest --tb=short
 test-sc: ## Supply-chain rag-api tests (uv workspace)
 	cd domains/supply-chain/rag-api && uv run --package supply-chain-rag-api pytest --tb=short
 
-build-wheels: ## Build rag-api wheels (+ graphrag-shared) into dist/
+build-wheels: ## Build rag-api wheels (+ agent-core, graphrag-shared) into dist/
+	uv build --wheel --package agent-core --out-dir dist
 	uv build --wheel --package graphrag-shared --out-dir dist
 	uv build --wheel --package healthcare-rag-api --out-dir dist
 	uv build --wheel --package supply-chain-rag-api --out-dir dist

@@ -8,6 +8,7 @@ requires-python = ">=3.11,<3.14"
 # packages. Runtime pins for the APIs live in the member pyproject.toml files;
 # do not duplicate them here.
 dependencies = [
+    "agent-core",
     "graphrag-shared",
     "healthcare-rag-api[bedrock]",
     "supply-chain-rag-api",
@@ -33,6 +34,7 @@ managed = true
 # wheel that is installed into the rag-api container images (see ADR-0011).
 [tool.uv.workspace]
 members = [
+    "packages/agent-core",
     "platform/shared",
     "domains/healthcare/rag-api",
     "domains/supply-chain/rag-api",
@@ -46,6 +48,7 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [tool.uv.sources]
+agent-core = { workspace = true }
 graphrag-shared = { workspace = true, editable = false }
 healthcare-rag-api = { workspace = true }
 supply-chain-rag-api = { workspace = true }

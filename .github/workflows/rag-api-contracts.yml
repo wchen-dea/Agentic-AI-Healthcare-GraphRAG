@@ -8,6 +8,7 @@ on:
       - .github/workflows/rag-api-contracts.yml
       - pyproject.toml
       - uv.lock
+      - packages/**
       - platform/shared/**
       - domains/healthcare/rag-api/**
       - domains/healthcare/skills/**
@@ -25,6 +26,7 @@ on:
       - .github/workflows/rag-api-contracts.yml
       - pyproject.toml
       - uv.lock
+      - packages/**
       - platform/shared/**
       - domains/healthcare/rag-api/**
       - domains/healthcare/skills/**
@@ -101,7 +103,11 @@ jobs:
           cache-dependency-glob: uv.lock
 
       - name: Sync locked rag-api environment
-        run: uv sync --frozen --package healthcare-rag-api --package supply-chain-rag-api
+        run: uv sync --frozen --package agent-core --package healthcare-rag-api --package supply-chain-rag-api
+
+      - name: Run agent-core tests (policy, audit, guardrails, SSE, settings)
+        run: uv run --frozen --package agent-core pytest -q
+        working-directory: packages/agent-core
 
       - name: Run healthcare rag-api tests (contracts, planner, runtime, guardrails)
         run: uv run --frozen --package healthcare-rag-api pytest -q

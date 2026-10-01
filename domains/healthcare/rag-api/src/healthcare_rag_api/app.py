@@ -1,15 +1,17 @@
-import hashlib
 import json
+import logging
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
+from agent_core.audit import AuditEvent, JsonlAuditSink, hash_payload, utc_timestamp
+from agent_core.policy import AuthorizationError, ToolPolicy
+from agent_core.streaming import SSE_HEADERS, StreamEventType, format_sse
 from healthcare_rag_api.domain import (
     apply_response_budget,
     classify_request_type,
@@ -184,6 +186,12 @@ TOOL_EXECUTION_TOTAL = Counter(
     "Tool execution count",
     ["tool", "outcome"],
 )
+AUDIT_WRITE_FAILURES_TOTAL = Counter(
+    "rag_api_audit_write_failures_total",
+    "Audit events that could not be persisted",
+    ["tool"],
+)
+logger = logging.getLogger("healthcare_rag_api")
 
 
 @app.middleware("http")
@@ -241,10 +249,6 @@ if not _tier_config.is_uniform():
         tier_config=_tier_config,
         default_provider_name=settings.llm_provider,
     )
-
-
-class AuthorizationError(RuntimeError):
-    pass
 
 
 class QueryRequest(BaseModel):
@@ -334,31 +338,21 @@ class SkillsPlanRequest(BaseModel):
 
 
 def _ts() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return utc_timestamp()
 
 
-def _hash_payload(payload: dict[str, Any]) -> str:
-    data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(data).hexdigest()
+def _on_audit_failure(event: AuditEvent, exc: Exception) -> None:
+    # Requests continue, but a lost audit event must be visible to operators.
+    AUDIT_WRITE_FAILURES_TOTAL.labels(tool=event.tool_name).inc()
+    logger.error("audit write failed trace_id=%s tool=%s: %s", event.trace_id, event.tool_name, exc)
 
 
-def _write_audit_event(event: dict[str, Any]) -> None:
-    try:
-        settings.audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-        with settings.audit_log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, separators=(",", ":")))
-            handle.write("\n")
-    except OSError:
-        pass  # audit failure must not crash requests
+audit_sink = JsonlAuditSink(settings.audit_log_path, on_failure=_on_audit_failure)
 
 
 @lru_cache(maxsize=4)
-def load_policy(path: str) -> dict[str, Any]:
-    policy_path = Path(path)
-    if not policy_path.exists():
-        return {"roles": {}}
-    with policy_path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+def load_policy(path: str) -> ToolPolicy:
+    return ToolPolicy.load(path)
 
 
 @lru_cache(maxsize=2)
@@ -367,13 +361,7 @@ def load_skills(path: str) -> dict[str, Any]:
 
 
 def _authorize(*, tool_name: str, caller_role: str) -> str:
-    policy = load_policy(str(settings.tool_policy_path))
-    allowed_tools = set(policy.get("roles", {}).get(caller_role, []))
-    if tool_name not in allowed_tools:
-        raise AuthorizationError(
-            f"Role '{caller_role}' is not authorized for tool '{tool_name}'"
-        )
-    return f"role:{caller_role}"
+    return load_policy(str(settings.tool_policy_path)).authorize(tool_name=tool_name, caller_role=caller_role)
 
 
 def _audit(
@@ -388,20 +376,19 @@ def _audit(
     trace_id: str,
     error: str | None = None,
 ) -> None:
-    event = {
-        "timestamp": _ts(),
-        "trace_id": trace_id,
-        "tool_name": tool_name,
-        "caller_id": caller_id,
-        "input_hash": _hash_payload(request_payload),
-        "patient_scope": patient_scope,
-        "outcome": outcome,
-        "latency_ms": latency_ms,
-        "response_size_bytes": response_size_bytes,
-    }
-    if error:
-        event["error"] = error
-    _write_audit_event(event)
+    audit_sink.write(
+        AuditEvent(
+            trace_id=trace_id,
+            tool_name=tool_name,
+            caller_id=caller_id,
+            input_hash=hash_payload(request_payload),
+            patient_scope=patient_scope,
+            outcome=outcome,
+            latency_ms=latency_ms,
+            response_size_bytes=response_size_bytes,
+            error=error,
+        )
+    )
 
 
 _EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
@@ -879,9 +866,8 @@ def query(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-def _sse_event(event: str, data: dict[str, Any] | str, event_id: int) -> str:
-    body = data if isinstance(data, str) else json.dumps(data, separators=(",", ":"))
-    return f"id: {event_id}\nevent: {event}\ndata: {body}\n\n"
+def _sse_event(event: StreamEventType, data: dict[str, Any] | str, event_id: int) -> str:
+    return format_sse(event, data, event_id)
 
 
 @app.post("/query/stream")
@@ -975,7 +961,7 @@ def query_stream(
     return StreamingResponse(
         events(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Trace-Id": trace_id},
+        headers={**SSE_HEADERS, "X-Trace-Id": trace_id},
     )
 
 

@@ -6,29 +6,18 @@ that detects prompt injection, toxic content, and off-topic queries.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from typing import Any
 
+from agent_core.guardrails import (
+    PROMPT_INJECTION_PATTERNS as _INJECTION_PATTERNS,
+    GuardrailResult,
+    check_length,
+    detect_prompt_injection,
+)
 
-@dataclass
-class GuardrailResult:
-    passed: bool
-    category: str = ""
-    reasons: list[str] = field(default_factory=list)
-    score: float = 0.0
+__all__ = ["GuardrailResult", "classify_grounding", "classify_input", "classify_output"]
 
-
-# Injection patterns (high-precision rules)
-_INJECTION_PATTERNS = [
-    re.compile(r"ignore\s+(all\s+)?(previous|above|prior)\s+(instructions|prompts|rules)", re.I),
-    re.compile(r"you\s+are\s+now\s+(a|an)\s+", re.I),
-    re.compile(r"system\s*:\s*", re.I),
-    re.compile(r"<\|?(system|assistant|user)\|?>", re.I),
-    re.compile(r"forget\s+(everything|all|your\s+instructions)", re.I),
-    re.compile(r"act\s+as\s+(if\s+)?(you\s+)?(are|were)\s+", re.I),
-    re.compile(r"do\s+not\s+follow\s+(your|the)\s+(rules|instructions|guidelines)", re.I),
-    re.compile(r"override\s+(safety|content|guardrail)", re.I),
-]
+_MAX_INPUT_CHARS = 5000
 
 # Off-topic patterns for healthcare domain
 _OFFTOPIC_PATTERNS = [
@@ -46,37 +35,19 @@ _OUTPUT_TOXIC_PATTERNS = [
 
 
 def classify_input(text: str) -> GuardrailResult:
-    """Classify input text for safety issues."""
-    reasons: list[str] = []
+    """Classify input text: injection first, then healthcare topic scope, then length."""
+    if (injection := detect_prompt_injection(text)) is not None:
+        return injection
 
-    # Check injection
-    for pattern in _INJECTION_PATTERNS:
-        if pattern.search(text):
-            return GuardrailResult(
-                passed=False,
-                category="prompt_injection",
-                reasons=[f"Detected injection pattern: {pattern.pattern[:50]}"],
-                score=0.95,
-            )
-
-    # Check off-topic
-    for pattern in _OFFTOPIC_PATTERNS:
-        if pattern.search(text):
-            reasons.append(f"Possible off-topic: {pattern.pattern[:40]}")
-
+    reasons = [
+        f"Possible off-topic: {pattern.pattern[:40]}"
+        for pattern in _OFFTOPIC_PATTERNS
+        if pattern.search(text)
+    ]
     if reasons:
         return GuardrailResult(passed=False, category="off_topic", reasons=reasons, score=0.7)
 
-    # Length check
-    if len(text) > 5000:
-        return GuardrailResult(
-            passed=False,
-            category="input_too_long",
-            reasons=["Input exceeds 5000 characters"],
-            score=0.9,
-        )
-
-    return GuardrailResult(passed=True, score=0.0)
+    return check_length(text, _MAX_INPUT_CHARS) or GuardrailResult(passed=True, score=0.0)
 
 
 def classify_output(text: str) -> GuardrailResult:

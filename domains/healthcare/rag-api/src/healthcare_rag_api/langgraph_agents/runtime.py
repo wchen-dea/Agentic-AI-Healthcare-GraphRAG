@@ -4,48 +4,29 @@ Agent nodes depend on this port instead of importing the composition root
 (``app``). Today the composition root binds in-process adapters over Qdrant,
 Neo4j, and the LLM provider; a later phase binds MCP-client adapters that call
 the per-domain MCP servers without changing any agent node.
+
+The runtime contract lives in ``agent_core.runtime`` (ADR-0012); this module
+keeps the process-wide binding for the healthcare service.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Protocol
+from agent_core.runtime import (
+    AgentRuntime,
+    GraphSearchFn,
+    StructuredSynthesizeFn,
+    SynthesizeFn,
+    VectorSearchFn,
+)
 
-
-class VectorSearchFn(Protocol):
-    def __call__(self, query_text: str, patient_id: str | None, limit: int) -> list[dict[str, Any]]: ...
-
-
-class GraphSearchFn(Protocol):
-    def __call__(self, patient_ids: list[str]) -> list[dict[str, Any]]: ...
-
-
-class SynthesizeFn(Protocol):
-    def __call__(
-        self,
-        question: str,
-        vector_ctx: list[dict[str, Any]],
-        graph_ctx: list[dict[str, Any]],
-    ) -> str: ...
-
-
-class StructuredSynthesizeFn(Protocol):
-    def __call__(
-        self,
-        question: str,
-        vector_ctx: list[dict[str, Any]],
-        graph_ctx: list[dict[str, Any]],
-    ) -> dict[str, Any]: ...
-
-
-@dataclass(frozen=True)
-class AgentRuntime:
-    """Capabilities the orchestrator may use. Authorization happens before invocation."""
-
-    vector_search: VectorSearchFn
-    graph_search: GraphSearchFn
-    synthesize: SynthesizeFn
-    synthesize_structured: StructuredSynthesizeFn | None = None
-
+__all__ = [
+    "AgentRuntime",
+    "GraphSearchFn",
+    "StructuredSynthesizeFn",
+    "SynthesizeFn",
+    "VectorSearchFn",
+    "configure_runtime",
+    "get_runtime",
+]
 
 _runtime: AgentRuntime | None = None
 

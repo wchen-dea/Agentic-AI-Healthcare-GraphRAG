@@ -18,6 +18,7 @@ WORKDIR /src
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=packages/agent-core/pyproject.toml,target=packages/agent-core/pyproject.toml \
     --mount=type=bind,source=platform/shared/pyproject.toml,target=platform/shared/pyproject.toml \
     --mount=type=bind,source=domains/healthcare/rag-api/pyproject.toml,target=domains/healthcare/rag-api/pyproject.toml \
     --mount=type=bind,source=domains/supply-chain/rag-api/pyproject.toml,target=domains/supply-chain/rag-api/pyproject.toml \
@@ -26,6 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # First-party code: build wheel(s) from the workspace and install them (no deps;
 # the locked dependency set is already in /opt/venv).
 COPY uv.lock pyproject.toml ./
+COPY packages/agent-core/pyproject.toml packages/agent-core/pyproject.toml
 COPY platform/shared/pyproject.toml platform/shared/pyproject.toml
 COPY domains/healthcare/rag-api/pyproject.toml domains/healthcare/rag-api/pyproject.toml
 COPY domains/supply-chain/rag-api/pyproject.toml domains/supply-chain/rag-api/pyproject.toml

@@ -8,6 +8,7 @@ on:
       - .github/workflows/deploy-ai-prd.yml
       - deploy/helm/**
       - domains/healthcare/rag-api/**
+      - packages/**
       - platform/shared/**
       - pyproject.toml
       - uv.lock
