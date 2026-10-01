@@ -2,10 +2,16 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-
-from healthcare_agent.generation.providers import AnthropicProvider, BedrockProvider, FallbackProvider, OllamaProvider, OpenAIProvider, create_provider
+from healthcare_agent.generation.providers import (
+    AnthropicProvider,
+    BedrockProvider,
+    FallbackProvider,
+    OllamaProvider,
+    OpenAIProvider,
+    create_provider,
+)
 
 
 class FallbackProviderTests(unittest.TestCase):

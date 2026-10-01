@@ -3,9 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock
 
-
 from healthcare_agent.generation.model_router import (
-    ComplexityResult,
     CostTracker,
     LatencyTracker,
     ModelRouter,
@@ -113,7 +111,7 @@ class ModelRouterTests(unittest.TestCase):
         config = ModelTierConfig(simple="small", moderate="medium", complex="large")
         router = ModelRouter(providers={"ollama": provider}, tier_config=config, default_provider_name="ollama")
 
-        result = router.generate(
+        router.generate(
             prompt="test", timeout_seconds=60, max_tokens=100,
             question="Analyze drug-drug interactions and contraindications with risk stratification",
         )

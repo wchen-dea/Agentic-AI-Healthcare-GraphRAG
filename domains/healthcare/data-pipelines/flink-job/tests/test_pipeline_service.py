@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import helpers  # noqa: F401
-
 from app.pipeline_service import HealthcareEventPipelineService
 
 

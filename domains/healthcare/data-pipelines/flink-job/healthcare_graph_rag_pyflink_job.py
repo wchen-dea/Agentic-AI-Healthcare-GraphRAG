@@ -7,19 +7,18 @@ existing HealthcareGraphRagProcessor side-effect sinks for Qdrant and Neo4j.
 
 import os
 
-from pyflink.common import WatermarkStrategy
-from pyflink.common.serialization import SimpleStringSchema
-from pyflink.common.typeinfo import Types
-from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaSource
-from pyflink.datastream.functions import MapFunction
-
 from healthcare_graph_rag_job import (
     ALL_TOPICS,
     REFERENCE_TOPICS,
     TOPICS,
     HealthcareGraphRagProcessor,
 )
+from pyflink.common import WatermarkStrategy
+from pyflink.common.serialization import SimpleStringSchema
+from pyflink.common.typeinfo import Types
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaSource
+from pyflink.datastream.functions import MapFunction
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 GROUP_ID = os.getenv("FLINK_KAFKA_GROUP_ID", "healthcare-graphrag-pyflink")

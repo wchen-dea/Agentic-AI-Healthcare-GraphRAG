@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -97,7 +96,7 @@ def print_report(result: GateResult, mode: str) -> None:
     print(f"  Evidence completeness: {result.evidence_score:.2f}")
     print(f"  Answer quality:        {result.answer_score:.2f}")
     if result.failures:
-        print(f"\n  Failures:")
+        print("\n  Failures:")
         for f in result.failures:
             print(f"    - {f}")
     print(f"{'='*60}\n")

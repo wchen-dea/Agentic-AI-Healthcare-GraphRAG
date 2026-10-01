@@ -1,13 +1,10 @@
 """Tests for supply-chain domain modules."""
 from __future__ import annotations
 
-import pytest
-
-from supply_chain_agent.orchestration.models import RequestType, RetrievalPlan
 from supply_chain_agent.orchestration.planner import classify_request_type, select_retrieval_plan
-from supply_chain_agent.retrieval.evidence import rank_vector_context, rank_graph_context
-from supply_chain_agent.safety.response_policy import truncate_text, estimate_confidence, apply_response_budget
-from supply_chain_agent.safety.harness import check_input_safety, check_output_safety, call_with_retry, RetryPolicy
+from supply_chain_agent.retrieval.evidence import rank_graph_context, rank_vector_context
+from supply_chain_agent.safety.harness import RetryPolicy, call_with_retry, check_input_safety
+from supply_chain_agent.safety.response_policy import estimate_confidence, truncate_text
 
 
 class TestPlanner:

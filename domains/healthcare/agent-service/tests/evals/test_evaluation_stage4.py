@@ -4,9 +4,14 @@ from __future__ import annotations
 import time
 import unittest
 
-
-from healthcare_agent.evaluation.retrieval_benchmark import precision_at_k, recall_at_k, evaluate_fixture, score_all, load_fixtures
 from healthcare_agent.evaluation.grounding_scorecard import score_grounding
+from healthcare_agent.evaluation.retrieval_benchmark import (
+    evaluate_fixture,
+    load_fixtures,
+    precision_at_k,
+    recall_at_k,
+    score_all,
+)
 from healthcare_agent.retrieval.ranking import fusion_rerank
 
 

@@ -5,8 +5,6 @@ enabling JSON-mode generation and downstream programmatic consumption.
 """
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 
@@ -73,7 +71,7 @@ def parse_structured_response(raw: str) -> StructuredClinicalResponse:
     # Strip markdown code fences if present
     if text.startswith("```"):
         lines = text.split("\n")
-        lines = [l for l in lines if not l.startswith("```")]
+        lines = [line for line in lines if not line.startswith("```")]
         text = "\n".join(lines)
 
     try:

@@ -67,8 +67,9 @@ class SupplyChainPipelineService:
         self._write_neo4j(event, payload, text)
 
     def _write_qdrant(self, event, payload, text, vector):
-        from qdrant_client.models import PointStruct
         import hashlib
+
+        from qdrant_client.models import PointStruct
         point_id = int(hashlib.md5(event["event_id"].encode()).hexdigest()[:16], 16)
         self.qdrant.upsert(
             collection_name=self.qdrant_collection,

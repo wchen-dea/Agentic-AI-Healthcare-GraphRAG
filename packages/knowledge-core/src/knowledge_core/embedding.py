@@ -14,7 +14,6 @@ import hashlib
 import os
 from typing import Literal
 
-
 VECTOR_SIZE = 384
 
 EmbeddingDomain = Literal["clinical", "claims", "device"]

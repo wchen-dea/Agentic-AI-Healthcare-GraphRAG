@@ -5,7 +5,6 @@ import sys
 import types
 from pathlib import Path
 
-
 FLINK_APP_DIR = Path(__file__).resolve().parents[1]
 DOMAIN_ROOT = Path(__file__).resolve().parents[3]
 KNOWLEDGE_DIR = DOMAIN_ROOT / "knowledge"
@@ -13,9 +12,22 @@ if str(FLINK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLINK_APP_DIR))
 
 
-from app.ontology_loader import load_claims_outcome_rules, load_lab_signal_rules, load_ontology_bundle  # noqa: E402
 from app.normalization import normalize_event_payload  # noqa: E402
+from app.ontology_loader import load_claims_outcome_rules, load_lab_signal_rules, load_ontology_bundle  # noqa: E402
 from app.rules_engine import evaluate_claims_outcome_rules, evaluate_lab_signal_rules  # noqa: E402
+
+__all__ = [
+    "DOMAIN_ROOT",
+    "KNOWLEDGE_DIR",
+    "build_seed_cypher",
+    "evaluate_claims_outcome_rules",
+    "evaluate_lab_signal_rules",
+    "load_claims_outcome_rules",
+    "load_lab_signal_rules",
+    "load_ontology_bundle",
+    "load_processor_module",
+    "normalize_event_payload",
+]
 
 
 def load_seed_generator():

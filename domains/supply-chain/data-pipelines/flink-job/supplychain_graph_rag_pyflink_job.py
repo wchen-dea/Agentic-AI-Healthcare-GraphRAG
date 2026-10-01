@@ -13,11 +13,8 @@ from pyflink.common.typeinfo import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaSource
 from pyflink.datastream.functions import MapFunction
-
 from supplychain_graph_rag_job import (
     ALL_TOPICS,
-    REFERENCE_TOPIC_SET,
-    TOPIC_SET,
     SupplyChainProcessor,
 )
 

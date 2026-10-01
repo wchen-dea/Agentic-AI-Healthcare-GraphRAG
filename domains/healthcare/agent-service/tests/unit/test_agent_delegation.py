@@ -3,18 +3,16 @@ from __future__ import annotations
 
 import unittest
 
-
+from healthcare_agent.agents.nodes import (
+    lab_interpretation_agent,
+    medication_safety_agent,
+)
 from healthcare_agent.agents.registry import (
     AGENT_REGISTRY,
-    AgentCard,
     DelegationRequest,
     DelegationResponse,
     discover_agents,
     resolve_delegation,
-)
-from healthcare_agent.agents.nodes import (
-    lab_interpretation_agent,
-    medication_safety_agent,
 )
 
 

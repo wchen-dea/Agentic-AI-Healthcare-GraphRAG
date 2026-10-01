@@ -2,11 +2,19 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
-
+from healthcare_agent.evaluation.mlflow_eval import (
+    _extract_trace,
+    compare_modes,
+    run_mlflow_evaluation,
+    score_agent_coverage,
+    score_answer_quality,
+    score_evidence_completeness,
+    score_latency,
+    score_routing,
+    score_safety_caveat,
+)
 from healthcare_agent.observability.tracing import (
     _safe_repr,
     mlflow_enabled,
@@ -16,18 +24,6 @@ from healthcare_agent.observability.tracing import (
     trace_query,
     trace_retriever,
 )
-from healthcare_agent.evaluation.mlflow_eval import (
-    _extract_trace,
-    compare_modes,
-    run_mlflow_evaluation,
-    score_answer_quality,
-    score_agent_coverage,
-    score_evidence_completeness,
-    score_latency,
-    score_routing,
-    score_safety_caveat,
-)
-
 
 # ── mlflow_enabled ─────────────────────────────────────────────────────────
 

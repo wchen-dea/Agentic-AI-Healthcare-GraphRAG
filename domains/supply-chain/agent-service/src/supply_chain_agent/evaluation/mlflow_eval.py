@@ -6,7 +6,6 @@ results as MLflow metrics, parameters, and a comparison artifact.
 from __future__ import annotations
 
 import json
-import os
 import time
 from typing import Any, Callable
 
@@ -21,7 +20,6 @@ from supply_chain_agent.evaluation.scenarios import (
 )
 from supply_chain_agent.observability.tracing import _ensure_experiment, mlflow_enabled
 from supply_chain_agent.safety.harness import SAFETY_CAVEAT_PHRASES
-
 
 # ── Thin wrappers that return float scores (evaluation.py returns dicts) ──
 

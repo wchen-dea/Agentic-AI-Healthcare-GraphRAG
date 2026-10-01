@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from healthcare_agent.agents.registry import DelegationRequest, DelegationResponse, discover_agents, resolve_delegation
+from healthcare_agent.agents.registry import DelegationRequest, DelegationResponse
 from healthcare_agent.orchestration.runtime import get_runtime
 from healthcare_agent.orchestration.state import HealthcareAgentState
-
 
 # ── Supervisor / Triage Agent ───────────────────────────────────────────────
 

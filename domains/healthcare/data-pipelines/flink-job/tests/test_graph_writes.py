@@ -4,7 +4,6 @@ import unittest
 from unittest.mock import Mock
 
 import helpers  # noqa: F401
-
 from app.graph_writes import merge_claim, merge_lab_signals, merge_reference_context
 
 

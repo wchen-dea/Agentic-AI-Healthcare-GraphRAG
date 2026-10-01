@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from qdrant_client.models import PointStruct
+
 from app.ontology_loader import provenance_for_source_type
 from app.reference_data import build_reference_data, update_reference_store
 from app.rules_engine import evaluate_claims_outcome_rules, evaluate_lab_signal_rules
 from app.storage import build_qdrant_payload, qdrant_point_id
 from app.text_processing import clinical_text, domain_for_event_type, stable_embedding
-from qdrant_client.models import PointStruct
 
 
 class HealthcareEventPipelineService:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 
 import helpers  # noqa: F401
-
 from knowledge_core.embedding import (
     ALL_DOMAINS,
     VECTOR_SIZE,

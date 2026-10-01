@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 
 import helpers  # noqa: F401
-
 from app.storage import build_qdrant_payload, qdrant_point_id
 
 

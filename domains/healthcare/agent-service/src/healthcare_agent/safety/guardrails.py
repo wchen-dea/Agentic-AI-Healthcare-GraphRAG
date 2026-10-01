@@ -9,7 +9,6 @@ import re
 from typing import Any
 
 from agent_core.guardrails import (
-    PROMPT_INJECTION_PATTERNS as _INJECTION_PATTERNS,
     GuardrailResult,
     check_length,
     detect_prompt_injection,

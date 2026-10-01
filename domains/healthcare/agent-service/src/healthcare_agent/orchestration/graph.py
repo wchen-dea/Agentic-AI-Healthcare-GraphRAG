@@ -57,7 +57,6 @@ def delegation_router(state: HealthcareAgentState) -> dict[str, Any]:
     messages: list[dict[str, Any]] = []
 
     for req in pending:
-        req_key = (req.get("to_agent"), req.get("capability"))
         already_resolved = (req.get("from_agent"), req.get("capability")) in resolved_ids
         if already_resolved:
             continue

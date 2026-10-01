@@ -6,7 +6,6 @@ results as MLflow metrics, parameters, and a comparison artifact.
 from __future__ import annotations
 
 import json
-import os
 import time
 from typing import Any, Callable
 
@@ -20,7 +19,6 @@ from healthcare_agent.evaluation.langsmith import (
     evaluate_routing_accuracy,
 )
 from healthcare_agent.observability.tracing import _ensure_experiment, mlflow_enabled
-
 
 # ── Thin wrappers that return float scores (evaluation.py returns dicts) ──
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from healthcare_agent.orchestration import runtime as runtime_module
 from healthcare_agent.orchestration.graph import public_step, run_langgraph_query, stream_langgraph_query
 from healthcare_agent.orchestration.runtime import AgentRuntime, configure_runtime, get_runtime

@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-
-from healthcare_agent.retrieval.ranking import rank_graph_context, rank_vector_context
 from healthcare_agent.orchestration.planner import classify_request_type, select_retrieval_plan
+from healthcare_agent.retrieval.ranking import rank_graph_context, rank_vector_context
 
 
 class PlannerEdgeCaseTests(unittest.TestCase):

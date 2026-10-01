@@ -8,7 +8,6 @@ from __future__ import annotations
 import operator
 from typing import Annotated, Any, Literal, TypedDict
 
-
 RequestType = Literal[
     "patient_summary",
     "medication_safety",

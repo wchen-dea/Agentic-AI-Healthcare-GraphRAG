@@ -6,7 +6,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 KNOWLEDGE_DIR = REPO_ROOT / "knowledge"
 FLINK_APP_DIR = REPO_ROOT / "data-pipelines" / "flink-job"

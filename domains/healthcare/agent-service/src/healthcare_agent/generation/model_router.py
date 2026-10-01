@@ -19,7 +19,7 @@ import os
 import re
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal
 
 ComplexityTier = Literal["simple", "moderate", "complex"]

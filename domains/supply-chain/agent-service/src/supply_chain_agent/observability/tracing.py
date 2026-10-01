@@ -19,7 +19,6 @@ from typing import Any, Callable
 import mlflow
 from mlflow.entities import SpanType
 
-
 # ── Configuration ──────────────────────────────────────────────────────────
 
 _DEFAULT_EXPERIMENT = "supplychain-graphrag"

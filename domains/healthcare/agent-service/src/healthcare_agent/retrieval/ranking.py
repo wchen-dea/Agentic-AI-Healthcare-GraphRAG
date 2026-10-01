@@ -1,9 +1,7 @@
+import time
 from typing import Any
 
-import time
-
 from healthcare_agent.orchestration.plan_types import RequestType
-
 
 _RECENCY_WEIGHT = 0.3
 _RELEVANCE_WEIGHT = 0.5
@@ -16,7 +14,7 @@ def _recency_score(item: dict[str, Any], now: float | None = None) -> float:
     if not event_ts:
         return 0.5
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
         if isinstance(event_ts, str):
             ts = datetime.fromisoformat(event_ts.replace("Z", "+00:00")).timestamp()
         else:

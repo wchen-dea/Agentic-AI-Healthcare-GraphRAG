@@ -1,9 +1,7 @@
 """Evaluation dataset and scoring for supply-chain agents."""
 from __future__ import annotations
 
-import os
 from typing import Any
-
 
 EVALUATION_DATASET = [
     {

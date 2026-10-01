@@ -16,13 +16,13 @@ from app.graph_writes import (
     merge_medication_order,
     merge_reference_context,
 )
+from app.normalization import normalize_event_payload
 from app.ontology_loader import (
     load_claims_outcome_rules,
     load_drug_safety_rules,
     load_lab_signal_rules,
     load_ontology_bundle,
 )
-from app.normalization import normalize_event_payload
 from app.pipeline_service import HealthcareEventPipelineService
 from app.runner import run_consumer_loop
 from app.text_processing import ALL_DOMAINS, VECTOR_SIZE

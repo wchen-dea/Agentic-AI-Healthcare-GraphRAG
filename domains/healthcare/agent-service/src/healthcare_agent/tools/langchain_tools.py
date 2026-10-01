@@ -13,7 +13,6 @@ from langchain_core.tools import tool
 
 from healthcare_agent.orchestration.runtime import get_runtime
 
-
 # ---------------------------------------------------------------------------
 # Retrieval tools
 # ---------------------------------------------------------------------------

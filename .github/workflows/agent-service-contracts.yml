@@ -19,6 +19,8 @@ on:
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
       - scripts/lib/**
+      - domains/*/scripts/**
+      - domains/*/data-pipelines/**/*.py
   pull_request:
     branches:
       - dev
@@ -37,6 +39,8 @@ on:
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
       - scripts/lib/**
+      - domains/*/scripts/**
+      - domains/*/data-pipelines/**/*.py
 
 jobs:
   skills-layer-validation:
@@ -89,6 +93,21 @@ jobs:
             echo "Install log tail:"
             tail -n 20 /tmp/skills-ref-install.log || true
           fi
+  ruff-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.11'
+
+      # Version matches the ruff pin resolved in uv.lock; config lives in the root pyproject.toml.
+      - name: Ruff lint (blocking)
+        run: uvx ruff@0.16.3 check --output-format=github packages domains scripts
+
   contract-tests:
     runs-on: ubuntu-latest
     steps:

@@ -60,3 +60,6 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+# Line length is a formatting concern; long prompt, Cypher and fixture literals
+# are clearer unwrapped. Correctness (E/F) and import order (I) are enforced.
+ignore = ["E501"]

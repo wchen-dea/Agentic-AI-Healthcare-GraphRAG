@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import argparse
 import re
-import sys
 from pathlib import Path
 
 import yaml
-
 
 KNOWLEDGE_DIR = Path(__file__).resolve().parents[1] / "knowledge"
 CONFIG_DIR = KNOWLEDGE_DIR / "ontology"

@@ -5,21 +5,15 @@ without requiring live infrastructure (Qdrant, Neo4j, Ollama).
 """
 from __future__ import annotations
 
-import json
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from healthcare_agent.agents.nodes import (
     coding_review_agent,
     confidence_evaluator,
-    graph_retrieval_agent,
     lab_interpretation_agent,
     medication_safety_agent,
-    synthesis_agent,
     triage_agent,
-    vector_retrieval_agent,
 )
 from healthcare_agent.evaluation.langsmith import (
     evaluate_agent_coverage,
@@ -29,7 +23,6 @@ from healthcare_agent.evaluation.langsmith import (
 )
 from healthcare_agent.orchestration.graph import _route_specialist, _should_continue
 from healthcare_agent.orchestration.state import HealthcareAgentState
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
 

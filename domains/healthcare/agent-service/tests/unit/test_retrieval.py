@@ -4,7 +4,6 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-
 from healthcare_agent.retrieval.search import classify_query_domains, vector_search
 
 

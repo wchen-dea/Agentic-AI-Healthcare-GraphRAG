@@ -1,14 +1,9 @@
 """Tests for the agent harness infrastructure."""
 from __future__ import annotations
 
-import pytest
-
 from healthcare_agent.safety.harness import (
     ContextBudget,
-    GuardResult,
-    HarnessResult,
     RetryPolicy,
-    ToolResult,
     call_with_retry,
     check_input_safety,
     check_output_grounding,

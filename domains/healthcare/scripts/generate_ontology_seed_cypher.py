@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLINK_APP_DIR = REPO_ROOT / "data-pipelines" / "flink-job"
 if str(FLINK_APP_DIR) not in sys.path:
