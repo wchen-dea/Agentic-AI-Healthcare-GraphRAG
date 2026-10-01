@@ -16,6 +16,8 @@ This folder contains Architecture Decision Records (ADRs) for the project.
 | [ADR-0007](0007-langgraph-multi-agent-orchestration.md) | LangGraph multi-agent query orchestration | Agent orchestration | accepted |
 | [ADR-0008](0008-mlflow-tracing-and-evaluation.md) | MLflow tracing and evaluation for agent pipelines | Observability | accepted |
 | [ADR-0009](0009-domain-module-extraction.md) | Domain module extraction for rag-api | Code architecture | accepted |
+| [ADR-0010](0010-layered-agentic-architecture.md) | Layered agentic architecture (UI → BFF → LangGraph → MCP) | Agent orchestration and API surface | accepted |
+| [ADR-0011](0011-uv-workspace-packaging.md) | uv workspace packaging and wheel-in-image delivery for rag-api | Build, packaging, and container runtime | accepted |
 
 ## Conventions
 

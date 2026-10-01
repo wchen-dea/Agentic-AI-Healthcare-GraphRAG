@@ -72,7 +72,7 @@ docker compose exec supplychain-neo4j cypher-shell \
 
 ```
 domains/supply-chain/
-├── agents/                   # app.py, skills_layer.py, domain/, config/
+├── rag-api/                  # app.py, skills_layer.py, domain/, config/
 ├── scripts/                  # query_examples.sh, validate_ontology.py, etc.
 ├── skills/                   # Agent Skills packages (SKILL.md)
 └── webapp/                   # index.html, domain.js, Dockerfile

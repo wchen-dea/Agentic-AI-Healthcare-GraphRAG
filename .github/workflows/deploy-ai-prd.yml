@@ -7,7 +7,10 @@ on:
     paths:
       - .github/workflows/deploy-ai-prd.yml
       - deploy/helm/**
-      - domains/healthcare/agents/**
+      - domains/healthcare/rag-api/**
+      - platform/shared/**
+      - pyproject.toml
+      - uv.lock
       - domains/healthcare/webapp/**
   workflow_dispatch:
 

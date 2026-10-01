@@ -26,7 +26,7 @@ rag-api:
     OLLAMA_URL: ""
     OLLAMA_MODEL: ""
     MCP_SERVER_NAME: "HealthcareGraphRAG MCP"
-    RAG_API_LANGGRAPH_ENABLED: "false"
+    RAG_API_LANGGRAPH_ENABLED: "true"
     LANGGRAPH_MAX_ITERATIONS: "3"
     MLFLOW_TRACKING_URI: "http://mlflow:5000"
     MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"

@@ -8,9 +8,9 @@ Source skill id: medication_safety_graph_review
 
 ## Source Mapping
 
-- Flow definition: agents/config/skills_layer.json
-- Runtime planner: agents/skills_layer.py
-- Runtime endpoint: agents/app.py (/skills/plan and skills_plan_get)
+- Flow definition: rag-api/src/healthcare_rag_api/config/skills_layer.json
+- Runtime planner: rag-api/src/healthcare_rag_api/skills_layer.py
+- Runtime endpoint: rag-api/src/healthcare_rag_api/app.py (/skills/plan and skills_plan_get)
 
 ## Tool and Context Summary
 

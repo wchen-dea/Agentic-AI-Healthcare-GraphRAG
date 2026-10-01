@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { errorDetail, parseQueryResponse, parseStructured, toSeverity } from "./guards";
+import { errorDetail, parseAgentStep, parseQueryResponse, parseStructured, toSeverity } from "./guards";
 
 describe("parseQueryResponse", () => {
   it("tolerates non-object input", () => {
@@ -29,6 +29,22 @@ describe("parseQueryResponse", () => {
   it("falls back to summary when answer is missing", () => {
     expect(parseQueryResponse({ summary: "s" }).answer).toBe("s");
   });
+
+  it("parses the langgraph agent trace", () => {
+    const r = parseQueryResponse({
+      answer: "ok",
+      langgraph: {
+        enabled: true,
+        iterations: 2,
+        confidence: 0.9,
+        final_reason: "confidence_reached",
+        agent_trace: [{ agent: "triage", action: "classify" }, "bad"],
+      },
+    });
+    expect(r.langgraph?.enabled).toBe(true);
+    expect(r.langgraph?.agent_trace).toEqual([{ agent: "triage", action: "classify" }]);
+    expect(r.extra.langgraph).toBeUndefined();
+  });
 });
 
 describe("parseStructured", () => {
@@ -56,5 +72,19 @@ describe("errorDetail", () => {
     expect(errorDetail({ detail: "Forbidden" })).toBe("Forbidden");
     expect(errorDetail({ detail: [{ msg: "too short" }, { msg: "bad id" }] })).toBe("too short; bad id");
     expect(errorDetail({})).toBeUndefined();
+  });
+});
+
+describe("parseAgentStep", () => {
+  it("accepts a node with message objects and drops malformed messages", () => {
+    expect(parseAgentStep({ node: "triage", messages: [{ action: "x" }, "bad", null] })).toEqual({
+      node: "triage",
+      messages: [{ action: "x" }],
+    });
+  });
+
+  it("rejects values without a node name", () => {
+    expect(parseAgentStep({ messages: [] })).toBeUndefined();
+    expect(parseAgentStep("triage")).toBeUndefined();
   });
 });

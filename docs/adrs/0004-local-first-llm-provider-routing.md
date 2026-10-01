@@ -20,11 +20,11 @@ Adopt local-first generation with provider abstraction:
 
 Implementation status:
 
-- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `BedrockProvider`, `DatabricksProvider`, `FallbackProvider` in `domains/healthcare/agents/llm_provider.py`.
+- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `BedrockProvider`, `DatabricksProvider`, `FallbackProvider` in `domains/healthcare/rag-api/src/healthcare_rag_api/llm_provider.py`.
 - Factory: `create_provider()` routes by `LLM_PROVIDER` env var.
 - Fallback: `FallbackProvider` wraps primary + fallback; triggered by `LLM_FALLBACK_PROVIDER` env var.
-- Dynamic model routing: `ModelRouter` in `domains/healthcare/agents/domain/model_router.py` classifies query complexity (simple/moderate/complex) and selects the appropriate model tier. Supports cross-provider routing via `provider:model` syntax (e.g. `bedrock:anthropic.claude-3-5-sonnet-20240620-v1:0` for complex queries).
-- Prompt construction and synthesis extracted into `domains/healthcare/agents/domain/synthesis.py`.
+- Dynamic model routing: `ModelRouter` in `domains/healthcare/rag-api/src/healthcare_rag_api/domain/model_router.py` classifies query complexity (simple/moderate/complex) and selects the appropriate model tier. Supports cross-provider routing via `provider:model` syntax (e.g. `bedrock:anthropic.claude-3-5-sonnet-20240620-v1:0` for complex queries).
+- Prompt construction and synthesis extracted into `domains/healthcare/rag-api/src/healthcare_rag_api/domain/synthesis.py`.
 - Docker Compose dev (`deploy/dev/rag-api.env`) uses a Databricks foundation model; Helm dev values still use Ollama (uniform model across tiers); production uses AWS Bedrock with optional per-tier model configuration and fallback.
 
 ## Consequences

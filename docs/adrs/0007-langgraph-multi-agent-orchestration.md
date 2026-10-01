@@ -5,6 +5,7 @@
 - Deciders: platform team
 - Supersedes: none
 - Superseded by: none
+- Amended by: [ADR-0010](0010-layered-agentic-architecture.md) (runtime port, graph-level guardrails, SSE streaming, phased roadmap)
 
 ## Context
 
@@ -39,9 +40,9 @@ Three query modes coexist:
 
 | Mode | Activation | Priority |
 | --- | --- | --- |
-| Single-pass | Default (no env vars) | Lowest |
-| ReAct | `RAG_API_REACT_ENABLED=true` | Medium |
-| LangGraph | `RAG_API_LANGGRAPH_ENABLED=true` | Highest |
+| Single-pass | `RAG_API_LANGGRAPH_ENABLED=false` | Lowest |
+| ReAct | `RAG_API_LANGGRAPH_ENABLED=false` and `RAG_API_REACT_ENABLED=true` | Medium |
+| LangGraph | Default (amended by ADR-0010; originally opt-in) | Highest |
 
 All modes share the same domain modules: `domain/retrieval.py`, `domain/synthesis.py`, `domain/evidence.py`, `domain/planner.py`, `domain/response_policy.py`.
 
@@ -72,10 +73,10 @@ Trade-offs:
 
 ## Rollout and Verification
 
-- Set `RAG_API_LANGGRAPH_ENABLED=true` in `.env` and rebuild `rag-api`.
+- LangGraph is on by default since ADR-0010; set `RAG_API_LANGGRAPH_ENABLED=false` in `.env` to roll back.
 - Verify with: `curl -s -X POST http://localhost:8000/query -H "Content-Type: application/json" -d '{"question":"Review medication safety for this patient","patient_id":"patient-0001"}' | jq '.langgraph'`
 - Expected: non-null `langgraph` block with `agent_trace`, `iterations`, `confidence`.
-- Run tests: `python -m pytest domains/healthcare/agents/tests/test_langgraph_agents.py`
+- Run tests: `python -m pytest domains/healthcare/rag-api/tests/test_langgraph_agents.py`
 - Polypharmacy scenario tests validate specialist agent activation and interaction chain extraction.
 
 ## Related
@@ -83,5 +84,5 @@ Trade-offs:
 - [ADR-0005: Embed FastMCP in rag-api](./0005-embed-fastmcp-in-rag-api.md)
 - [ADR-0004: Local-first LLM with provider routing](./0004-local-first-llm-provider-routing.md)
 - [docs/05_ai_agents.md](../05_ai_agents.md)
-- [domains/healthcare/agents/langgraph_agents/](../../domains/healthcare/agents/langgraph_agents/)
-- [domains/healthcare/agents/domain/](../../domains/healthcare/agents/domain/)
+- [domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/](../../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/)
+- [domains/healthcare/rag-api/src/healthcare_rag_api/domain/](../../domains/healthcare/rag-api/src/healthcare_rag_api/domain/)

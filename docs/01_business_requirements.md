@@ -327,8 +327,8 @@ Production uses AWS Bedrock as primary and can use Anthropic as fallback via `LL
 Dev defaults to local Ollama for zero-cost iteration.
 
 Multi-agent orchestration is implemented via LangGraph with specialist agents for
-medication safety, lab interpretation, and coding review (feature-flagged via
-`RAG_API_LANGGRAPH_ENABLED`). Agent execution is traceable through MLflow spans and
+medication safety, lab interpretation, and coding review (default orchestrator; rollback via
+`RAG_API_LANGGRAPH_ENABLED=false`). Agent execution is traceable through MLflow spans and
 LangSmith traces when the respective tracking backends are configured.
 
 ### Guardrails enforced at the API layer

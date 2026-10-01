@@ -10,6 +10,7 @@ export function TraceView({ response }: { response: QueryResponse }) {
   const plan = response.retrieval_plan;
   const routing = response.model_routing;
   const react = response.react;
+  const langgraph = response.langgraph;
   const guardrails = response.guardrails;
 
   return (
@@ -78,6 +79,37 @@ export function TraceView({ response }: { response: QueryResponse }) {
                 </div>
               </li>
             ))}
+          </ol>
+        </section>
+      )}
+
+      {langgraph && (
+        <section>
+          <h4>LangGraph agents</h4>
+          <p className="muted">
+            {langgraph.iterations ?? langgraph.agent_trace.length} iteration(s) · final confidence{" "}
+            {formatPercent(langgraph.confidence)}
+            {langgraph.final_reason ? ` · stopped: ${langgraph.final_reason}` : ""}
+          </p>
+          <ol className="timeline">
+            {langgraph.agent_trace.map((step, i) => {
+              const { agent, action, ...rest } = step;
+              return (
+                <li key={i}>
+                  <strong>
+                    #{i + 1} {agent ?? "agent"}
+                  </strong>
+                  {action && <span> · {action}</span>}
+                  {Object.keys(rest).length > 0 && (
+                    <div className="muted">
+                      {Object.entries(rest)
+                        .map(([k, v]) => `${humanizeKey(k)}: ${flag(v)}`)
+                        .join(" · ")}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </section>
       )}

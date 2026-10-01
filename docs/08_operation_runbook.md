@@ -109,9 +109,9 @@ curl -s -X POST "http://localhost:8000/query" \
 
 Expected: non-null object with `enabled`, `iterations`, and `final_reason`.
 
-### Optional: Enable LangGraph Multi-Agent Mode
+### LangGraph Multi-Agent Mode (Default)
 
-Add or update these variables in `.env`:
+LangGraph is enabled by default. To tune it, or to roll back with `RAG_API_LANGGRAPH_ENABLED=false`, add or update these variables in `.env`:
 
 ```bash
 RAG_API_LANGGRAPH_ENABLED=true

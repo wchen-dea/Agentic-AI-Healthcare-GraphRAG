@@ -20,7 +20,7 @@ def render_skill_md(
     skill_id: str,
     skill: dict,
     goals: list[str],
-    source_config_path: str = "agents/config/skills_layer.json",
+    source_config_path: str = "rag-api/config/skills_layer.json",
 ) -> str:
     description = skill["description"].strip()
     use_when = f"Use when handling workflows related to: {', '.join(goals)}."
@@ -96,9 +96,9 @@ def render_reference_md(
     skill_id: str,
     skill: dict,
     goals: list[str],
-    source_config_path: str = "agents/config/skills_layer.json",
-    planner_path: str = "agents/skills_layer.py",
-    endpoint_path: str = "agents/app.py (/skills/plan and skills_plan_get)",
+    source_config_path: str = "rag-api/config/skills_layer.json",
+    planner_path: str = "rag-api/skills_layer.py",
+    endpoint_path: str = "rag-api/app.py (/skills/plan and skills_plan_get)",
 ) -> str:
     lines: list[str] = []
     lines.append(f"# {skill_name}")
@@ -131,9 +131,9 @@ def generate_skills(
     skills_root: Path,
     domain_root: Path,
     check: bool,
-    source_config_path: str = "agents/config/skills_layer.json",
-    planner_path: str = "agents/skills_layer.py",
-    endpoint_path: str = "agents/app.py (/skills/plan and skills_plan_get)",
+    source_config_path: str = "rag-api/config/skills_layer.json",
+    planner_path: str = "rag-api/skills_layer.py",
+    endpoint_path: str = "rag-api/app.py (/skills/plan and skills_plan_get)",
 ) -> int:
     """Generate or check skill packages. Returns 0 on success, 1 on drift."""
     layer = json.loads(skills_layer_path.read_text(encoding="utf-8"))

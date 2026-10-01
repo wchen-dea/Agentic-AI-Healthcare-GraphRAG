@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import { ApiError, runMcpTool, runRagQuery, type RequestHandle } from "../api/client";
-import type { QueryResponse } from "../api/types";
+import { ApiError, runMcpTool, runRagQuery, runRagQueryStreaming, type RequestHandle } from "../api/client";
+import type { QueryRequest, QueryResponse } from "../api/types";
 import { conversationReducer, initialConversation, isBusy, type TurnRequest } from "../lib/conversation";
 
 function newId(): string {
@@ -9,9 +9,16 @@ function newId(): string {
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function useConversation(apiBase: string) {
+export interface ConversationOptions {
+  /** Stream LangGraph agent progress from `/query/stream` for RAG turns. */
+  stream: boolean;
+}
+
+export function useConversation(apiBase: string, { stream }: ConversationOptions = { stream: false }) {
   const [state, dispatch] = useReducer(conversationReducer, undefined, () => initialConversation(newId()));
   const inflight = useRef(new Map<string, RequestHandle<QueryResponse>>());
+  // Remember per API base when the server lacks `/query/stream`, to skip the extra round trip.
+  const streamUnsupported = useRef(new Set<string>());
 
   useEffect(() => {
     const handles = inflight.current;
@@ -25,15 +32,26 @@ export function useConversation(apiBase: string) {
     (request: TurnRequest) => {
       const id = newId();
       dispatch({ type: "start", id, request, at: Date.now() });
-      const handle =
-        request.mode === "rag"
-          ? runRagQuery(apiBase, {
-              question: request.question,
-              ...(request.patientId ? { patient_id: request.patientId } : {}),
-              ...(request.structured ? { structured: true } : {}),
-              session_id: state.sessionId.slice(0, 64),
-            })
-          : runMcpTool(apiBase, request.tool, request.args ?? {});
+      let handle: RequestHandle<QueryResponse>;
+      if (request.mode === "rag") {
+        const payload: QueryRequest = {
+          question: request.question,
+          ...(request.patientId ? { patient_id: request.patientId } : {}),
+          ...(request.structured ? { structured: true } : {}),
+          session_id: state.sessionId.slice(0, 64),
+        };
+        handle =
+          stream && !streamUnsupported.current.has(apiBase)
+            ? runRagQueryStreaming(
+                apiBase,
+                payload,
+                (step) => dispatch({ type: "progress", id, step }),
+                () => streamUnsupported.current.add(apiBase),
+              )
+            : runRagQuery(apiBase, payload);
+      } else {
+        handle = runMcpTool(apiBase, request.tool, request.args ?? {});
+      }
       inflight.current.set(id, handle);
       handle.promise
         .then((response) => dispatch({ type: "succeed", id, response, at: Date.now() }))
@@ -49,7 +67,7 @@ export function useConversation(apiBase: string) {
         })
         .finally(() => inflight.current.delete(id));
     },
-    [apiBase, state.sessionId],
+    [apiBase, state.sessionId, stream],
   );
 
   const cancelAll = useCallback(() => {

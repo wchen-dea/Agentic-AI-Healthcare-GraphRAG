@@ -6,11 +6,14 @@ on:
       - dev
     paths:
       - .github/workflows/rag-api-contracts.yml
-      - domains/healthcare/agents/**
+      - pyproject.toml
+      - uv.lock
+      - platform/shared/**
+      - domains/healthcare/rag-api/**
       - domains/healthcare/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
-      - domains/supply-chain/agents/**
+      - domains/supply-chain/rag-api/**
       - domains/supply-chain/skills/**
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
@@ -20,11 +23,14 @@ on:
       - dev
     paths:
       - .github/workflows/rag-api-contracts.yml
-      - domains/healthcare/agents/**
+      - pyproject.toml
+      - uv.lock
+      - platform/shared/**
+      - domains/healthcare/rag-api/**
       - domains/healthcare/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
-      - domains/supply-chain/agents/**
+      - domains/supply-chain/rag-api/**
       - domains/supply-chain/skills/**
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
@@ -87,31 +93,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: domains/healthcare/agents/requirements.txt
+          version: '0.12.11'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
-      - name: Create isolated venv
-        run: python -m venv .venv311
+      - name: Sync locked rag-api environment
+        run: uv sync --frozen --package healthcare-rag-api --package supply-chain-rag-api
 
-      - name: Install rag-api dependencies
-        run: .venv311/bin/python -m pip install -r domains/healthcare/agents/requirements.txt
+      - name: Run healthcare rag-api tests (contracts, planner, runtime, guardrails)
+        run: uv run --frozen --package healthcare-rag-api pytest -q
+        working-directory: domains/healthcare/rag-api
 
-      - name: Run rag-api contract tests
-        run: .venv311/bin/python domains/healthcare/agents/tests/test_contracts.py
-
-      - name: Run planner evaluation suite
-        run: .venv311/bin/python domains/healthcare/agents/tests/test_planner_evaluation.py
-
-      - name: Run planner edge-case suite
-        run: .venv311/bin/python domains/healthcare/agents/tests/test_planner_edge_cases.py
+      - name: Run supply-chain rag-api tests
+        run: uv run --frozen --package supply-chain-rag-api pytest -q
+        working-directory: domains/supply-chain/rag-api
 
       - name: Run evaluation quality gates (offline, from fixtures)
-        run: .venv311/bin/python -m domain.evaluation_gates --results-file domains/healthcare/agents/tests/fixtures/evaluation_results.json --min-score 0.5
-        working-directory: domains/healthcare/agents
+        run: uv run --frozen --package healthcare-rag-api python -m healthcare_rag_api.domain.evaluation_gates --results-file tests/fixtures/evaluation_results.json --min-score 0.5
+        working-directory: domains/healthcare/rag-api
         continue-on-error: true
 
   container-build:
@@ -120,8 +122,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build rag-api container
-        run: docker build -f domains/healthcare/agents/Dockerfile -t rag-api-contracts:ci .
+      - name: Build healthcare rag-api container
+        run: docker build -f domains/healthcare/rag-api/Dockerfile -t rag-api-contracts:ci .
+
+      - name: Build supply-chain rag-api container
+        run: docker build -f domains/supply-chain/rag-api/Dockerfile -t sc-rag-api-contracts:ci .
 
   helm-lint:
     runs-on: ubuntu-latest

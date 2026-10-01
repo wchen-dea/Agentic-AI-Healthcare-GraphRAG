@@ -1,4 +1,4 @@
-// MCP tool catalog mirroring the @mcp.tool() functions in domains/healthcare/agents/app.py.
+// MCP tool catalog mirroring the @mcp.tool() functions in domains/healthcare/rag-api/src/healthcare_rag_api/app.py.
 // Roles are fixed server-side per tool (config/tool_policies.json); shown here for transparency.
 
 export type ToolFieldType = "text" | "textarea" | "number" | "boolean" | "select";
@@ -129,7 +129,7 @@ export const MCP_TOOLS: ToolSpec[] = [
         type: "select",
         required: true,
         default: "medication_safety_review",
-        // Mirrors business_goals in agents/config/skills_layer.json.
+        // Mirrors business_goals in rag-api/src/healthcare_rag_api/config/skills_layer.json.
         options: ["clinical_deterioration_triage", "medication_safety_review", "claims_denial_prevention"],
       },
       { name: "agent", label: "Agent (optional)", type: "text", default: "" },

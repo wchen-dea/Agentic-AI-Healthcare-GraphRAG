@@ -493,6 +493,18 @@ button:focus-visible,
   color: var(--primary);
 }
 
+.agent-steps {
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.agent-steps li.current code {
+  font-weight: 600;
+}
+
 .skeleton {
   margin-top: 1rem;
   display: grid;

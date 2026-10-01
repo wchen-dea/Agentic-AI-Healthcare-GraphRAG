@@ -4,6 +4,7 @@ import type { ApiMode } from "./api/types";
 import { QueryPanel } from "./components/QueryPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { TurnCard } from "./components/TurnCard";
+import { useAgents } from "./hooks/useAgents";
 import { useConversation } from "./hooks/useConversation";
 import { useHealth } from "./hooks/useHealth";
 import { useLocalSetting } from "./hooks/useLocalSetting";
@@ -12,6 +13,7 @@ type Theme = "light" | "dark";
 
 const isMode = (v: string): v is ApiMode => v === "rag" || v === "mcp";
 const isTheme = (v: string): v is Theme => v === "light" || v === "dark";
+const isOnOff = (v: string): v is "on" | "off" => v === "on" || v === "off";
 const isUrl = (v: string): v is string => /^(https?:\/\/|\/)/.test(v.trim());
 
 function preferredTheme(): Theme {
@@ -22,9 +24,11 @@ export function App() {
   const [apiBase, setApiBase] = useLocalSetting("hc.apiBase", config.defaultApiBaseUrl, isUrl);
   const [mode, setMode] = useLocalSetting<ApiMode>("hc.mode", "rag", isMode);
   const [theme, setTheme] = useLocalSetting<Theme>("hc.theme", preferredTheme(), isTheme);
+  const [streaming, setStreaming] = useLocalSetting<"on" | "off">("hc.stream", "on", isOnOff);
   const [apiDraft, setApiDraft] = useState(apiBase);
   const { health, checking, refresh } = useHealth(apiBase);
-  const { state, busy, submit, cancelAll, reset, remove } = useConversation(apiBase);
+  const { agents } = useAgents(apiBase);
+  const { state, busy, submit, cancelAll, reset, remove } = useConversation(apiBase, { stream: streaming === "on" });
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,6 +115,14 @@ export function App() {
                 onKeyDown={(e) => e.key === "Enter" && commitApiBase()}
               />
             </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={streaming === "on"}
+                onChange={(e) => setStreaming(e.target.checked ? "on" : "off")}
+              />
+              Stream agent steps (LangGraph orchestrator)
+            </label>
             <div className="session-row">
               <span className="muted" title={state.sessionId}>
                 Session <code>{state.sessionId.slice(0, 8)}</code> · {turnCount} turn(s)
@@ -123,6 +135,18 @@ export function App() {
               Decision support only — clinical review required. Questions and answers are kept in memory for this tab and
               never persisted.
             </p>
+            {agents.length > 0 && (
+              <details className="examples">
+                <summary>Registered agents ({agents.length})</summary>
+                <ul>
+                  {agents.map((a) => (
+                    <li key={a.name}>
+                      <strong>{a.name}</strong> — {a.description}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </section>
         </aside>
 

@@ -21,6 +21,16 @@ describe("conversationReducer", () => {
     expect(after.turns[0]?.status).toBe("cancelled");
   });
 
+  it("appends streamed progress only while pending", () => {
+    const step = { node: "triage", messages: [{ agent: "triage", action: "classified" }] };
+    let s = conversationReducer(initialConversation("s1"), { type: "start", id: "t1", request, at: 1 });
+    s = conversationReducer(s, { type: "progress", id: "t1", step });
+    s = conversationReducer(s, { type: "progress", id: "t1", step: { ...step, node: "retrieval" } });
+    expect(s.turns[0]?.steps?.map((x) => x.node)).toEqual(["triage", "retrieval"]);
+    s = conversationReducer(s, { type: "succeed", id: "t1", response: parseQueryResponse({ answer: "a" }), at: 2 });
+    expect(conversationReducer(s, { type: "progress", id: "t1", step })).toBe(s);
+  });
+
   it("removes and resets", () => {
     let s = conversationReducer(initialConversation("s1"), { type: "start", id: "t1", request, at: 1 });
     s = conversationReducer(s, { type: "remove", id: "t1" });

@@ -1,4 +1,4 @@
-// Wire contract mirroring domains/healthcare/agents/app.py (`/query`, MCP tools)
+// Wire contract mirroring domains/healthcare/rag-api/src/healthcare_rag_api/app.py (`/query`, MCP tools)
 // and domain/structured_output.py. Keep in sync with the backend envelope.
 
 export type ApiMode = "rag" | "mcp";
@@ -65,6 +65,32 @@ export interface ReactTrace {
   actions: ReactAction[];
 }
 
+export type AgentTraceStep = Record<string, unknown> & {
+  agent?: string;
+  action?: string;
+};
+
+export interface LangGraphTrace {
+  enabled?: boolean;
+  iterations?: number;
+  confidence?: number;
+  final_reason?: string;
+  agent_trace: AgentTraceStep[];
+}
+
+/** One `event: step` from `POST /query/stream`: an evidence-free progress update for a graph node. */
+export interface AgentProgressStep {
+  node: string;
+  messages: AgentTraceStep[];
+}
+
+export interface AgentCard {
+  name: string;
+  description: string;
+  capabilities: string[];
+  accepted_inputs: string[];
+}
+
 export type Severity = "high" | "moderate" | "low" | "unknown";
 
 export interface RiskFinding {
@@ -112,6 +138,7 @@ export interface QueryResponse {
   model_routing?: ModelRouting;
   react?: ReactTrace;
   structured_response?: StructuredClinicalResponse;
+  langgraph?: LangGraphTrace;
   /** Any tool-specific fields not modelled above (MCP tools return varied shapes). */
   extra: Record<string, unknown>;
 }

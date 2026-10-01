@@ -1,8 +1,12 @@
 // Narrow untrusted wire data (`unknown`) into typed view models.
 import type {
+  AgentCard,
+  AgentProgressStep,
+  AgentTraceStep,
   GraphEntity,
   Guardrails,
   LabSignal,
+  LangGraphTrace,
   MedicationInteraction,
   ModelRouting,
   QueryResponse,
@@ -110,6 +114,46 @@ export function parseStructured(value: unknown): StructuredClinicalResponse | un
   };
 }
 
+function parseLangGraph(value: unknown): LangGraphTrace | undefined {
+  if (!isRecord(value)) return undefined;
+  const agentTrace: AgentTraceStep[] = records(value.agent_trace).map((m) => ({
+    ...m,
+    agent: str(m.agent),
+    action: str(m.action),
+  }));
+  return {
+    enabled: bool(value.enabled),
+    iterations: num(value.iterations),
+    confidence: num(value.confidence),
+    final_reason: str(value.final_reason),
+    agent_trace: agentTrace,
+  };
+}
+
+/** Converts a `/query/stream` step event; returns undefined for malformed events. */
+export function parseAgentStep(value: unknown): AgentProgressStep | undefined {
+  if (!isRecord(value)) return undefined;
+  const node = str(value.node);
+  if (!node) return undefined;
+  return {
+    node,
+    messages: records(value.messages).map((m) => ({ ...m, agent: str(m.agent), action: str(m.action) })),
+  };
+}
+
+/** Converts a `GET /agents` payload into the agent-card catalog. */
+export function parseAgents(value: unknown): AgentCard[] {
+  const data = isRecord(value) ? value : {};
+  return records(data.agents).map((a) => ({
+    name: str(a.name) ?? "unknown",
+    description: str(a.description) ?? "",
+    capabilities: Array.isArray(a.capabilities) ? a.capabilities.filter((c): c is string => typeof c === "string") : [],
+    accepted_inputs: Array.isArray(a.accepted_inputs)
+      ? a.accepted_inputs.filter((c): c is string => typeof c === "string")
+      : [],
+  }));
+}
+
 const KNOWN_KEYS = new Set([
   "answer",
   "question",
@@ -124,6 +168,7 @@ const KNOWN_KEYS = new Set([
   "model_routing",
   "react",
   "structured_response",
+  "langgraph",
 ]);
 
 /** Converts any `/query` or MCP tool payload into the unified view model. */
@@ -155,6 +200,7 @@ export function parseQueryResponse(value: unknown): QueryResponse {
       : undefined,
     react: parseReact(data.react),
     structured_response: parseStructured(data.structured_response),
+    langgraph: parseLangGraph(data.langgraph),
     extra,
   };
 }

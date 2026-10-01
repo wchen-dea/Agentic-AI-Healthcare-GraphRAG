@@ -33,6 +33,7 @@ Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
 - [ADR-0007: LangGraph multi-agent orchestration](adrs/0007-langgraph-multi-agent-orchestration.md)
 - [ADR-0008: MLflow tracing and evaluation](adrs/0008-mlflow-tracing-and-evaluation.md)
 - [ADR-0009: Domain module extraction](adrs/0009-domain-module-extraction.md)
+- [ADR-0010: Layered agentic architecture](adrs/0010-layered-agentic-architecture.md)
 
 Roadmap design strategy and execution backlog details are documented in [docs/03_platform_blueprint.md](03_platform_blueprint.md).
 
@@ -64,7 +65,7 @@ The platform supports parallel domain deployments sharing infrastructure (Kafka 
 
 | Domain | Directory | Neo4j Port | Qdrant Port | Topic Prefix |
 | --- | --- | --- | --- | --- |
-| Healthcare Provider | root (`platform/healthcare/producer/`, `platform/healthcare/flink-app/`, `domains/healthcare/agents/`) | 7474/7687 | 6333 | `healthcare.*` |
+| Healthcare Provider | root (`platform/healthcare/producer/`, `platform/healthcare/flink-app/`, `domains/healthcare/rag-api/`) | 7474/7687 | 6333 | `healthcare.*` |
 | Supply Chain Resilience | `domains/supply-chain/` | 7475/7688 | 6335 | `supplychain.*` |
 
 Each domain brings its own: Avro envelope schema, ontology YAML (entities, seeds, rules), graph write functions, producer event generators, and RAG API planner/classifier. The streaming pipeline, embedding infrastructure, and observability stack are reused.
@@ -123,14 +124,14 @@ This architecture intentionally combines several patterns so streaming ingestion
 
 - Event-Driven Pipeline: [platform/healthcare/producer/produce_events.py](../platform/healthcare/producer/produce_events.py), [platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [container/docker-compose.infra.yml](../container/docker-compose.infra.yml)
 - Dual Materialized Views: [platform/healthcare/flink-app/healthcare_graph_rag_job.py](../platform/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/04_data_platform.md](04_data_platform.md)
-- Shared-Core, Multi-Interface: [domains/healthcare/agents/app.py](../domains/healthcare/agents/app.py) (`run_query`, REST `/query`, MCP tools)
-- Policy Enforcement Point: [domains/healthcare/agents/domain/response_policy.py](../domains/healthcare/agents/domain/response_policy.py) (sanitization, truncation, budget), [domains/healthcare/agents/app.py](../domains/healthcare/agents/app.py) (`_authorize`, `_execute_with_audit`)
-- Contract-First Tooling: [domains/healthcare/agents/tests/test_contracts.py](../domains/healthcare/agents/tests/test_contracts.py), [docs/05_ai_agents.md](05_ai_agents.md)
-- Bounded Context Window: [domains/healthcare/agents/domain/response_policy.py](../domains/healthcare/agents/domain/response_policy.py) (`apply_response_budget`, `truncate_text`)
+- Shared-Core, Multi-Interface: [domains/healthcare/rag-api/src/healthcare_rag_api/app.py](../domains/healthcare/rag-api/src/healthcare_rag_api/app.py) (`run_query`, REST `/query`, MCP tools)
+- Policy Enforcement Point: [domains/healthcare/rag-api/src/healthcare_rag_api/domain/response_policy.py](../domains/healthcare/rag-api/src/healthcare_rag_api/domain/response_policy.py) (sanitization, truncation, budget), [domains/healthcare/rag-api/src/healthcare_rag_api/app.py](../domains/healthcare/rag-api/src/healthcare_rag_api/app.py) (`_authorize`, `_execute_with_audit`)
+- Contract-First Tooling: [domains/healthcare/rag-api/tests/test_contracts.py](../domains/healthcare/rag-api/tests/test_contracts.py), [docs/05_ai_agents.md](05_ai_agents.md)
+- Bounded Context Window: [domains/healthcare/rag-api/src/healthcare_rag_api/domain/response_policy.py](../domains/healthcare/rag-api/src/healthcare_rag_api/domain/response_policy.py) (`apply_response_budget`, `truncate_text`)
 - Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/08_operation_runbook.md](08_operation_runbook.md)
-- Adapter Pattern: [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md), [domains/healthcare/agents/llm_provider.py](../domains/healthcare/agents/llm_provider.py)
-- Multi-Agent Orchestration: [domains/healthcare/agents/langgraph_agents/](../domains/healthcare/agents/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
-- MLflow Tracing: [domains/healthcare/agents/langgraph_agents/mlflow_tracing.py](../domains/healthcare/agents/langgraph_agents/mlflow_tracing.py), [domains/healthcare/agents/langgraph_agents/mlflow_eval.py](../domains/healthcare/agents/langgraph_agents/mlflow_eval.py)
+- Adapter Pattern: [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md), [domains/healthcare/rag-api/src/healthcare_rag_api/llm_provider.py](../domains/healthcare/rag-api/src/healthcare_rag_api/llm_provider.py)
+- Multi-Agent Orchestration: [domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/](../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/) (`graph.py`, `agents.py`, `state.py`)
+- MLflow Tracing: [domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_tracing.py](../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_tracing.py), [domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_eval.py](../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_eval.py)
 
 ## Modern AI Stack Frameworks and Design Patterns Summary
 
@@ -177,7 +178,7 @@ This section maps the current implementation to a modern AI application stack mo
 - Session-scoped conversation memory provides multi-turn context carryover.
 - Classifier-based guardrails detect prompt injection, off-topic queries, and harmful output.
 - No dynamic model routing based on task complexity, latency, or cost.
-- No streaming responses (SSE) to client applications.
+- SSE streaming (`POST /query/stream`) covers LangGraph agent progress only; answer tokens are not streamed yet.
 - Evaluation quality gates enforce minimum routing, evidence, and answer scores before release (`domain/evaluation_gates.py`).
 - No per-user identity propagation or data-classification-aware access control.
 
@@ -215,7 +216,7 @@ Scoring guide:
 | Agent memory and context | 3 | 3 | Session-scoped conversation memory with TTL expiration | Add persistent cross-session memory for longitudinal monitoring |
 | Model routing and optimization | 2 | 3 | Single Ollama provider | Add dynamic routing by task complexity and cost |
 | Input guardrails and safety | 3 | 3 | Classifier-based injection detection + output safety + grounding check | Add dedicated ML classifier model (Llama Guard) |
-| Streaming UX | 1 | 3 | Synchronous responses only | Add SSE streaming to provider web UI |
+| Streaming UX | 2 | 3 | SSE agent-step streaming in provider web UI with `/query` fallback ([ADR-0010](adrs/0010-layered-agentic-architecture.md)) | Stream synthesis tokens; durable resume (P2) |
 
 Sprint tracking note:
 
@@ -287,13 +288,13 @@ flowchart LR
   end
 
   subgraph Domains[domains/ - AI Agents]
-    subgraph HCA[healthcare/agents]
+    subgraph HCA[healthcare/rag-api]
       HAPI[FastAPI + embedded FastMCP]
       HDOM[domain/ - planner, retrieval, policy]
       HMODES[Single-pass / ReAct / LangGraph]
       HAPI --> HDOM --> HMODES
     end
-    subgraph SCA[supply-chain/agents]
+    subgraph SCA[supply-chain/rag-api]
       SAPI[FastAPI + embedded FastMCP]
       SDOM[domain/ - planner, retrieval, policy]
       SMODES[Single-pass / ReAct / LangGraph]
@@ -421,7 +422,7 @@ flowchart TD
 
 ### Local Development
 
-Current implementation uses Ollama in domains/healthcare/agents/app.py.
+Current implementation uses Ollama in domains/healthcare/rag-api/src/healthcare_rag_api/app.py.
 
 - Local endpoint via OLLAMA_URL.
 - Local model choice via OLLAMA_MODEL.
@@ -438,7 +439,7 @@ MCP delivery in the current implementation:
 
 ### LLM Provider Routing (Implemented)
 
-The repository runtime includes a provider adapter in `domains/healthcare/agents/llm_provider.py` with four implemented generation providers:
+The repository runtime includes a provider adapter in `domains/healthcare/rag-api/src/healthcare_rag_api/llm_provider.py` with four implemented generation providers:
 
 - **OllamaProvider** — local inference (default for dev)
 - **BedrockProvider** — AWS Bedrock Runtime (production primary)
@@ -567,7 +568,7 @@ See [04_data_platform.md](04_data_platform.md) for the full model.
 
 ### RAG API
 
-domains/healthcare/agents/app.py exposes:
+domains/healthcare/rag-api/src/healthcare_rag_api/app.py exposes:
 
 - GET /health
 - GET /metrics
@@ -605,7 +606,7 @@ Query flow:
 
 #### LLM Provider Interface (Implemented)
 
-The provider adapter in `domains/healthcare/agents/llm_provider.py` implements the following contract:
+The provider adapter in `domains/healthcare/rag-api/src/healthcare_rag_api/llm_provider.py` implements the following contract:
 
 ```python
 class LLMProvider(Protocol):

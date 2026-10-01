@@ -9,7 +9,7 @@ sys.path.insert(0, str(DOMAIN_ROOT.parents[1] / "scripts"))
 
 from lib.skill_generator import generate_skills  # noqa: E402
 
-SKILLS_LAYER_PATH = DOMAIN_ROOT / "agents" / "config" / "skills_layer.json"
+SKILLS_LAYER_PATH = DOMAIN_ROOT / "rag-api" / "src" / "supply_chain_rag_api" / "config" / "skills_layer.json"
 SKILLS_ROOT = DOMAIN_ROOT / "skills"
 
 
@@ -22,9 +22,9 @@ def main() -> int:
         skills_root=SKILLS_ROOT,
         domain_root=DOMAIN_ROOT,
         check=args.check,
-        source_config_path="agents/config/skills_layer.json",
-        planner_path="agents/skills_layer.py",
-        endpoint_path="agents/app.py (/skills/plan and skills_plan_get)",
+        source_config_path="rag-api/src/supply_chain_rag_api/config/skills_layer.json",
+        planner_path="rag-api/src/supply_chain_rag_api/skills_layer.py",
+        endpoint_path="rag-api/src/supply_chain_rag_api/app.py (/skills/plan and skills_plan_get)",
     )
 
 

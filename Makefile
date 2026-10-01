@@ -16,7 +16,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
         validate-skills generate-skills validate-ontology \
-        test-hc test-sc web-hc-dev web-hc-test web-hc-build pull-model fresh \
+        sync test-hc test-sc build-wheels web-hc-dev web-hc-test web-hc-build pull-model fresh \
         helm-dev helm-dev-down helm-ports helm-ports-stop helm-prd helm-lint
 
 help: ## Show this help
@@ -133,10 +133,18 @@ validate-ontology: ## Validate ontology configs for both domains
 	python domains/healthcare/scripts/validate_ontology.py
 	python domains/supply-chain/scripts/validate_ontology.py
 
-test-hc: ## Healthcare agent + domain tests
-	cd domains/healthcare/agents && python -m pytest tests/ --tb=short
-test-sc: ## Supply-chain domain tests
-	cd domains/supply-chain/agents && python -m pytest tests/ --tb=short 2>/dev/null || echo "No supply-chain tests yet"
+sync: ## Sync the full dev venv (root depends on every workspace member)
+	uv sync
+
+test-hc: ## Healthcare rag-api tests (uv workspace)
+	cd domains/healthcare/rag-api && uv run --package healthcare-rag-api pytest --tb=short
+test-sc: ## Supply-chain rag-api tests (uv workspace)
+	cd domains/supply-chain/rag-api && uv run --package supply-chain-rag-api pytest --tb=short
+
+build-wheels: ## Build rag-api wheels (+ graphrag-shared) into dist/
+	uv build --wheel --package graphrag-shared --out-dir dist
+	uv build --wheel --package healthcare-rag-api --out-dir dist
+	uv build --wheel --package supply-chain-rag-api --out-dir dist
 
 pull-model: ## Pull Ollama LLM model
 	docker exec infra-ollama ollama pull llama3.1

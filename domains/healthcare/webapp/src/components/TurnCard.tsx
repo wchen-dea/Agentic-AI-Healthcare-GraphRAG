@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { AgentProgressStep } from "../api/types";
 import type { Turn } from "../lib/conversation";
 import { turnToJson, turnToMarkdown } from "../lib/export";
 import { AnswerView } from "./AnswerView";
@@ -20,6 +21,30 @@ const STATUS_LABEL: Record<Turn["status"], string> = {
 function Elapsed({ turn }: { turn: Turn }) {
   if (!turn.finishedAt) return null;
   return <span className="muted">{((turn.finishedAt - turn.startedAt) / 1000).toFixed(1)}s</span>;
+}
+
+function stepSummary(step: AgentProgressStep): string {
+  const msg = step.messages[step.messages.length - 1];
+  if (!msg) return "";
+  const details = Object.entries(msg)
+    .filter(
+      ([key, value]) =>
+        key !== "agent" && key !== "action" && ["string", "number", "boolean"].includes(typeof value),
+    )
+    .map(([key, value]) => `${key.replace(/_/g, " ")}: ${String(value)}`);
+  return [msg.action, ...details].filter(Boolean).join(" · ");
+}
+
+function AgentSteps({ steps }: { steps: AgentProgressStep[] }) {
+  return (
+    <ol className="agent-steps" aria-label="Agent progress" aria-live="polite">
+      {steps.map((step, i) => (
+        <li key={`${step.node}-${i}`} className={i === steps.length - 1 ? "current" : undefined}>
+          <code>{step.node}</code> <span className="muted">{stepSummary(step)}</span>
+        </li>
+      ))}
+    </ol>
+  );
 }
 
 export function TurnCard({ turn, onRemove, onRetry }: { turn: Turn; onRemove: () => void; onRetry: () => void }) {
@@ -77,6 +102,8 @@ export function TurnCard({ turn, onRemove, onRetry }: { turn: Turn; onRemove: ()
           </button>
         </div>
       </header>
+
+      {turn.status === "pending" && turn.steps && turn.steps.length > 0 && <AgentSteps steps={turn.steps} />}
 
       {turn.status === "pending" && (
         <div className="skeleton" aria-label="Loading">

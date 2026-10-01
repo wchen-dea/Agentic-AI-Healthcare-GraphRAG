@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-python3 agents/tests/test_react_controller.py
-python3 agents/tests/test_planner_evaluation.py
-python3 agents/tests/test_planner_edge_cases.py
+cd "$(dirname "$0")/../rag-api"
+uv run --package healthcare-rag-api pytest -q \
+  tests/test_react_controller.py \
+  tests/test_planner_evaluation.py \
+  tests/test_planner_edge_cases.py

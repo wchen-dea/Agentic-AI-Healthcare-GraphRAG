@@ -27,9 +27,9 @@ Question
 
 ## 1. Contract Tests (CI-Automated)
 
-**File:** `domains/healthcare/agents/tests/test_contracts.py`  
-**Runner:** `python domains/healthcare/agents/tests/test_contracts.py` (stdlib `unittest`, no pytest)  
-**CI trigger:** push or PR to `dev` touching `domains/healthcare/agents/**` — `.github/workflows/rag-api-contracts.yml`
+**File:** `domains/healthcare/rag-api/tests/test_contracts.py`  
+**Runner:** `python domains/healthcare/rag-api/tests/test_contracts.py` (stdlib `unittest`, no pytest)  
+**CI trigger:** push or PR to `dev` touching `domains/healthcare/rag-api/**` — `.github/workflows/rag-api-contracts.yml`
 
 These tests run entirely in-process using `fastapi.testclient.TestClient`. All three
 external services (Qdrant, Neo4j, Ollama) are mocked with `unittest.mock.patch`, so no
@@ -52,8 +52,8 @@ live stack is required.
 
 ### Planner evaluation suite (Stage 2)
 
-**Files:** `domains/healthcare/agents/tests/test_planner_evaluation.py`, `domains/healthcare/agents/tests/fixtures/planner_route_fixtures.json`  
-**Runner:** `python domains/healthcare/agents/tests/test_planner_evaluation.py`
+**Files:** `domains/healthcare/rag-api/tests/test_planner_evaluation.py`, `domains/healthcare/rag-api/tests/fixtures/planner_route_fixtures.json`  
+**Runner:** `python domains/healthcare/rag-api/tests/test_planner_evaluation.py`
 
 This suite validates planner route selection and plan generation with fixture-driven assertions:
 
@@ -64,8 +64,8 @@ This suite validates planner route selection and plan generation with fixture-dr
 
 ### Planner edge-case suite (Stage 2)
 
-**File:** `domains/healthcare/agents/tests/test_planner_edge_cases.py`  
-**Runner:** `python domains/healthcare/agents/tests/test_planner_edge_cases.py`
+**File:** `domains/healthcare/rag-api/tests/test_planner_edge_cases.py`  
+**Runner:** `python domains/healthcare/rag-api/tests/test_planner_edge_cases.py`
 
 This suite focuses on negative and edge conditions that are easy to miss in happy-path fixtures:
 
@@ -77,26 +77,19 @@ This suite focuses on negative and edge conditions that are easy to miss in happ
 
 ### How to run locally
 
-The contract tests must be run with **Python 3.11** (matching Docker and CI). Running with
-Python 3.14+ causes a dependency conflict: `mcp==1.28.0` requires `pydantic>=2.12.0` on
-3.14, and pydantic 2.12.x has no wheel for that version yet.
+The rag-api packages are members of the root **uv workspace** (see
+[ADR-0011](adrs/0011-uv-workspace-packaging.md)). Run them with Python 3.11 (matching
+Docker and CI); the members declare `requires-python = ">=3.11,<3.14"` because
+`mcp==1.28.0` and `fastapi==0.115.0` cannot co-resolve on Python 3.14+.
 
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
-uv sync
-uv run python domains/healthcare/agents/tests/test_contracts.py
-uv run python domains/healthcare/agents/tests/test_planner_evaluation.py
-uv run python domains/healthcare/agents/tests/test_planner_edge_cases.py
-```
-
-Or with a manual venv (if uv is not available):
-
-```bash
-python3.11 -m venv .venv311
-.venv311/bin/pip install -r domains/healthcare/agents/requirements.txt
-.venv311/bin/python domains/healthcare/agents/tests/test_contracts.py
-.venv311/bin/python domains/healthcare/agents/tests/test_planner_evaluation.py
-.venv311/bin/python domains/healthcare/agents/tests/test_planner_edge_cases.py
+uv sync                                     # once, and after changing platform/shared
+make test-hc                                # = uv run --package healthcare-rag-api pytest
+make test-sc
+# or a subset:
+cd domains/healthcare/rag-api
+uv run --package healthcare-rag-api pytest tests/test_contracts.py tests/test_planner_evaluation.py
 ```
 
 Expected output:
@@ -109,8 +102,8 @@ OK
 
 ### Test harness internals
 
-**Module isolation:** `load_module()` pops `app` from `sys.modules` and calls
-`importlib.import_module("app")` for each test, giving each test a fresh module with its
+**Module isolation:** `load_module()` pops `healthcare_rag_api.app` from `sys.modules` and calls
+`importlib.import_module("healthcare_rag_api.app")` for each test, giving each test a fresh module with its
 own settings and connections.
 
 **Prometheus registry fix:** `app.py` registers three Prometheus metrics (`Histogram`,
@@ -400,14 +393,14 @@ git push → dev branch
   │
   ├── contract-tests job
   │     ├── uv sync (or python 3.11 venv fallback)
-  │     ├── uv run python domains/healthcare/agents/tests/test_contracts.py  ← 10 tests, ~2-4 s
-  │     ├── python domains/healthcare/agents/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
-  │     ├── python domains/healthcare/agents/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
-  │     ├── python -m pytest domains/healthcare/agents/tests/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
-  │     └── python -m pytest domains/healthcare/agents/tests/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
+  │     ├── uv run python domains/healthcare/rag-api/tests/test_contracts.py  ← 10 tests, ~2-4 s
+  │     ├── python domains/healthcare/rag-api/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
+  │     ├── python domains/healthcare/rag-api/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
+  │     ├── python -m pytest domains/healthcare/rag-api/tests/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
+  │     └── python -m pytest domains/healthcare/rag-api/tests/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
   │
   └── container-build job
-        └── docker build -f domains/healthcare/agents/Dockerfile      ← validates image builds
+        └── docker build -f domains/healthcare/rag-api/Dockerfile      ← validates image builds
 ```
 
 Neither job requires live external services. The contract tests mock all three
@@ -421,7 +414,7 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 | Gap | Recommended next step |
 |-----|-----------------------|
 | Ontology and rule-pack conformance | Validate `platform/healthcare/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
-| Graph integration tests after event injection | Add `domains/healthcare/agents/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
+| Graph integration tests after event injection | Add `domains/healthcare/rag-api/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
 | Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
 | Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |
 | Adverse event detection end-to-end | Inject known medication + symptom pair, assert `AdverseEvent` node via Cypher |

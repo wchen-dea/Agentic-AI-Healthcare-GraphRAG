@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 // Only non-sensitive UI preferences are persisted. Never store questions, answers or tokens.
-export type SettingKey = "hc.apiBase" | "hc.mode" | "hc.theme";
+export type SettingKey = "hc.apiBase" | "hc.mode" | "hc.theme" | "hc.stream";
 
 function read(key: SettingKey): string | null {
   try {

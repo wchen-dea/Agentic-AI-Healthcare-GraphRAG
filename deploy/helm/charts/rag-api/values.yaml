@@ -4,6 +4,20 @@ image:
   repository: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-rag-api
   tag: latest
   pullPolicy: IfNotPresent
+# The image runs as the non-root `app` user (uid/gid 10001); see ADR-0011.
+# readOnlyRootFilesystem stays off: the Hugging Face model cache (HF_HOME) and
+# the audit log (/var/log/rag-api) are written inside the container.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
 service:
   type: ClusterIP
   port: 8000
@@ -32,7 +46,7 @@ config:
   OLLAMA_URL: "http://ollama:11434"
   OLLAMA_MODEL: "llama3.1"
   MCP_SERVER_NAME: "HealthcareGraphRAG MCP"
-  RAG_API_LANGGRAPH_ENABLED: "false"
+  RAG_API_LANGGRAPH_ENABLED: "true"
   LANGGRAPH_MAX_ITERATIONS: "3"
   MLFLOW_TRACKING_URI: "http://mlflow:5000"
   MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"

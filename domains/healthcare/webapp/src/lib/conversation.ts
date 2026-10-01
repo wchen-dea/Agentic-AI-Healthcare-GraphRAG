@@ -1,5 +1,5 @@
 // Pure state for the multi-turn conversation. No I/O here.
-import type { ApiMode, QueryResponse } from "../api/types";
+import type { AgentProgressStep, ApiMode, QueryResponse } from "../api/types";
 
 export type TurnStatus = "pending" | "success" | "error" | "cancelled" | "timeout";
 
@@ -22,6 +22,8 @@ export interface Turn {
   finishedAt?: number;
   response?: QueryResponse;
   error?: string;
+  /** Live LangGraph node progress received while streaming (RAG only). */
+  steps?: AgentProgressStep[];
 }
 
 export interface ConversationState {
@@ -31,6 +33,7 @@ export interface ConversationState {
 
 export type ConversationAction =
   | { type: "start"; id: string; request: TurnRequest; at: number }
+  | { type: "progress"; id: string; step: AgentProgressStep }
   | { type: "succeed"; id: string; response: QueryResponse; at: number }
   | { type: "fail"; id: string; status: Exclude<TurnStatus, "pending" | "success">; error: string; at: number }
   | { type: "remove"; id: string }
@@ -58,6 +61,8 @@ export function conversationReducer(state: ConversationState, action: Conversati
         ...state,
         turns: [...state.turns, { id: action.id, request: action.request, status: "pending", startedAt: action.at }],
       };
+    case "progress":
+      return update(state, action.id, (t) => ({ ...t, steps: [...(t.steps ?? []), action.step] }));
     case "succeed":
       return update(state, action.id, (t) => ({ ...t, status: "success", response: action.response, finishedAt: action.at }));
     case "fail":
