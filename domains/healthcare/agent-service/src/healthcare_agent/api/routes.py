@@ -8,6 +8,7 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 from agent_core.audit import utc_timestamp
+from agent_core.governance import ToolGovernance, scope_for
 from agent_core.policy import AuthorizationError
 from agent_core.streaming import SSE_HEADERS, format_sse
 from fastapi import APIRouter, Header, HTTPException
@@ -15,7 +16,6 @@ from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from healthcare_agent.agents.registry import AGENT_REGISTRY
-from healthcare_agent.api.governance import ToolGovernance, patient_scope
 from healthcare_agent.api.responses import ResponseShaper
 from healthcare_agent.api.schemas import QueryRequest, SkillsPlanRequest
 from healthcare_agent.config.settings import HealthcareAgentSettings
@@ -82,7 +82,7 @@ def build_router(
                 tool_name="skills_plan_get",
                 caller_role=governance.resolve_caller_role(x_caller_role),
                 request_payload=req.model_dump(exclude_none=True),
-                patient_scope="none",
+                scope="none",
                 fn=lambda trace_id: responses.budget(
                     {
                         **build_skill_plan(
@@ -118,7 +118,7 @@ def build_router(
                 tool_name="query",
                 caller_role=caller_role,
                 request_payload=req.model_dump(exclude_none=True),
-                patient_scope=patient_scope(req.patient_id),
+                scope=scope_for(req.patient_id),
                 fn=lambda trace_id: responses.query_response(
                     queries.run_query(
                         req.question, req.patient_id, structured=req.structured, session_id=req.session_id
@@ -143,7 +143,7 @@ def build_router(
         tool_name = "query"
         request_payload = req.model_dump(exclude_none=True)
         caller_role = governance.resolve_caller_role(x_caller_role)
-        scope = patient_scope(req.patient_id)
+        scope = scope_for(req.patient_id)
         started_at = time.time()
         trace_id = str(uuid.uuid4())
         try:
@@ -151,7 +151,7 @@ def build_router(
                 tool_name=tool_name,
                 caller_role=caller_role,
                 request_payload=request_payload,
-                patient_scope=scope,
+                scope=scope,
                 started_at=started_at,
                 trace_id=trace_id,
             )
@@ -195,7 +195,7 @@ def build_router(
                     tool_name=tool_name,
                     caller_id=caller_id,
                     request_payload=request_payload,
-                    patient_scope=scope,
+                    scope=scope,
                     outcome=outcome,
                     started_at=started_at,
                     response_size_bytes=response_size,

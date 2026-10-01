@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_core.settings import AgentServiceSettings, env_alias
+from agent_core.settings import AgentServiceSettings, env_name
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
@@ -44,7 +44,7 @@ class HealthcareAgentSettings(AgentServiceSettings):
 
     # Tool surface
     mcp_server_name: str = Field(default="HealthcareGraphRAG MCP", validation_alias="MCP_SERVER_NAME")
-    skills_layer_path: Path | None = Field(default=None, validation_alias=env_alias("SKILLS_LAYER_PATH"))
+    skills_layer_path: Path | None = Field(default=None, validation_alias=env_name("SKILLS_LAYER_PATH"))
 
     # Observability
     mlflow_tracking_uri: str = Field(default="", validation_alias="MLFLOW_TRACKING_URI")

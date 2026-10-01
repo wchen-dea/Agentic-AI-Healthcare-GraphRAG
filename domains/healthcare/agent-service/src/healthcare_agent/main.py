@@ -14,13 +14,14 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Any
 
+from agent_core.governance import ToolGovernance
+from agent_core.metrics import ServiceMetrics
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server.fastmcp import FastMCP
 from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
 
-from healthcare_agent.api.governance import ToolGovernance
 from healthcare_agent.api.responses import ResponseShaper
 from healthcare_agent.api.routes import build_router
 from healthcare_agent.api.schemas import RequestLimits, configure_request_limits
@@ -28,7 +29,6 @@ from healthcare_agent.config.settings import load_settings
 from healthcare_agent.generation.factory import build_llm_provider, llm_model_info
 from healthcare_agent.generation.structured_output import build_structured_prompt, parse_structured_response
 from healthcare_agent.generation.synthesis import compact_graph_context, compact_vector_context, synthesize_answer
-from healthcare_agent.observability.metrics import ServiceMetrics
 from healthcare_agent.orchestration.query_service import QueryService
 from healthcare_agent.orchestration.runtime import AgentRuntime, configure_runtime
 from healthcare_agent.retrieval.search import graph_search, vector_search
@@ -119,7 +119,8 @@ def load_skills(path: str) -> dict[str, Any]:
     return load_skills_layer(path)
 
 
-governance = ToolGovernance(settings, metrics)
+# Healthcare audit events keep the `patient_scope` key (audit schema contract).
+governance = ToolGovernance(settings, metrics, audit_scope_key="patient_scope")
 responses = ResponseShaper(settings)
 queries = QueryService(max_context_items=settings.max_context_items)
 mcp_tools = HealthcareMcpTools(
@@ -164,9 +165,7 @@ async def instrument_http_requests(request: Request, call_next):
         return response
     finally:
         if request.url.path != "/metrics":
-            metrics.http_request_duration_seconds.labels(
-                method=request.method, path=request.url.path, status=str(status_code)
-            ).observe(time.perf_counter() - started)
+            metrics.observe_http(request.method, request.url.path, status_code, time.perf_counter() - started)
 
 
 app.include_router(

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
 
 import pytest
-from agent_core import settings as settings_module
 from agent_core.audit import AuditEvent, JsonlAuditSink, hash_payload
+from agent_core.governance import ToolGovernance, scope_for
 from agent_core.guardrails import check_length, detect_prompt_injection
 from agent_core.policy import AuthorizationError, ToolPolicy
 from agent_core.ports import GraphStore, NoopTracer, VectorStore
@@ -21,7 +20,7 @@ def _event(**overrides) -> AuditEvent:
         tool_name="query",
         caller_id="role:generation",
         input_hash=hash_payload({"question": "q"}),
-        patient_scope=["p-1"],
+        scope=["p-1"],
         outcome="success",
         latency_ms=5,
         response_size_bytes=10,
@@ -62,6 +61,14 @@ class TestAudit:
         assert "error" not in lines[0]
         assert lines[1]["error"] == "unauthorized"
         assert "question" not in lines[0]
+        assert lines[0]["scope"] == ["p-1"]
+
+    def test_sink_scope_key_preserves_domain_schema(self, tmp_path: Path) -> None:
+        path = tmp_path / "audit.log"
+        JsonlAuditSink(path, scope_key="patient_scope").write(_event())
+        event = json.loads(path.read_text(encoding="utf-8"))
+        assert list(event)[:5] == ["trace_id", "tool_name", "caller_id", "input_hash", "patient_scope"]
+        assert "scope" not in event
 
     def test_write_failure_is_reported_not_raised(self, tmp_path: Path) -> None:
         blocker = tmp_path / "file"
@@ -72,6 +79,66 @@ class TestAudit:
         assert sink.write(_event()) is False
         assert len(failures) == 1
         assert failures[0][0].trace_id == "t-1"
+
+
+class _RecordingMetrics:
+    def __init__(self) -> None:
+        self.tools: list[tuple[str, str]] = []
+        self.audit_failures: list[str] = []
+
+    def observe_tool(self, tool_name: str, outcome: str, elapsed_seconds: float) -> None:
+        self.tools.append((tool_name, outcome))
+
+    def record_audit_failure(self, tool_name: str) -> None:
+        self.audit_failures.append(tool_name)
+
+
+class TestGovernance:
+    def _governance(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **env: str):
+        policy = tmp_path / "policy.json"
+        policy.write_text(json.dumps({"roles": {"generation": ["query"]}}), encoding="utf-8")
+        monkeypatch.setenv("AGENT_TOOL_POLICY_PATH", str(policy))
+        monkeypatch.setenv("AGENT_AUDIT_LOG_PATH", str(tmp_path / "audit.log"))
+        for key, value in env.items():
+            monkeypatch.setenv(key, value)
+        metrics = _RecordingMetrics()
+        return ToolGovernance(AgentServiceSettings(), metrics, audit_scope_key="entity_scope"), metrics
+
+    def _events(self, tmp_path: Path) -> list[dict]:
+        return [json.loads(line) for line in (tmp_path / "audit.log").read_text(encoding="utf-8").splitlines()]
+
+    def test_execute_success_audits_and_measures(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        governance, metrics = self._governance(tmp_path, monkeypatch)
+        result = governance.execute(
+            tool_name="query",
+            caller_role="generation",
+            request_payload={"q": 1},
+            scope=scope_for("s-1"),
+            fn=lambda trace_id: {"trace_id": trace_id},
+        )
+        (event,) = self._events(tmp_path)
+        assert event["outcome"] == "success" and event["trace_id"] == result["trace_id"]
+        assert event["entity_scope"] == ["s-1"]
+        assert metrics.tools == [("query", "success")]
+
+    def test_denial_is_audited_and_raised(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        governance, metrics = self._governance(tmp_path, monkeypatch)
+        with pytest.raises(AuthorizationError):
+            governance.execute(
+                tool_name="query", caller_role="intruder", request_payload={}, scope="cohort", fn=lambda t: {}
+            )
+        (event,) = self._events(tmp_path)
+        assert event["outcome"] == "denied" and event["caller_id"] == "role:intruder"
+        assert metrics.tools == []  # denials are audited, not timed
+
+    def test_role_header_honored_only_when_allowed(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        governance, _ = self._governance(tmp_path, monkeypatch, AGENT_ALLOW_ROLE_HEADER="false")
+        assert governance.resolve_caller_role("admin") == "generation"
+
+    def test_scope_for(self) -> None:
+        assert scope_for("p") == ["p"]
+        assert scope_for(None) == "cohort"
+        assert scope_for("", collective="portfolio") == "portfolio"
 
 
 class TestGuardrails:
@@ -97,7 +164,6 @@ class TestSettings:
         monkeypatch.chdir(tmp_path)
         for name in ("LLM_MODEL", "OLLAMA_MODEL", "AGENT_ALLOW_ORIGINS", "AGENT_AUDIT_LOG_PATH"):
             monkeypatch.delenv(name, raising=False)
-            monkeypatch.delenv(name.replace("AGENT_", "RAG_API_"), raising=False)
         settings = AgentServiceSettings()
         assert settings.llm_model == "llama3.1"
         assert settings.allowed_origins == ["*"]
@@ -115,21 +181,10 @@ class TestSettings:
         assert settings.allow_role_header is False
         assert settings.audit_log_path == Path("/var/log/audit.log")
 
-    def test_legacy_env_names_still_read_and_warn(
-        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_removed_rag_api_names_are_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("AGENT_MAX_CONTEXT_ITEMS", raising=False)
-        monkeypatch.setenv("RAG_API_MAX_CONTEXT_ITEMS", "7")
-        monkeypatch.setattr(settings_module, "_warned_legacy_names", set())
-        with caplog.at_level(logging.WARNING, logger="agent_core.settings"):
-            settings = AgentServiceSettings()
-        assert settings.max_context_items == 7
-        assert "RAG_API_MAX_CONTEXT_ITEMS" in caplog.text
-
-    def test_new_env_name_wins_over_legacy(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AGENT_MAX_CONTEXT_ITEMS", "3")
         monkeypatch.setenv("RAG_API_MAX_CONTEXT_ITEMS", "9")
-        assert AgentServiceSettings().max_context_items == 3
+        assert AgentServiceSettings().max_context_items == 5
 
 
 class TestPorts:

@@ -10,9 +10,9 @@ from collections.abc import Callable
 from typing import Any
 
 from agent_core.audit import utc_timestamp
+from agent_core.governance import ToolGovernance, scope_for
 from mcp.server.fastmcp import FastMCP
 
-from healthcare_agent.api.governance import ToolGovernance, patient_scope
 from healthcare_agent.api.responses import ResponseShaper
 from healthcare_agent.api.schemas import (
     CodingGapDetectRequest,
@@ -109,7 +109,7 @@ class HealthcareMcpTools:
             tool_name="patient_context_get",
             caller_role="read_only",
             request_payload=req.model_dump(),
-            patient_scope=[req.patient_id],
+            scope=[req.patient_id],
             fn=_handler,
         )
 
@@ -124,7 +124,7 @@ class HealthcareMcpTools:
             tool_name="vector_evidence_search",
             caller_role="read_only",
             request_payload=req.model_dump(exclude_none=True),
-            patient_scope=patient_scope(req.patient_id),
+            scope=scope_for(req.patient_id),
             fn=lambda trace_id: apply_response_budget(
                 {
                     "question": req.question,
@@ -161,7 +161,7 @@ class HealthcareMcpTools:
             tool_name="graphrag_answer_generate",
             caller_role="generation",
             request_payload=req.model_dump(exclude_none=True),
-            patient_scope=patient_scope(req.patient_id),
+            scope=scope_for(req.patient_id),
             fn=lambda trace_id: self._responses.query_response(
                 self._queries.run_query(style_prefix[req.response_style] + req.question, req.patient_id),
                 trace_id,
@@ -205,7 +205,7 @@ class HealthcareMcpTools:
             tool_name="risk_summary_generate",
             caller_role="generation",
             request_payload=req.model_dump(),
-            patient_scope=[req.patient_id],
+            scope=[req.patient_id],
             fn=_handler,
         )
 
@@ -251,7 +251,7 @@ class HealthcareMcpTools:
             tool_name="evidence_bundle_export",
             caller_role="export",
             request_payload=req.model_dump(exclude_none=True),
-            patient_scope=patient_scope(req.patient_id),
+            scope=scope_for(req.patient_id),
             fn=_handler,
         )
 
@@ -295,7 +295,7 @@ class HealthcareMcpTools:
             tool_name="timeline_explain",
             caller_role="generation",
             request_payload=req.model_dump(),
-            patient_scope=[req.patient_id],
+            scope=[req.patient_id],
             fn=_handler,
         )
 
@@ -333,7 +333,7 @@ class HealthcareMcpTools:
             tool_name="medication_risk_assess",
             caller_role="generation",
             request_payload=req.model_dump(),
-            patient_scope=[req.patient_id],
+            scope=[req.patient_id],
             fn=_handler,
         )
 
@@ -372,7 +372,7 @@ class HealthcareMcpTools:
             tool_name="coding_gap_detect",
             caller_role="generation",
             request_payload=req.model_dump(),
-            patient_scope=[req.patient_id],
+            scope=[req.patient_id],
             fn=_handler,
         )
 
@@ -412,7 +412,7 @@ class HealthcareMcpTools:
             tool_name="cohort_risk_summary",
             caller_role="generation",
             request_payload=req.model_dump(),
-            patient_scope="cohort",
+            scope="cohort",
             fn=_handler,
         )
 
@@ -440,7 +440,7 @@ class HealthcareMcpTools:
             tool_name="skills_plan_get",
             caller_role="read_only",
             request_payload=req.model_dump(exclude_none=True),
-            patient_scope="none",
+            scope="none",
             fn=_handler,
         )
 

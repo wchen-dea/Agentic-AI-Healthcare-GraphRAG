@@ -1,7 +1,8 @@
 """Governed tool execution: authorize, run, audit, and measure every call.
 
 Authorization is deterministic and runs before the tool body. Every outcome,
-including denials and client cancellations, produces one audit event.
+including denials and failures, produces one audit event. Transports (HTTP
+routes, MCP tools) call ``ToolGovernance``; they never call tools directly.
 """
 from __future__ import annotations
 
@@ -11,21 +12,26 @@ import time
 import uuid
 from collections.abc import Callable
 from functools import lru_cache
-from typing import Any
+from typing import Any, Protocol
 
 from agent_core.audit import AuditEvent, JsonlAuditSink, hash_payload
 from agent_core.policy import AuthorizationError, ToolPolicy
+from agent_core.settings import AgentServiceSettings
 
-from healthcare_agent.config.settings import HealthcareAgentSettings
-from healthcare_agent.observability.metrics import ServiceMetrics
+logger = logging.getLogger(__name__)
 
-logger = logging.getLogger("healthcare_agent")
-
-PatientScope = list[str] | str
+Scope = list[str] | str
 
 
-def patient_scope(patient_id: str | None) -> PatientScope:
-    return [patient_id] if patient_id else "cohort"
+class GovernanceMetrics(Protocol):
+    def observe_tool(self, tool_name: str, outcome: str, elapsed_seconds: float) -> None: ...
+
+    def record_audit_failure(self, tool_name: str) -> None: ...
+
+
+def scope_for(subject_id: str | None, *, collective: str = "cohort") -> Scope:
+    """Scope of one subject, or ``collective`` when the call spans many."""
+    return [subject_id] if subject_id else collective
 
 
 @lru_cache(maxsize=4)
@@ -34,14 +40,22 @@ def load_policy(path: str) -> ToolPolicy:
 
 
 class ToolGovernance:
-    def __init__(self, settings: HealthcareAgentSettings, metrics: ServiceMetrics) -> None:
+    def __init__(
+        self,
+        settings: AgentServiceSettings,
+        metrics: GovernanceMetrics,
+        *,
+        audit_scope_key: str = "scope",
+    ) -> None:
         self._settings = settings
         self._metrics = metrics
-        self._sink = JsonlAuditSink(settings.audit_log_path, on_failure=self._on_audit_failure)
+        self._sink = JsonlAuditSink(
+            settings.audit_log_path, on_failure=self._on_audit_failure, scope_key=audit_scope_key
+        )
 
     def _on_audit_failure(self, event: AuditEvent, exc: Exception) -> None:
         # Requests continue, but a lost audit event must be visible to operators.
-        self._metrics.audit_write_failures_total.labels(tool=event.tool_name).inc()
+        self._metrics.record_audit_failure(event.tool_name)
         logger.error("audit write failed trace_id=%s tool=%s: %s", event.trace_id, event.tool_name, exc)
 
     def resolve_caller_role(self, header_value: str | None) -> str:
@@ -61,7 +75,7 @@ class ToolGovernance:
         tool_name: str,
         caller_id: str,
         request_payload: dict[str, Any],
-        patient_scope: PatientScope,
+        scope: Scope,
         outcome: str,
         started_at: float,
         response_size_bytes: int,
@@ -74,7 +88,7 @@ class ToolGovernance:
                 tool_name=tool_name,
                 caller_id=caller_id,
                 input_hash=hash_payload(request_payload),
-                patient_scope=patient_scope,
+                scope=scope,
                 outcome=outcome,
                 latency_ms=int((time.time() - started_at) * 1000),
                 response_size_bytes=response_size_bytes,
@@ -88,7 +102,7 @@ class ToolGovernance:
         tool_name: str,
         caller_role: str,
         request_payload: dict[str, Any],
-        patient_scope: PatientScope,
+        scope: Scope,
         started_at: float,
         trace_id: str,
     ) -> str:
@@ -100,7 +114,7 @@ class ToolGovernance:
                 tool_name=tool_name,
                 caller_id=f"role:{caller_role}",
                 request_payload=request_payload,
-                patient_scope=patient_scope,
+                scope=scope,
                 outcome="denied",
                 started_at=started_at,
                 response_size_bytes=0,
@@ -118,7 +132,7 @@ class ToolGovernance:
         tool_name: str,
         caller_role: str,
         request_payload: dict[str, Any],
-        patient_scope: PatientScope,
+        scope: Scope,
         fn: Callable[[str], dict[str, Any]],
     ) -> dict[str, Any]:
         """Run ``fn(trace_id)`` under policy, audit, and metrics."""
@@ -129,7 +143,7 @@ class ToolGovernance:
             tool_name=tool_name,
             caller_role=caller_role,
             request_payload=request_payload,
-            patient_scope=patient_scope,
+            scope=scope,
             started_at=started_at,
             trace_id=trace_id,
         )
@@ -140,7 +154,7 @@ class ToolGovernance:
                 tool_name=tool_name,
                 caller_id=caller_id,
                 request_payload=request_payload,
-                patient_scope=patient_scope,
+                scope=scope,
                 outcome=outcome,
                 started_at=started_at,
                 response_size_bytes=len(json.dumps(response, separators=(",", ":")).encode("utf-8")),
@@ -152,7 +166,7 @@ class ToolGovernance:
                 tool_name=tool_name,
                 caller_id=caller_id,
                 request_payload=request_payload,
-                patient_scope=patient_scope,
+                scope=scope,
                 outcome=outcome,
                 started_at=started_at,
                 response_size_bytes=0,
@@ -162,3 +176,13 @@ class ToolGovernance:
             raise
         finally:
             self.observe(tool_name, outcome, started_at)
+
+
+__all__ = [
+    "AuthorizationError",
+    "GovernanceMetrics",
+    "Scope",
+    "ToolGovernance",
+    "load_policy",
+    "scope_for",
+]

@@ -1,1 +1,1 @@
-"""Observability: Prometheus metrics and MLflow tracing."""
+"""Observability: MLflow tracing (Prometheus metrics live in agent_core.metrics)."""
