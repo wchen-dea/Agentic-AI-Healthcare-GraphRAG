@@ -323,7 +323,6 @@ All services are defined in `infra/compose/docker-compose.infra.yml` and `infra/
 | `healthcare-qdrant` | qdrant/qdrant | latest | 6333 (HTTP), 6334 (gRPC) | Vector store |
 | `healthcare-neo4j` | neo4j | 5.26.2 | 7474 (HTTP), 7687 (Bolt) | Graph database |
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
-| `healthcare-neodash` | neo4jlabs/neodash | latest | 5005 | Neo4j dashboard UI |
 | `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
 | `infra-flink-jobmanager` | custom (infra/images/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
 | `infra-flink-taskmanager` | custom (infra/images/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
@@ -791,7 +790,6 @@ Cross-provider routing uses `provider:model` syntax (e.g. `openai:gpt-4.1`). The
 | Blackbox Exporter | `http://localhost:9115` | HTTP probe results |
 | Conduktor Console | `http://localhost:8085` | Kafka topic browser (admin@healthcare.local / Admin@123!) |
 | Neo4j Browser | `http://localhost:7474` | Cypher query UI (neo4j / healthcare123) |
-| NeoDash | `http://localhost:5005` | Pre-built graph dashboards |
 | Agent API metrics | `http://localhost:8000/metrics` | Prometheus text format |
 
 ### Key Prometheus metrics

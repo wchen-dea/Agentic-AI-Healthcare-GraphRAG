@@ -58,25 +58,6 @@ services:
       - ../../domains/healthcare/knowledge/graph-seeds/generated_ontology_seeds.cypher:/generated_ontology_seeds.cypher
       - ../../domains/healthcare/knowledge/graph-seeds/bootstrap.sh:/bootstrap.sh
 
-  neodash:
-    image: neo4jlabs/neodash:latest
-    container_name: healthcare-neodash
-    platform: linux/amd64
-    depends_on:
-      - neo4j
-    ports:
-      - "5005:5005"
-    environment:
-      standalone: "true"
-      standaloneProtocol: neo4j
-      standaloneHost: localhost
-      standalonePort: "7687"
-      standaloneDatabase: neo4j
-      standaloneUsername: ${NEO4J_USER:-neo4j}
-      standalonePassword: ${NEO4J_PASSWORD:-healthcare123}
-      standalonePasswordWarningHidden: "true"
-      customHeader: Healthcare Neo4j GUI
-
   flink-jobmanager:
     build:
       context: ../..

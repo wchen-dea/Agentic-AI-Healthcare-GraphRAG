@@ -162,25 +162,6 @@ services:
     command: >
       bash -c "sleep 35 && flink run -m sc-flink-jobmanager:8081 -d -Dpython.client.executable=/usr/bin/python3 -Dpython.executable=/usr/bin/python3 -py /app/supplychain_graph_rag_pyflink_job.py && tail -f /dev/null"
 
-  sc-neodash:
-    image: neo4jlabs/neodash:latest
-    container_name: supplychain-neodash
-    platform: linux/amd64
-    depends_on:
-      - neo4j-sc
-    ports:
-      - "5006:5005"
-    environment:
-      standalone: "true"
-      standaloneProtocol: neo4j
-      standaloneHost: localhost
-      standalonePort: "7688"
-      standaloneDatabase: neo4j
-      standaloneUsername: neo4j
-      standalonePassword: supplychain123
-      standalonePasswordWarningHidden: "true"
-      customHeader: Supply Chain Neo4j GUI
-
 volumes:
   neo4j_sc_data:
   qdrant_sc_data:

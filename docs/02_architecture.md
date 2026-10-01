@@ -250,7 +250,7 @@ Domain AI Agents (domains/)
 
 Operational Plane
   Flink UI, Conduktor, Prometheus, Grafana, MLflow UI
-  Neo4j Browser + NeoDash, Provider Web UI
+  Neo4j Browser, Provider Web UI
 ```
 
 ## Overall Architecture Diagram
