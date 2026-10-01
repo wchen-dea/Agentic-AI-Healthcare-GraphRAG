@@ -16,5 +16,5 @@ Source skill id: disruption_impact_assessment
 
 - Context requirements: question
 - Ontology dependencies: entities, risk_signals
-- MCP tools: disruption_impact_analyze, vector_evidence_search
+- MCP tools: disruption_impact_assess, vector_evidence_search
 - Runtime tools: neo4j, qdrant

@@ -16,5 +16,5 @@ Source skill id: quality_supplier_scorecard
 
 - Context requirements: entity_id
 - Ontology dependencies: entities
-- MCP tools: supplier_context_get, quality_trend_summarize
+- MCP tools: supplier_context_get, graphrag_answer_generate
 - Runtime tools: neo4j

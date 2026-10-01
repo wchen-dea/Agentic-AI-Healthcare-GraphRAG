@@ -17,5 +17,5 @@ Source skill id: inventory_exposure_check
 
 - Context requirements: question
 - Ontology dependencies: entities
-- MCP tools: inventory_status_get, vector_evidence_search
+- MCP tools: inventory_reorder_check, vector_evidence_search
 - Runtime tools: neo4j, qdrant

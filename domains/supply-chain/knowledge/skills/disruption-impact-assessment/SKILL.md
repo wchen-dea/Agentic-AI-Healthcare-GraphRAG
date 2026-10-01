@@ -28,7 +28,7 @@ Use when handling workflows related to: disruption_impact_analysis.
 
 ## MCP Tools
 
-- disruption_impact_analyze
+- disruption_impact_assess
 - vector_evidence_search
 
 ## Runtime Tools

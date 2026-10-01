@@ -28,7 +28,7 @@ Use when handling workflows related to: quality_trend_review.
 ## MCP Tools
 
 - supplier_context_get
-- quality_trend_summarize
+- graphrag_answer_generate
 
 ## Runtime Tools
 

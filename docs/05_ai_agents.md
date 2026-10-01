@@ -500,7 +500,7 @@ This makes prerequisites explicit before tool execution.
 The resolver emits:
 
 - mcp_tools: MCP tools expected to be called
-- runtime_tools: underlying system tools/services (neo4j, qdrant, rag_api, ollama)
+- runtime_tools: underlying system tools/services (neo4j, qdrant, agent_service, ollama)
 
 ## API Contract
 
@@ -657,7 +657,7 @@ Nine LangGraph nodes share typed state (three retrieval agents, three specialist
 | `MLFLOW_TRACKING_URI` | (none) | Enable MLflow tracing (for example `http://mlflow:5000`) |
 | `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | MLflow experiment name |
 
-Operational names were aligned in ADR-0012 Phase 3b: the environment prefix is `AGENT_*` (legacy `RAG_API_*` names are still read and log a deprecation warning), Prometheus collectors are `agent_service_*`, the Helm chart and Kubernetes service are `agent-service`, the Compose service is `agent-service` (container `healthcare-agent-service`), and the CI workflow is `agent-service-contracts.yml`.
+Operational names were aligned in ADR-0012 Phase 3b: the environment prefix is `AGENT_*` (legacy `RAG_API_*` names were removed in Phase 4 and are ignored), Prometheus collectors are `agent_service_*`, the Helm chart and Kubernetes service are `agent-service`, the Compose service is `agent-service` (container `healthcare-agent-service`), and the CI workflow is `agent-service-contracts.yml`.
 
 ## Test Notes
 

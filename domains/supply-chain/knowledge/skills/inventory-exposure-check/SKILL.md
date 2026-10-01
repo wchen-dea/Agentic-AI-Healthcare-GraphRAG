@@ -27,7 +27,7 @@ Use when handling workflows related to: disruption_impact_analysis, inventory_re
 
 ## MCP Tools
 
-- inventory_status_get
+- inventory_reorder_check
 - vector_evidence_search
 
 ## Runtime Tools

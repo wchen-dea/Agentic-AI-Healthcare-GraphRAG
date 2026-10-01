@@ -404,7 +404,7 @@ Launched via `docker compose -f infra/compose/docker-compose.infra.yml -f infra/
 | Component | Python version | Base image |
 |-----------|---------------|-----------|
 | agent-service (healthcare) | 3.11 | python:3.11-slim |
-| rag-api (supply-chain) | 3.11 | python:3.11-slim |
+| agent-service (supply-chain) | 3.11 | python:3.11-slim |
 | flink-app (healthcare) | 3.11 (via Flink image) | custom Flink Dockerfile |
 | flink-processor (supply-chain) | 3.11 | python:3.11-slim |
 | producer (both domains) | 3.11 | python:3.11-slim |

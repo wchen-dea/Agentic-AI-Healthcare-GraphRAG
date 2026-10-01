@@ -56,21 +56,21 @@
       "description": "Trace disruption events through facility and BOM dependency chains to identify affected parts and assemblies.",
       "context_requirements": ["question"],
       "ontology_dependencies": ["entities", "risk_signals"],
-      "mcp_tools": ["disruption_impact_analyze", "vector_evidence_search"],
+      "mcp_tools": ["disruption_impact_assess", "vector_evidence_search"],
       "runtime_tools": ["neo4j", "qdrant"]
     },
     "quality_supplier_scorecard": {
       "description": "Aggregate quality inspection results by supplier with defect rate trends and corrective action history.",
       "context_requirements": ["entity_id"],
       "ontology_dependencies": ["entities"],
-      "mcp_tools": ["supplier_context_get", "quality_trend_summarize"],
+      "mcp_tools": ["supplier_context_get", "graphrag_answer_generate"],
       "runtime_tools": ["neo4j"]
     },
     "inventory_exposure_check": {
       "description": "Identify parts below reorder points, low days-of-supply, and at-risk facility-part positions.",
       "context_requirements": ["question"],
       "ontology_dependencies": ["entities"],
-      "mcp_tools": ["inventory_status_get", "vector_evidence_search"],
+      "mcp_tools": ["inventory_reorder_check", "vector_evidence_search"],
       "runtime_tools": ["neo4j", "qdrant"]
     },
     "grounded_answer": {

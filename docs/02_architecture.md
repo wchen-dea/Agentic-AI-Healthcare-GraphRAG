@@ -291,10 +291,10 @@ flowchart LR
       HMODES[LangGraph StateGraph]
       HAPI --> HDOM --> HMODES
     end
-    subgraph SCA[supply-chain/rag-api]
+    subgraph SCA[supply-chain/agent-service]
       SAPI[FastAPI + embedded FastMCP]
-      SDOM[domain/ - planner, retrieval, policy]
-      SMODES[Single-pass / ReAct / LangGraph]
+      SDOM[supply_chain_agent modules - planner, retrieval, safety]
+      SMODES[LangGraph StateGraph]
       SAPI --> SDOM --> SMODES
     end
   end

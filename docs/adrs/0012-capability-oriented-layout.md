@@ -1,6 +1,6 @@
 # ADR-0012: Capability-Oriented Layout and Shared Agent Core
 
-- Status: accepted (Phases 1–3b implemented; Phase 4 planned)
+- Status: accepted (Phases 1–4 implemented)
 - Date: 2026-10-01
 - Deciders: platform team
 - Supersedes: none
@@ -73,7 +73,7 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
    | 2 (done) | `git mv` `rag-api` → `agent-service` and `healthcare_rag_api` → `healthcare_agent`; split `app.py`, `domain/`, and `langgraph_agents/` into the capability folders; adopt `AgentServiceSettings`; remove the legacy non-LangGraph query path |
    | 3 (done) | Move `platform/shared` → `packages/knowledge-core` and switch Flink images to the wheel; move ontology/skills under `knowledge/`; merge infra folders under `infra/` |
    | 3b (done) | Rename ops identifiers (`RAG_API_*` env prefix, `rag_api_*` metrics, Helm chart/k8s service `rag-api`, compose container, `rag-api-contracts.yml`, `rag-api.env`) with a deprecation window that accepts the old env names |
-   | 4 | Split tests into `unit`/`integration`/`evals`; make ruff blocking in CI; remove shims; apply the same layout to supply-chain |
+   | 4 (done) | Split tests into `unit`/`integration`/`evals`; make ruff blocking in CI; remove shims; apply the same layout to supply-chain |
 
    Phase 2 moved modules without re-export shims: the service is deployed only as a wheel, and no external code imports the old paths. New code must import from the target location.
 
@@ -166,11 +166,30 @@ Healthcare ops identifiers now match the `agent-service` name. Supply-chain name
   - A branch-protection rule that requires the old `rag-api-contracts` check name must be updated.
   - Old local logs stay in `rag-api/logs/`.
 
-## Follow-ups
+## Phase 4 Changes
 
-- Remove the `RAG_API_*` env aliases and the `RAG_API_URL` script fallback in Phase 4.
-- Decide whether to rename the `runtime_tools` value `"rag_api"` (requires regenerating skills and updating the webapp contract test).
-- Rename the supply-chain `rag-api` folder, package, compose services, and CI steps in Phase 4.
+Supply-chain now has the same layout and governance as healthcare, the deprecation shims are gone, and CI enforces test tiers and lint.
+
+| Area | Before | After |
+|---|---|---|
+| Supply-chain service | `domains/supply-chain/rag-api`, `supply_chain_rag_api` (`app.py`, `domain/`, `langgraph_agents/`, `react_controller.py`) | `domains/supply-chain/agent-service`, distribution `supply-chain-agent-service`, package `supply_chain_agent` with `api/`, `orchestration/`, `agents/`, `retrieval/`, `generation/`, `safety/`, `tools/`, `evaluation/`, `observability/`, `config/` and a `main.py` composition root |
+| Supply-chain query path | single-pass / ReAct / LangGraph modes | LangGraph only, through `QueryService`, with role-based `ToolPolicy`, guardrails and JSONL audit |
+| Shared governance | per-domain policy, audit and metrics wiring | `agent_core.governance.ToolGovernance` and `agent_core.metrics.ServiceMetrics` (`agent-core[metrics]`) |
+| Env names | `AGENT_*` with `RAG_API_*` aliases; `RAG_API_URL`, `SC_RAG_API_URL`, `SC_SKILLS_LAYER_PATH` | `AGENT_*` only; scripts use `AGENT_SERVICE_URL` / `SC_AGENT_SERVICE_URL` |
+| Supply-chain compose / CI | `sc-rag-api`, `supplychain-rag-api` | `sc-agent-service`, `supplychain-agent-service`; image `sc-agent-service-contracts:ci` |
+| Skills `runtime_tools` | `"rag_api"` | `"agent_service"` (skills regenerated for both domains) |
+| Tests | flat `tests/` | `tests/unit`, `tests/integration`, `tests/evals`; `make test-unit`, `test-integration`, `test-evals`; separate CI steps |
+| Lint | advisory | blocking `ruff-lint` CI job and `make lint` (E, F, I; E501 left to formatting) |
+
+- The supply-chain image now builds the `agent-core` wheel alongside the service wheel.
+- The supply-chain skills layer referenced three MCP tools that did not exist (`disruption_impact_analyze`, `quality_trend_summarize`, `inventory_status_get`). They now point at implemented tools, and `tests/unit/test_tool_catalog.py` in each domain fails on future drift between skills, tool policy and MCP tools.
+- Breaking changes:
+  - `RAG_API_*`, `SC_RAG_API_URL` and `SC_SKILLS_LAYER_PATH` are ignored. Rename them in env files and secrets before deploying.
+  - Supply-chain `/query` returns 401 for roles without the `query` grant, 422 for unknown request fields, and new LangGraph output keys (`retrieval_plan`, `guardrails`, `langgraph`, `trace_id`).
+  - CI step and job names changed; update branch-protection rules that require them.
+- Not renamed: the supply-chain webapp `localStorage` keys `rag_api_base` / `rag_api_mode`, to keep users' saved settings.
+
+## Follow-ups
 
 - Replace the dev-only role header with verified caller identity (OIDC/JWT claims mapped to roles) behind `ToolPolicy`.
 - Adapt `observability/tracing.py` to the `Tracer` port and the Qdrant/Neo4j clients to `VectorStore`/`GraphStore` (`retrieval/qdrant.py`, `retrieval/neo4j.py`).
