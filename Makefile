@@ -16,7 +16,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
         validate-skills generate-skills validate-ontology \
-        sync test-core test-hc test-sc build-wheels web-hc-dev web-hc-test web-hc-build pull-model fresh \
+        sync test-core test-hc test-sc test-unit test-integration test-evals build-wheels web-hc-dev web-hc-test web-hc-build pull-model fresh \
         helm-dev helm-dev-down helm-ports helm-ports-stop helm-prd helm-lint
 
 help: ## Show this help
@@ -142,6 +142,15 @@ test-hc: ## Healthcare agent-service tests (uv workspace)
 	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short
 test-sc: ## Supply-chain agent-service tests (uv workspace)
 	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short
+test-unit: ## Fast, isolated unit tests across agent-core and both domains
+	cd packages/agent-core && uv run --package agent-core pytest --tb=short tests/unit
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/unit
+	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/unit
+test-integration: ## HTTP/MCP contract, tracing and ontology integration tests (no live services)
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/integration
+	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/integration
+test-evals: ## Offline evaluation suites (planner fixtures, evaluation gates)
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/evals
 
 build-wheels: ## Build agent service wheels (+ agent-core, knowledge-core) into dist/
 	uv build --wheel --package agent-core --out-dir dist

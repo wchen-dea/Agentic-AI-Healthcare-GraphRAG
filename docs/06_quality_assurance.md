@@ -27,9 +27,9 @@ Question
 
 ## 1. Contract Tests (CI-Automated)
 
-**File:** `domains/healthcare/agent-service/tests/test_contracts.py`
+**File:** `domains/healthcare/agent-service/tests/integration/test_contracts.py`
 
-**Runner:** `python domains/healthcare/agent-service/tests/test_contracts.py` (stdlib `unittest`, no pytest)
+**Runner:** `python domains/healthcare/agent-service/tests/integration/test_contracts.py` (stdlib `unittest`, no pytest)
 
 **CI trigger:** push or PR to `dev` touching `domains/healthcare/agent-service/**` — `.github/workflows/agent-service-contracts.yml`
 
@@ -54,9 +54,9 @@ live stack is required.
 
 ### Planner evaluation suite (Stage 2)
 
-**Files:** `domains/healthcare/agent-service/tests/test_planner_evaluation.py`, `domains/healthcare/agent-service/tests/fixtures/planner_route_fixtures.json`
+**Files:** `domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py`, `domains/healthcare/agent-service/tests/evals/fixtures/planner_route_fixtures.json`
 
-**Runner:** `python domains/healthcare/agent-service/tests/test_planner_evaluation.py`
+**Runner:** `python domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py`
 
 This suite validates planner route selection and plan generation with fixture-driven assertions:
 
@@ -67,9 +67,9 @@ This suite validates planner route selection and plan generation with fixture-dr
 
 ### Planner edge-case suite (Stage 2)
 
-**File:** `domains/healthcare/agent-service/tests/test_planner_edge_cases.py`
+**File:** `domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py`
 
-**Runner:** `python domains/healthcare/agent-service/tests/test_planner_edge_cases.py`
+**Runner:** `python domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py`
 
 This suite focuses on negative and edge conditions that are easy to miss in happy-path fixtures:
 
@@ -397,11 +397,11 @@ git push → dev branch
   │
   ├── contract-tests job
   │     ├── uv sync (or python 3.11 venv fallback)
-  │     ├── uv run python domains/healthcare/agent-service/tests/test_contracts.py  ← 10 tests, ~2-4 s
-  │     ├── python domains/healthcare/agent-service/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
-  │     ├── python domains/healthcare/agent-service/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
-  │     ├── python -m pytest domains/healthcare/agent-service/tests/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
-  │     └── python -m pytest domains/healthcare/agent-service/tests/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
+  │     ├── uv run python domains/healthcare/agent-service/tests/integration/test_contracts.py  ← 10 tests, ~2-4 s
+  │     ├── python domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py  ← fixture-driven planner assertions
+  │     ├── python domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py  ← negative/edge planner assertions
+  │     ├── python -m pytest domains/healthcare/agent-service/tests/unit/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
+  │     └── python -m pytest domains/healthcare/agent-service/tests/integration/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
   │
   └── container-build job
         └── docker build -f domains/healthcare/agent-service/Dockerfile      ← validates image builds
@@ -418,7 +418,7 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 | Gap | Recommended next step |
 |-----|-----------------------|
 | Ontology and rule-pack conformance | Validate `domains/healthcare/knowledge/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
-| Graph integration tests after event injection | Add `domains/healthcare/agent-service/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
+| Graph integration tests after event injection | Add `domains/healthcare/agent-service/tests/integration/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
 | Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
 | Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |
 | Adverse event detection end-to-end | Inject known medication + symptom pair, assert `AdverseEvent` node via Cypher |

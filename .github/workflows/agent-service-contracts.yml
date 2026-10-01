@@ -105,20 +105,23 @@ jobs:
       - name: Sync locked agent service environments
         run: uv sync --frozen --package agent-core --package healthcare-agent-service --package supply-chain-agent-service
 
-      - name: Run agent-core tests (policy, audit, guardrails, SSE, settings)
-        run: uv run --frozen --package agent-core pytest -q
-        working-directory: packages/agent-core
+      - name: Unit tests (agent-core, healthcare, supply-chain)
+        run: |
+          (cd packages/agent-core && uv run --frozen --package agent-core pytest -q tests/unit)
+          (cd domains/healthcare/agent-service && uv run --frozen --package healthcare-agent-service pytest -q tests/unit)
+          (cd domains/supply-chain/agent-service && uv run --frozen --package supply-chain-agent-service pytest -q tests/unit)
 
-      - name: Run healthcare agent-service tests (contracts, planner, runtime, guardrails)
-        run: uv run --frozen --package healthcare-agent-service pytest -q
+      - name: Integration tests (HTTP/MCP contracts, tracing, ontology conformance)
+        run: |
+          (cd domains/healthcare/agent-service && uv run --frozen --package healthcare-agent-service pytest -q tests/integration)
+          (cd domains/supply-chain/agent-service && uv run --frozen --package supply-chain-agent-service pytest -q tests/integration)
+
+      - name: Evaluation suites (offline planner and quality fixtures)
+        run: uv run --frozen --package healthcare-agent-service pytest -q tests/evals
         working-directory: domains/healthcare/agent-service
 
-      - name: Run supply-chain agent-service tests
-        run: uv run --frozen --package supply-chain-agent-service pytest -q
-        working-directory: domains/supply-chain/agent-service
-
       - name: Run evaluation quality gates (offline, from fixtures)
-        run: uv run --frozen --package healthcare-agent-service python -m healthcare_agent.evaluation.gates --results-file tests/fixtures/evaluation_results.json --min-score 0.5
+        run: uv run --frozen --package healthcare-agent-service python -m healthcare_agent.evaluation.gates --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
         working-directory: domains/healthcare/agent-service
         continue-on-error: true
 

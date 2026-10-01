@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-DOMAIN_DIR = Path(__file__).resolve().parents[2]
+DOMAIN_DIR = Path(__file__).resolve().parents[3]
 ONTOLOGY_DIR = DOMAIN_DIR / "knowledge" / "ontology"
 FLINK_JOB_DIR = DOMAIN_DIR / "data-pipelines" / "flink-job"
 RELATIONSHIPS_FILE = ONTOLOGY_DIR / "relationships.yaml"
@@ -91,7 +91,7 @@ class RelationshipCardinalityTests(unittest.TestCase):
 
     def test_graph_search_query_uses_declared_relationships(self):
         """Retrieval Cypher should only traverse ontology-declared relationships."""
-        retrieval_file = Path(__file__).resolve().parents[1] / "src" / "healthcare_agent" / "retrieval" / "search.py"
+        retrieval_file = Path(__file__).resolve().parents[2] / "src" / "healthcare_agent" / "retrieval" / "search.py"
         retrieval_source = retrieval_file.read_text()
         used_rels = set(re.findall(r"\[:([A-Z_]{3,})\]", retrieval_source))
         used_rels |= set(re.findall(r"-\[:([A-Z_]{3,})\]-", retrieval_source))

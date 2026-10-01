@@ -545,7 +545,7 @@ skills_plan_get is authorized in read_only role via [agent-service/src/healthcar
 
 ## Validation
 
-Contracts are tested in [agent-service/tests/test_contracts.py](../domains/healthcare/agent-service/tests/test_contracts.py), including:
+Contracts are tested in [agent-service/tests/integration/test_contracts.py](../domains/healthcare/agent-service/tests/integration/test_contracts.py), including:
 
 - successful plan generation for known business goal
 - deterministic flow shape and tool outputs
