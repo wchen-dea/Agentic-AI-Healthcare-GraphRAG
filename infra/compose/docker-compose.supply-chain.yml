@@ -78,15 +78,15 @@ services:
       dockerfile: domains/supply-chain/webapp/Dockerfile
     container_name: supplychain-webapp
     depends_on:
-      - sc-rag-api
+      - sc-agent-service
     ports:
       - "8089:80"
 
-  sc-rag-api:
+  sc-agent-service:
     build:
       context: ../..
-      dockerfile: domains/supply-chain/rag-api/Dockerfile
-    container_name: supplychain-rag-api
+      dockerfile: domains/supply-chain/agent-service/Dockerfile
+    container_name: supplychain-agent-service
     depends_on:
       - qdrant-sc
       - neo4j-sc

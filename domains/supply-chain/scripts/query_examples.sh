@@ -4,7 +4,7 @@ set -euo pipefail
 # Supply-chain domain query examples.
 # Usage: ./domains/supply-chain/scripts/query_examples.sh
 
-BASE="${SC_RAG_API_URL:-http://localhost:8001}"
+BASE="${SC_AGENT_SERVICE_URL:-http://localhost:8001}"
 NEO4J_HTTP="${SC_NEO4J_HTTP_URL:-http://localhost:7475}"
 NEO4J_AUTH="$(printf '%s:%s' "${SC_NEO4J_USER:-neo4j}" "${SC_NEO4J_PASSWORD:-supplychain123}" | base64)"
 

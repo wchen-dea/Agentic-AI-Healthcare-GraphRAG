@@ -10,13 +10,13 @@ Source skill id: grounded_answer
 
 ## Source Mapping
 
-- Flow definition: rag-api/src/supply_chain_rag_api/config/skills_layer.json
-- Runtime planner: rag-api/src/supply_chain_rag_api/skills_layer.py
-- Runtime endpoint: rag-api/src/supply_chain_rag_api/app.py (/skills/plan and skills_plan_get)
+- Flow definition: agent-service/src/supply_chain_agent/config/skills_layer.json
+- Runtime planner: agent-service/src/supply_chain_agent/tools/skills.py
+- Runtime endpoint: agent-service/src/supply_chain_agent/api/routes.py (/skills/plan) and tools/mcp_server.py (skills_plan_get)
 
 ## Tool and Context Summary
 
 - Context requirements: question
 - Ontology dependencies: provenance
 - MCP tools: graphrag_answer_generate
-- Runtime tools: rag_api, ollama
+- Runtime tools: agent_service, ollama

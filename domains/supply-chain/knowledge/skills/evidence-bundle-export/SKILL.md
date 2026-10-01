@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Designed for Agent Skills-compatible coding agents with MCP support
 metadata:
   source_skill_id: evidence_bundle_export
-  source_config: rag-api/src/supply_chain_rag_api/config/skills_layer.json
+  source_config: agent-service/src/supply_chain_agent/config/skills_layer.json
   generator: scripts/generate_agent_skills.py
 ---
 
@@ -31,7 +31,7 @@ Use when handling workflows related to: quality_trend_review.
 
 ## Runtime Tools
 
-- rag_api
+- agent_service
 
 ## Procedure
 

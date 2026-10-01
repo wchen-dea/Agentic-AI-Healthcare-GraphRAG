@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=packages/agent-core/pyproject.toml,target=packages/agent-core/pyproject.toml \
     --mount=type=bind,source=packages/knowledge-core/pyproject.toml,target=packages/knowledge-core/pyproject.toml \
     --mount=type=bind,source=domains/healthcare/agent-service/pyproject.toml,target=domains/healthcare/agent-service/pyproject.toml \
-    --mount=type=bind,source=domains/supply-chain/rag-api/pyproject.toml,target=domains/supply-chain/rag-api/pyproject.toml \
+    --mount=type=bind,source=domains/supply-chain/agent-service/pyproject.toml,target=domains/supply-chain/agent-service/pyproject.toml \
     uv sync --frozen --no-dev --no-install-workspace --package healthcare-agent-service
 
 # First-party code: build wheel(s) from the workspace and install them (no deps;
@@ -30,7 +30,7 @@ COPY uv.lock pyproject.toml ./
 COPY packages/agent-core/pyproject.toml packages/agent-core/pyproject.toml
 COPY packages/knowledge-core/pyproject.toml packages/knowledge-core/pyproject.toml
 COPY domains/healthcare/agent-service/pyproject.toml domains/healthcare/agent-service/pyproject.toml
-COPY domains/supply-chain/rag-api/pyproject.toml domains/supply-chain/rag-api/pyproject.toml
+COPY domains/supply-chain/agent-service/pyproject.toml domains/supply-chain/agent-service/pyproject.toml
 COPY packages/knowledge-core/src packages/knowledge-core/src
 COPY packages/agent-core/src packages/agent-core/src
 COPY domains/healthcare/agent-service/src domains/healthcare/agent-service/src

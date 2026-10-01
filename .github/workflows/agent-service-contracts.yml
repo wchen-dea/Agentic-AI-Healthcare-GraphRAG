@@ -14,7 +14,7 @@ on:
       - domains/healthcare/knowledge/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
-      - domains/supply-chain/rag-api/**
+      - domains/supply-chain/agent-service/**
       - domains/supply-chain/knowledge/skills/**
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
@@ -32,7 +32,7 @@ on:
       - domains/healthcare/knowledge/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
-      - domains/supply-chain/rag-api/**
+      - domains/supply-chain/agent-service/**
       - domains/supply-chain/knowledge/skills/**
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
@@ -103,7 +103,7 @@ jobs:
           cache-dependency-glob: uv.lock
 
       - name: Sync locked agent service environments
-        run: uv sync --frozen --package agent-core --package healthcare-agent-service --package supply-chain-rag-api
+        run: uv sync --frozen --package agent-core --package healthcare-agent-service --package supply-chain-agent-service
 
       - name: Run agent-core tests (policy, audit, guardrails, SSE, settings)
         run: uv run --frozen --package agent-core pytest -q
@@ -113,9 +113,9 @@ jobs:
         run: uv run --frozen --package healthcare-agent-service pytest -q
         working-directory: domains/healthcare/agent-service
 
-      - name: Run supply-chain rag-api tests
-        run: uv run --frozen --package supply-chain-rag-api pytest -q
-        working-directory: domains/supply-chain/rag-api
+      - name: Run supply-chain agent-service tests
+        run: uv run --frozen --package supply-chain-agent-service pytest -q
+        working-directory: domains/supply-chain/agent-service
 
       - name: Run evaluation quality gates (offline, from fixtures)
         run: uv run --frozen --package healthcare-agent-service python -m healthcare_agent.evaluation.gates --results-file tests/fixtures/evaluation_results.json --min-score 0.5
@@ -131,8 +131,8 @@ jobs:
       - name: Build healthcare agent-service container
         run: docker build -f domains/healthcare/agent-service/Dockerfile -t agent-service-contracts:ci .
 
-      - name: Build supply-chain rag-api container
-        run: docker build -f domains/supply-chain/rag-api/Dockerfile -t sc-rag-api-contracts:ci .
+      - name: Build supply-chain agent-service container
+        run: docker build -f domains/supply-chain/agent-service/Dockerfile -t sc-agent-service-contracts:ci .
 
   helm-lint:
     runs-on: ubuntu-latest

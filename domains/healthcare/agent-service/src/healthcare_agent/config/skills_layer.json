@@ -89,7 +89,7 @@
         "graphrag_answer_generate"
       ],
       "runtime_tools": [
-        "rag_api",
+        "agent_service",
         "ollama"
       ]
     },
@@ -125,7 +125,7 @@
         "evidence_bundle_export"
       ],
       "runtime_tools": [
-        "rag_api"
+        "agent_service"
       ]
     },
     "claim_outcome_risk_review": {

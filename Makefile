@@ -67,7 +67,7 @@ ps: ## Show running containers
 logs:    ## Tail healthcare logs
 	$(DC_HC) logs -f --tail 20
 logs-sc: ## Tail supply-chain logs
-	$(DC_SC) logs -f --tail 20 sc-producer sc-flink-app sc-rag-api
+	$(DC_SC) logs -f --tail 20 sc-producer sc-flink-app sc-agent-service
 
 # ── Service access ────────────────────────────────────────────────────────────
 
@@ -140,14 +140,14 @@ test-core: ## Provider-neutral agent-core tests (uv workspace)
 	cd packages/agent-core && uv run --package agent-core pytest --tb=short
 test-hc: ## Healthcare agent-service tests (uv workspace)
 	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short
-test-sc: ## Supply-chain rag-api tests (uv workspace)
-	cd domains/supply-chain/rag-api && uv run --package supply-chain-rag-api pytest --tb=short
+test-sc: ## Supply-chain agent-service tests (uv workspace)
+	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short
 
 build-wheels: ## Build agent service wheels (+ agent-core, knowledge-core) into dist/
 	uv build --wheel --package agent-core --out-dir dist
 	uv build --wheel --package knowledge-core --out-dir dist
 	uv build --wheel --package healthcare-agent-service --out-dir dist
-	uv build --wheel --package supply-chain-rag-api --out-dir dist
+	uv build --wheel --package supply-chain-agent-service --out-dir dist
 
 pull-model: ## Pull Ollama LLM model
 	docker exec infra-ollama ollama pull llama3.1

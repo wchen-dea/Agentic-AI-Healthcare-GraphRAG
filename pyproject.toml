@@ -11,7 +11,7 @@ dependencies = [
     "agent-core",
     "knowledge-core",
     "healthcare-agent-service[bedrock]",
-    "supply-chain-rag-api",
+    "supply-chain-agent-service",
     # Platform tooling (producers, Flink job tests, ontology scripts)
     "pyyaml>=6.0.2",
     "confluent-kafka>=2.5.3",
@@ -37,7 +37,7 @@ members = [
     "packages/agent-core",
     "packages/knowledge-core",
     "domains/healthcare/agent-service",
-    "domains/supply-chain/rag-api",
+    "domains/supply-chain/agent-service",
 ]
 
 # Linux (containers/CI) resolves torch from the CPU-only index so images do not
@@ -51,7 +51,7 @@ explicit = true
 agent-core = { workspace = true }
 knowledge-core = { workspace = true }
 healthcare-agent-service = { workspace = true }
-supply-chain-rag-api = { workspace = true }
+supply-chain-agent-service = { workspace = true }
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.ruff]

@@ -17,4 +17,4 @@ Source skill id: evidence_bundle_export
 - Context requirements: question, patient_id
 - Ontology dependencies: provenance, guardrails
 - MCP tools: evidence_bundle_export
-- Runtime tools: rag_api
+- Runtime tools: agent_service

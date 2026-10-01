@@ -25,7 +25,7 @@ env/
 *.log
 *.pid
 
-rag-api/logs/
+agent-service/logs/
 logs/
 mcp-server/logs/
 

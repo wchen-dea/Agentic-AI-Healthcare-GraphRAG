@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-BASE="${AGENT_SERVICE_URL:-${RAG_API_URL:-http://localhost:8000}}"
+BASE="${AGENT_SERVICE_URL:-http://localhost:8000}"
 NEO4J_HTTP="${NEO4J_HTTP_URL:-http://localhost:7474}"
 NEO4J_AUTH="$(printf '%s:%s' "${NEO4J_USER:-neo4j}" "${NEO4J_PASSWORD:-healthcare123}" | base64)"
 

@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Designed for Agent Skills-compatible coding agents with MCP support
 metadata:
   source_skill_id: supplier_risk_review
-  source_config: rag-api/src/supply_chain_rag_api/config/skills_layer.json
+  source_config: agent-service/src/supply_chain_agent/config/skills_layer.json
   generator: scripts/generate_agent_skills.py
 ---
 

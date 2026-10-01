@@ -33,7 +33,7 @@ Use when handling workflows related to: clinical_deterioration_triage, claims_de
 
 ## Runtime Tools
 
-- rag_api
+- agent_service
 - ollama
 
 ## Procedure

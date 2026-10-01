@@ -33,7 +33,7 @@ Use when handling workflows related to: medication_safety_review.
 
 ## Runtime Tools
 
-- rag_api
+- agent_service
 
 ## Procedure
 

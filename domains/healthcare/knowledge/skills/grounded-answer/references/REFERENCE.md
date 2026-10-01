@@ -18,4 +18,4 @@ Source skill id: grounded_answer
 - Context requirements: question, patient_id
 - Ontology dependencies: prompt_policy, provenance
 - MCP tools: graphrag_answer_generate
-- Runtime tools: rag_api, ollama
+- Runtime tools: agent_service, ollama
