@@ -14,8 +14,8 @@ resolution-markers = [
 members = [
     "agent-core",
     "agentic-healthcare",
-    "graphrag-shared",
     "healthcare-agent-service",
+    "knowledge-core",
     "supply-chain-rag-api",
 ]
 
@@ -52,8 +52,8 @@ dependencies = [
     { name = "confluent-kafka" },
     { name = "faker" },
     { name = "fastavro" },
-    { name = "graphrag-shared" },
     { name = "healthcare-agent-service", extra = ["bedrock"] },
+    { name = "knowledge-core" },
     { name = "pyyaml" },
     { name = "supply-chain-rag-api" },
 ]
@@ -71,8 +71,8 @@ requires-dist = [
     { name = "confluent-kafka", specifier = ">=2.5.3" },
     { name = "faker", specifier = ">=25.8.0" },
     { name = "fastavro", specifier = ">=1.9.5" },
-    { name = "graphrag-shared", directory = "platform/shared" },
     { name = "healthcare-agent-service", extras = ["bedrock"], editable = "domains/healthcare/agent-service" },
+    { name = "knowledge-core", editable = "packages/knowledge-core" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "supply-chain-rag-api", editable = "domains/supply-chain/rag-api" },
 ]
@@ -791,17 +791,6 @@ wheels = [
 ]
 
 [[package]]
-name = "graphrag-shared"
-version = "0.1.0"
-source = { directory = "platform/shared" }
-dependencies = [
-    { name = "pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "pyyaml", specifier = ">=6.0.2" }]
-
-[[package]]
 name = "grpcio"
 version = "1.83.0"
 source = { registry = "https://pypi.org/simple" }
@@ -927,8 +916,8 @@ dependencies = [
     { name = "agent-core" },
     { name = "email-validator" },
     { name = "fastapi" },
-    { name = "graphrag-shared" },
     { name = "httpx" },
+    { name = "knowledge-core" },
     { name = "langchain-core" },
     { name = "langgraph" },
     { name = "langsmith" },
@@ -962,8 +951,8 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.0" },
     { name = "email-validator", specifier = ">=2.2.0" },
     { name = "fastapi", specifier = "==0.115.0" },
-    { name = "graphrag-shared", directory = "platform/shared" },
     { name = "httpx", specifier = "==0.27.2" },
+    { name = "knowledge-core", editable = "packages/knowledge-core" },
     { name = "langchain-core", specifier = ">=0.3.0,<1.0.0" },
     { name = "langgraph", specifier = ">=0.4.1,<1.0.0" },
     { name = "langsmith", specifier = ">=0.3.0,<1.0.0" },
@@ -1300,6 +1289,17 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/10/b1/d61c61a84ff85d1a36a99df2c152b59ffedb1d356c598902aba44abcdb60/kiwisolver-1.5.1-pp311-pypy311_pp73-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:cdaeeb6c350106df6bf9d873395973e5f066a9713200b72cd64f55d0a3eafab6", size = 77605, upload-time = "2026-08-28T10:28:24.322Z" },
     { url = "https://files.pythonhosted.org/packages/d3/52/5aef56f21a460a6e43ab3cdfc7697d59d7b87deb0ec97a0f7b91aa4a521b/kiwisolver-1.5.1-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:17851e5dad4484be0cbccbde3b15331deae036de9aebd45eed964487802b172f", size = 98465, upload-time = "2026-08-28T10:28:25.696Z" },
 ]
+
+[[package]]
+name = "knowledge-core"
+version = "0.1.0"
+source = { editable = "packages/knowledge-core" }
+dependencies = [
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pyyaml", specifier = ">=6.0.2" }]
 
 [[package]]
 name = "langchain-core"

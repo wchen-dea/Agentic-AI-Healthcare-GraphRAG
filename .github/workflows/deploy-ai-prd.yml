@@ -6,10 +6,10 @@ on:
       - prd
     paths:
       - .github/workflows/deploy-ai-prd.yml
-      - deploy/helm/**
+      - infra/helm/**
       - domains/healthcare/agent-service/**
       - packages/**
-      - platform/shared/**
+      - packages/knowledge-core/**
       - pyproject.toml
       - uv.lock
       - domains/healthcare/webapp/**
@@ -53,8 +53,8 @@ jobs:
 
       - name: Deploy with Helm
         run: |
-          helm upgrade --install healthcare deploy/helm \
-            -f deploy/helm/values-production.yaml \
+          helm upgrade --install healthcare infra/helm \
+            -f infra/helm/values-production.yaml \
             -n healthcare-ai --create-namespace \
             --set rag-api.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
             --set rag-api.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \

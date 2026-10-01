@@ -1,6 +1,6 @@
 # ADR-0012: Capability-Oriented Layout and Shared Agent Core
 
-- Status: accepted (Phases 1–2 implemented; Phases 3–4 planned)
+- Status: accepted (Phases 1–3 implemented; Phases 3b–4 planned)
 - Date: 2026-10-01
 - Deciders: platform team
 - Supersedes: none
@@ -71,7 +71,8 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
    | --- | --- |
    | 1 (done) | Add `agent-core`; healthcare delegates policy, audit, guardrail base, SSE, and runtime contracts to it; audit failures are logged and counted |
    | 2 (done) | `git mv` `rag-api` → `agent-service` and `healthcare_rag_api` → `healthcare_agent`; split `app.py`, `domain/`, and `langgraph_agents/` into the capability folders; adopt `AgentServiceSettings`; remove the legacy non-LangGraph query path |
-   | 3 | Move `platform/shared` → `packages/knowledge-core` and switch Flink images to the wheel; move ontology/skills under `knowledge/`; merge infra folders under `infra/` |
+   | 3 (done) | Move `platform/shared` → `packages/knowledge-core` and switch Flink images to the wheel; move ontology/skills under `knowledge/`; merge infra folders under `infra/` |
+   | 3b | Rename ops identifiers (`RAG_API_*` env prefix, `rag_api_*` metrics, Helm chart/k8s service `rag-api`, compose container, `rag-api-contracts.yml`, `rag-api.env`) with a deprecation window that accepts the old env names |
    | 4 | Split tests into `unit`/`integration`/`evals`; make ruff blocking in CI; remove shims; apply the same layout to supply-chain |
 
    Phase 2 moved modules without re-export shims: the service is deployed only as a wheel, and no external code imports the old paths. New code must import from the target location.
@@ -117,7 +118,28 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
 - HTTP and MCP share one path. `QueryService.run_query` / `stream` always run the LangGraph graph. `/query` passes `RAG_API_MAX_CONTEXT_ITEMS` to the triage agent as `context_limit` instead of a hard-coded 5. The default is still 5.
 - Removed: the legacy single-pass query path, the ReAct controller, `RAG_API_LANGGRAPH_ENABLED`, and `RAG_API_REACT_*`. The flags are also removed from the deploy env files and Helm values. There is no rollback flag; roll back by redeploying the previous image.
 - `domains/healthcare/scripts/test_react_planner.sh` → `test_planner.sh`.
-- Ops names are kept until Phase 3: the `RAG_API_*` env prefix, the `rag_api_*` metrics, the Helm chart and k8s service `rag-api`, the compose container `healthcare-rag-api`, and the CI workflow `rag-api-contracts.yml`.
+- Ops names are kept until Phase 3b: the `RAG_API_*` env prefix, the `rag_api_*` metrics, the Helm chart and k8s service `rag-api`, the compose container `healthcare-rag-api`, and the CI workflow `rag-api-contracts.yml`.
+
+## Phase 3 Changes
+
+- Path moves (all with `git mv`):
+
+  | New location | Old location |
+  | --- | --- |
+  | `packages/knowledge-core` (import `knowledge_core`) | `platform/shared` (`shared_lib`) |
+  | `domains/<d>/knowledge/{ontology,graph-seeds,skills}` | `domains/<d>/{ontology,graph-seeds,skills}` |
+  | `domains/<d>/data-pipelines/{flink-job,producer}` | `domains/<d>/{flink-job,producer}` |
+  | `infra/compose/docker-compose.*.yml` | `container/docker-compose.*.yml` |
+  | `infra/helm` | `deploy/helm` |
+  | `infra/environments/{dev,production}` | `deploy/{dev,production}` |
+  | `infra/observability` | `monitoring` |
+
+- `knowledge-core` is a uv workspace member with `requires-python >=3.10`, because the `flink:1.20` image ships Python 3.10. The wheel is pure Python (`py3-none-any`).
+- The Flink job and Flink cluster Dockerfiles build the `knowledge-core` wheel in a `uv` builder stage and `pip install` it. They no longer copy shared source into `/app/shared`.
+- Domain scripts and tests resolve paths from their own location (`Path(__file__).parents[n]`) instead of the repo root. The Flink `ontology_loader.ontology_dir()` checks `config/ontology`, `knowledge/ontology`, and `ontology` while walking up parents. `ONTOLOGY_CONFIG_DIR` still overrides it.
+- The healthcare webapp image builds in a mirrored repo path (`/src/domains/healthcare/webapp`) and copies the agent-service `skills_layer.json`, so the vitest contract-drift test runs inside the image.
+- Compose files, `setup-minikube.sh`, the Makefile, CI workflows, `scripts/validate_docs.sh`, the README, and docs 01–09 use the new paths. Historical ADRs (0004–0011) are not edited.
+- Local data in `container/volume/` is untracked and unchanged.
 
 ## Follow-ups
 
@@ -125,3 +147,5 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
 - Adapt `observability/tracing.py` to the `Tracer` port and the Qdrant/Neo4j clients to `VectorStore`/`GraphStore` (`retrieval/qdrant.py`, `retrieval/neo4j.py`).
 - Unify the duplicate injection rules in `safety/harness.py` with `agent_core.guardrails`.
 - Move the remaining library-level `os.getenv` reads into `HealthcareAgentSettings`. They are in `retrieval/search.py` (`EMBEDDING_MODEL`), `orchestration/memory.py`, `orchestration/graph.py` (`LANGGRAPH_MAX_ITERATIONS`, LangSmith), `generation/model_router.py` (`ModelTierConfig.from_env`), `generation/providers.py`, and `observability/tracing.py`.
+- Remove the drifted copies of `ontology_loader`, `rules_engine`, `runner`, and `storage` in the healthcare Flink app in favour of `knowledge_core`.
+- Remove the try/except import fallback in the supply-chain Flink job now that `knowledge_core` is always installed.

@@ -7,7 +7,7 @@ requires-python = ">=3.11,<3.14"
 # workspace uv.lock; keep constraints here as compatible ranges or pins.
 dependencies = [
     "agent-core",
-    "graphrag-shared",
+    "knowledge-core",
     "fastapi==0.115.0",
     "uvicorn==0.31.1",
     "qdrant-client==1.11.3",
@@ -43,7 +43,7 @@ module-name = "healthcare_agent"
 
 [tool.uv.sources]
 agent-core = { workspace = true }
-graphrag-shared = { workspace = true, editable = false }
+knowledge-core = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

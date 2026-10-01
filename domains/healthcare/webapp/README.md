@@ -60,7 +60,7 @@ Make targets from the repo root: `make web-hc-dev`, `make web-hc-test`, `make we
 
 ## Container
 
-The `Dockerfile` is multi-stage and uses the repository root as build context. It runs the tests and builds with Node 22, then serves `dist/` with Nginx using `platform/shared/webapp/nginx.conf` (with SPA fallback).
+The `Dockerfile` is multi-stage and uses the repository root as build context. It runs the tests and builds with Node 22, then serves `dist/` with Nginx using `infra/web/nginx.conf` (with SPA fallback).
 
 ```bash
 docker build -f domains/healthcare/webapp/Dockerfile \

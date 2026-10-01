@@ -12,11 +12,13 @@ from pathlib import Path
 
 import yaml
 
-PLATFORM_DIR = Path(__file__).resolve().parents[4] / "platform" / "healthcare"
-RELATIONSHIPS_FILE = PLATFORM_DIR / "ontology" / "relationships.yaml"
-GRAPH_WRITES_FILE = PLATFORM_DIR / "flink-app" / "app" / "graph_writes.py"
+DOMAIN_DIR = Path(__file__).resolve().parents[2]
+ONTOLOGY_DIR = DOMAIN_DIR / "knowledge" / "ontology"
+FLINK_JOB_DIR = DOMAIN_DIR / "data-pipelines" / "flink-job"
+RELATIONSHIPS_FILE = ONTOLOGY_DIR / "relationships.yaml"
+GRAPH_WRITES_FILE = FLINK_JOB_DIR / "app" / "graph_writes.py"
 
-sys.path.insert(0, str(PLATFORM_DIR / "flink-app"))
+sys.path.insert(0, str(FLINK_JOB_DIR))
 
 
 class RelationshipCardinalityTests(unittest.TestCase):
@@ -62,7 +64,7 @@ class RelationshipCardinalityTests(unittest.TestCase):
 
     def test_node_types_match_ontology(self):
         """Node labels used in graph_writes should match ontology entity types."""
-        entities_file = PLATFORM_DIR / "ontology" / "entities.yaml"
+        entities_file = ONTOLOGY_DIR / "entities.yaml"
         entities = yaml.safe_load(entities_file.read_text())
         declared_types = {e["canonical_name"] for e in entities.get("entities", [])}
         merge_labels = set(re.findall(r"MERGE\s*\(\w+:(\w+)", self.graph_writes_source))

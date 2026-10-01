@@ -33,8 +33,8 @@ AI Client (Copilot, Claude Desktop, custom agent)
      - tools/mcp_server.py, langchain_tools.py, skills.py
      - evaluation/ and observability/ modules
   -> External stores:
-     - Neo4j (platform/healthcare/neo4j)
-     - Qdrant (platform/healthcare via flink-app)
+     - Neo4j (domains/healthcare/knowledge/graph-seeds)
+     - Qdrant (populated by domains/healthcare/data-pipelines/flink-job)
      - Ollama (infra)
 ```
 
@@ -580,7 +580,7 @@ python domains/supply-chain/scripts/generate_agent_skills.py --check
 python domains/supply-chain/scripts/validate_agent_skills.py
 ```
 
-Generated skill packages are stored under [healthcare/skills](../domains/healthcare/skills) and [supply-chain/skills](../domains/supply-chain/skills) and include one `SKILL.md` per skill folder plus supporting references.
+Generated skill packages are stored under [healthcare/skills](../domains/healthcare/knowledge/skills) and [supply-chain/skills](../domains/supply-chain/knowledge/skills) and include one `SKILL.md` per skill folder plus supporting references.
 
 # LangGraph Multi-Agent Query Path
 

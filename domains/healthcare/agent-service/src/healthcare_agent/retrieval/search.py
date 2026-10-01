@@ -5,49 +5,10 @@ and provide a single retrieval interface for all orchestration modes.
 """
 from __future__ import annotations
 
-import hashlib
-import os
 import re
 from typing import Any
 
-# ``shared`` is the platform/shared workspace package (graphrag-shared).
-try:
-    from shared.embedding import (
-        ALL_DOMAINS,
-        VECTOR_SIZE,
-        EmbeddingDomain,
-        stable_embedding,
-    )
-except ImportError:
-    VECTOR_SIZE = 384
-    ALL_DOMAINS = ["clinical", "claims", "device"]
-    EmbeddingDomain = str  # type: ignore[misc]
-    _EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    _embedding_model = None
-
-    def _get_embedding_model():
-        global _embedding_model
-        if _embedding_model is not None:
-            return _embedding_model
-        try:
-            from sentence_transformers import SentenceTransformer
-            _embedding_model = SentenceTransformer(_EMBEDDING_MODEL_NAME)
-        except Exception:
-            _embedding_model = False
-        return _embedding_model
-
-    def stable_embedding(text: str, dim: int = VECTOR_SIZE, *, domain: str = "clinical") -> list[float]:  # type: ignore[misc]
-        model = _get_embedding_model()
-        if model and model is not False:
-            vec = model.encode(text, normalize_embeddings=True).tolist()
-            return vec[:dim] if len(vec) >= dim else vec + [0.0] * (dim - len(vec))
-        vec = [0.0] * dim
-        for token in text.lower().split():
-            token_hash = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
-            vec[token_hash % dim] += 1.0
-        norm = sum(x * x for x in vec) ** 0.5
-        return [x / norm if norm else 0.0 for x in vec]
-
+from knowledge_core.embedding import EmbeddingDomain, stable_embedding
 
 _CLAIMS_PATTERNS = re.compile(
     r"\b(claim|billed|payer|reimburse|denied|appeal|copay|deductible|coverage|insurance|cpt|hcpcs)\b",

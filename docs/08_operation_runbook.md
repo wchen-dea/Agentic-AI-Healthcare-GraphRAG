@@ -56,29 +56,29 @@ make help        # Show all targets
 Start or refresh services:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
 ```
 
 Start supply-chain domain alongside healthcare:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml \
-  -f container/docker-compose.healthcare.yml \
-  -f container/docker-compose.supply-chain.yml \
+docker compose -f infra/compose/docker-compose.infra.yml \
+  -f infra/compose/docker-compose.healthcare.yml \
+  -f infra/compose/docker-compose.supply-chain.yml \
   up -d --build
 ```
 
 Apply compose changes and remove deleted services:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 If you change `rag-api` source code, rebuild the image before recreating the service:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 ### LangGraph Query Path
@@ -92,8 +92,8 @@ LANGGRAPH_MAX_ITERATIONS=3
 Rebuild and recreate `rag-api` after source or configuration changes:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 Verify with a smoke query and ensure a `langgraph` object is present in the response:
@@ -118,8 +118,8 @@ MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
 Rebuild and recreate `rag-api`:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate rag-api
 ```
 
 Verify MLflow UI is reachable:
@@ -139,13 +139,13 @@ Run planner test suites (CI-safe shortcut):
 Stop all services:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down
 ```
 
 Stop and delete volumes (destructive):
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down -v
 ```
 
 ## Service Health Checklist
@@ -153,7 +153,7 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 ### 1) Container Status
 
 ```bash
-make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps
+make ps  # or: docker compose -f infra/compose/docker-compose.infra.yml -p infra ps
 ```
 
 Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer, localstack.
@@ -437,7 +437,7 @@ Symptom:
 Fix:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 ### 2) Unexpected Non-Healthcare Flink Job Running
@@ -457,13 +457,13 @@ curl -s -X PATCH http://localhost:8082/jobs/<demo_job_id>
 2. Ensure no old submitter container exists:
 
 ```bash
-make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps
+make ps  # or: docker compose -f infra/compose/docker-compose.infra.yml -p infra ps
 ```
 
 3. Re-run with orphan cleanup:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 ### 3) PyFlink Python Worker Not Found
@@ -487,7 +487,7 @@ Expected:
 Recovery:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build --force-recreate flink-jobmanager flink-taskmanager flink-app
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build --force-recreate flink-jobmanager flink-taskmanager flink-app
 ```
 
 ### 4) Kafka Connector Class Errors In Flink
@@ -505,8 +505,8 @@ docker exec infra-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-connect
 Recovery:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build --no-cache flink-jobmanager flink-taskmanager flink-app
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate flink-jobmanager flink-taskmanager flink-app
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build --no-cache flink-jobmanager flink-taskmanager flink-app
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate flink-jobmanager flink-taskmanager flink-app
 ```
 
 ### 5) Ollama Model Not Available
@@ -558,8 +558,8 @@ Note:
 ### Soft Restart (keep volumes)
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
 ```
 
 ### Hard Reset (delete all local data)
@@ -567,8 +567,8 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 Warning: this removes Kafka, Qdrant, Neo4j, and Grafana/Prometheus local state.
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down -v
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
 ```
 
 ## Post-Change Validation
@@ -586,8 +586,8 @@ curl -s http://localhost:8082/jobs/overview | jq .
 For Helm deployments:
 
 ```bash
-helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null && echo OK
-helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null && echo OK
+helm template dev infra/helm -f infra/helm/values-dev.yaml > /dev/null && echo OK
+helm template prd infra/helm -f infra/helm/values-production.yaml > /dev/null && echo OK
 ```
 
 Confirm:
@@ -601,17 +601,17 @@ Confirm:
 ### Deploy dev (minikube)
 
 ```bash
-./deploy/dev/setup-minikube.sh
+infra/environments/dev/setup-minikube.sh
 # Or manually:
 minikube start --cpus=4 --memory=8192
-helm install healthcare-dev deploy/helm -f deploy/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
+helm install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
 ```
 
 ### Deploy production
 
 ```bash
-helm install healthcare deploy/helm \
-  -f deploy/helm/values-production.yaml \
+helm install healthcare infra/helm \
+  -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
   --set rag-api.secrets.NEO4J_PASSWORD=<value> \
   --set rag-api.secrets.OPENAI_API_KEY=<value> \
@@ -621,7 +621,7 @@ helm install healthcare deploy/helm \
 ### Upgrade
 
 ```bash
-helm upgrade healthcare deploy/helm -f deploy/helm/values-production.yaml -n healthcare-ai
+helm upgrade healthcare infra/helm -f infra/helm/values-production.yaml -n healthcare-ai
 ```
 
 ### Rollback

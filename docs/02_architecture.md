@@ -15,7 +15,7 @@ The architecture is optimized for reproducible local experimentation with clear 
 ## Architectural Principles
 
 1. **Evidence before generation** — deterministic retrieval, ranking, and safety checks complete before any LLM call
-2. **Separation of data platform and AI** — `platform/` owns ingestion and stores; `domains/` owns reasoning and delivery
+2. **Separation of data platform and AI** — `domains/<d>/data-pipelines/` and `packages/knowledge-core` own ingestion and stores; `domains/<d>/agent-service` and `packages/agent-core` own reasoning and delivery
 3. **Domain-specific agents share infrastructure** — harness, response policy, MLflow tracing, and MCP protocol are reusable across domains
 4. **LangGraph-only orchestration** — ADR-0012 removed the former single-pass and ReAct paths; REST, SSE, and MCP share the LangGraph query service
 5. **Observable by default** — every query produces Prometheus metrics, audit records, and optional MLflow traces
@@ -65,7 +65,7 @@ The platform supports parallel domain deployments sharing infrastructure (Kafka 
 
 | Domain | Directory | Neo4j Port | Qdrant Port | Topic Prefix |
 | --- | --- | --- | --- | --- |
-| Healthcare Provider | root (`platform/healthcare/producer/`, `platform/healthcare/flink-app/`, `domains/healthcare/agent-service/`) | 7474/7687 | 6333 | `healthcare.*` |
+| Healthcare Provider | root (`domains/healthcare/data-pipelines/producer/`, `domains/healthcare/data-pipelines/flink-job/`, `domains/healthcare/agent-service/`) | 7474/7687 | 6333 | `healthcare.*` |
 | Supply Chain Resilience | `domains/supply-chain/` | 7475/7688 | 6335 | `supplychain.*` |
 
 Each domain brings its own: Avro envelope schema, ontology YAML (entities, seeds, rules), graph write functions, producer event generators, and RAG API planner/classifier. The streaming pipeline, embedding infrastructure, and observability stack are reused.
@@ -122,13 +122,13 @@ This architecture intentionally combines several patterns so streaming ingestion
 
 ### Pattern Mapping to Repository Components
 
-- Event-Driven Pipeline: [platform/healthcare/producer/produce_events.py](../platform/healthcare/producer/produce_events.py), [platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py](../platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py), [container/docker-compose.infra.yml](../container/docker-compose.infra.yml)
-- Dual Materialized Views: [platform/healthcare/flink-app/healthcare_graph_rag_job.py](../platform/healthcare/flink-app/healthcare_graph_rag_job.py), [docs/04_data_platform.md](04_data_platform.md)
+- Event-Driven Pipeline: [domains/healthcare/data-pipelines/producer/produce_events.py](../domains/healthcare/data-pipelines/producer/produce_events.py), [domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py](../domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py), [infra/compose/docker-compose.infra.yml](../infra/compose/docker-compose.infra.yml)
+- Dual Materialized Views: [domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py](../domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py), [docs/04_data_platform.md](04_data_platform.md)
 - Shared-Core, Multi-Interface: [domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py](../domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py) (`QueryService.run_query`/`stream` shared by REST `/query`, `/query/stream`, and MCP tools)
 - Policy Enforcement Point: [domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py](../domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py) (sanitization, truncation, budget), [domains/healthcare/agent-service/src/healthcare_agent/api/governance.py](../domains/healthcare/agent-service/src/healthcare_agent/api/governance.py) (`ToolGovernance` role policy, audit, and metrics)
 - Contract-First Tooling: [domains/healthcare/agent-service/tests/test_contracts.py](../domains/healthcare/agent-service/tests/test_contracts.py), [docs/05_ai_agents.md](05_ai_agents.md)
 - Bounded Context Window: [domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py](../domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py) (`apply_response_budget`, `truncate_text`)
-- Observability by Design: [monitoring/prometheus.yml](../monitoring/prometheus.yml), [monitoring/grafana/dashboards/healthcare-monitoring-overview.json](../monitoring/grafana/dashboards/healthcare-monitoring-overview.json), [docs/08_operation_runbook.md](08_operation_runbook.md)
+- Observability by Design: [infra/observability/prometheus.yml](../infra/observability/prometheus.yml), [infra/observability/grafana/dashboards/healthcare-monitoring-overview.json](../infra/observability/grafana/dashboards/healthcare-monitoring-overview.json), [docs/08_operation_runbook.md](08_operation_runbook.md)
 - Adapter Pattern: [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md), [domains/healthcare/agent-service/src/healthcare_agent/generation/providers.py](../domains/healthcare/agent-service/src/healthcare_agent/generation/providers.py)
 - Multi-Agent Orchestration: [domains/healthcare/agent-service/src/healthcare_agent/orchestration/](../domains/healthcare/agent-service/src/healthcare_agent/orchestration/) (`graph.py`, `runtime.py`, `state.py`) and [agents/nodes.py](../domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py)
 - MLflow Tracing: [domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py](../domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py), [domains/healthcare/agent-service/src/healthcare_agent/evaluation/mlflow_eval.py](../domains/healthcare/agent-service/src/healthcare_agent/evaluation/mlflow_eval.py)
@@ -231,7 +231,7 @@ Shared Infrastructure (docker-compose.infra.yml)
   MLflow Tracing
   Conduktor Console
 
-Data Platform (platform/)
+Data Platform (domains/<d>/data-pipelines/ + packages/knowledge-core)
   Per-domain: Producer -> Kafka -> Flink job submission -> Qdrant + Neo4j
 
 Domain AI Agents (domains/)
@@ -267,7 +267,7 @@ flowchart LR
     CDK[Conduktor]
   end
 
-  subgraph DP[platform/]
+  subgraph DP[data-pipelines/]
     subgraph DPHC[healthcare]
       HP[Producer] --> K
       SR -. schemas .-> HP
@@ -471,7 +471,7 @@ Use a secret manager for API keys. Do not store credentials in files or compose 
 
 ### Producer
 
-platform/healthcare/producer/produce_events.py emits two event families:
+domains/healthcare/data-pipelines/producer/produce_events.py emits two event families:
 
 - Transactional events:
   - clinical notes
@@ -490,13 +490,13 @@ The producer registers a shared Avro envelope in Schema Registry and publishes C
 
 ### Kafka + Schema Registry
 
-Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in container/docker-compose.healthcare.yml with fixed partitions per domain topic.
+Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in infra/compose/docker-compose.healthcare.yml with fixed partitions per domain topic.
 
 Schema Registry stores the MedicalEvent envelope under topic-value subjects for transactional and reference topics, and the schema ID is embedded in Kafka value payloads.
 
 ### Flink Runtime
 
-The Flink cluster (JobManager + TaskManager) is shared infrastructure defined in container/docker-compose.infra.yml using a domain-neutral image (platform/flink-cluster/Dockerfile).
+The Flink cluster (JobManager + TaskManager) is shared infrastructure defined in infra/compose/docker-compose.infra.yml using a domain-neutral image (infra/images/flink-cluster/Dockerfile).
 
 Domain-specific job submitters are defined in each domain's compose overlay:
 
@@ -507,7 +507,7 @@ Each job submitter uses `flink run -m flink-jobmanager:8081` to submit to the sh
 
 ### Native PyFlink Job
 
-platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py is the active stream job:
+domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py is the active stream job:
 
 - Builds one KafkaSource per topic in ALL_TOPICS.
 - Tags each record with its topic and unions all streams.
@@ -523,9 +523,9 @@ Execution details:
 
 ### Processor Logic Reuse
 
-platform/healthcare/flink-app/healthcare_graph_rag_job.py provides:
+domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py provides:
 
-- domain-routed embedding (clinical / claims / device) via `platform/shared/embedding.py`,
+- domain-routed embedding (clinical / claims / device) via `packages/knowledge-core/embedding.py`,
 - clinical_text rendering with optional reference-data expansion,
 - in-memory reference store updates,
 - event enrichment,

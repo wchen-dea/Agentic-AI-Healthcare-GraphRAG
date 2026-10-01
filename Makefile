@@ -1,8 +1,8 @@
 # Usage: make <target>
 
-INFRA    := container/docker-compose.infra.yml
-HC       := container/docker-compose.healthcare.yml
-SC       := container/docker-compose.supply-chain.yml
+INFRA    := infra/compose/docker-compose.infra.yml
+HC       := infra/compose/docker-compose.healthcare.yml
+SC       := infra/compose/docker-compose.supply-chain.yml
 NET      := graphrag-net
 DC_INFRA := docker compose -f $(INFRA) -p infra
 DC_HC    := docker compose -f $(HC) -p healthcare
@@ -143,9 +143,9 @@ test-hc: ## Healthcare rag-api tests (uv workspace)
 test-sc: ## Supply-chain rag-api tests (uv workspace)
 	cd domains/supply-chain/rag-api && uv run --package supply-chain-rag-api pytest --tb=short
 
-build-wheels: ## Build rag-api wheels (+ agent-core, graphrag-shared) into dist/
+build-wheels: ## Build rag-api wheels (+ agent-core, knowledge-core) into dist/
 	uv build --wheel --package agent-core --out-dir dist
-	uv build --wheel --package graphrag-shared --out-dir dist
+	uv build --wheel --package knowledge-core --out-dir dist
 	uv build --wheel --package healthcare-agent-service --out-dir dist
 	uv build --wheel --package supply-chain-rag-api --out-dir dist
 
@@ -157,7 +157,7 @@ fresh: clean up pull-model ## Full fresh start with both domains
 # ── Helm / Minikube ───────────────────────────────────────────────────────────
 
 helm-dev: ## Deploy to minikube via Helm (dev values)
-	./deploy/dev/setup-minikube.sh
+	infra/environments/dev/setup-minikube.sh
 
 helm-dev-down: ## Tear down minikube dev release
 	helm uninstall healthcare-dev -n healthcare-ai-dev || true
@@ -182,10 +182,10 @@ helm-ports-stop: ## Kill all port-forwards
 	@echo "Port-forwards stopped."
 
 helm-prd: ## Template production Helm chart (dry-run)
-	helm template healthcare deploy/helm -f deploy/helm/values-production.yaml
+	helm template healthcare infra/helm -f infra/helm/values-production.yaml
 
 helm-lint: ## Lint Helm chart and template both envs
-	helm lint deploy/helm
-	helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null
-	helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null
+	helm lint infra/helm
+	helm template dev infra/helm -f infra/helm/values-dev.yaml > /dev/null
+	helm template prd infra/helm -f infra/helm/values-production.yaml > /dev/null
 	@echo "Helm lint: OK"

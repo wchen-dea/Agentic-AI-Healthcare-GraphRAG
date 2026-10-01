@@ -84,12 +84,11 @@ make helm-ports  # Start port-forwards
 ## Project Layout
 
 ```
-container/            Docker Compose orchestration files
-deploy/               Helm charts, Docker Compose, monitoring
-docs/                 Full documentation suite
-domains/              Domain agents, scripts, skills, webapps
-monitoring/           Prometheus, Grafana, alerting configs
-platform/             Streaming infrastructure (Flink, producers, ontology)
+docs/                 Full documentation suite and ADRs
+domains/<d>/          Per-domain agent service, data-pipelines/ (Flink job, producer, schemas),
+                      knowledge/ (ontology, graph-seeds, skills), scripts, webapp
+packages/             Shared Python packages: agent-core (runtime), knowledge-core (streaming, ontology)
+infra/                compose/, helm/, environments/{dev,production}, observability/, images/, web/
 scripts/              Cross-domain validation, shared lib
 ```
 

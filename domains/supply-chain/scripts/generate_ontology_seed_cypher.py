@@ -10,9 +10,9 @@ from pathlib import Path
 import yaml
 
 
-DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "platform" / "supply-chain"
-CONFIG_DIR = DATA_PLATFORM_DIR / "ontology"
-TARGET_FILE = DATA_PLATFORM_DIR / "neo4j" / "generated_ontology_seeds.cypher"
+KNOWLEDGE_DIR = Path(__file__).resolve().parents[1] / "knowledge"
+CONFIG_DIR = KNOWLEDGE_DIR / "ontology"
+TARGET_FILE = KNOWLEDGE_DIR / "graph-seeds" / "generated_ontology_seeds.cypher"
 
 # Mapping from risk category name to (id-suffix, description)
 RISK_DESCRIPTIONS: dict[str, tuple[str, str]] = {

@@ -88,7 +88,7 @@ Docker and CI); the members declare `requires-python = ">=3.11,<3.14"` because
 
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
-uv sync                                     # once, and after changing platform/shared
+uv sync                                     # once, and after changing packages/knowledge-core
 make test-hc                                # = uv run --package healthcare-agent-service pytest
 make test-sc
 # or a subset:
@@ -417,7 +417,7 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 
 | Gap | Recommended next step |
 |-----|-----------------------|
-| Ontology and rule-pack conformance | Validate `platform/healthcare/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
+| Ontology and rule-pack conformance | Validate `domains/healthcare/knowledge/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
 | Graph integration tests after event injection | Add `domains/healthcare/agent-service/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
 | Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
 | Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |

@@ -9,13 +9,13 @@ on:
       - pyproject.toml
       - uv.lock
       - packages/**
-      - platform/shared/**
+      - packages/knowledge-core/**
       - domains/healthcare/agent-service/**
-      - domains/healthcare/skills/**
+      - domains/healthcare/knowledge/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
       - domains/supply-chain/rag-api/**
-      - domains/supply-chain/skills/**
+      - domains/supply-chain/knowledge/skills/**
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
       - scripts/lib/**
@@ -27,13 +27,13 @@ on:
       - pyproject.toml
       - uv.lock
       - packages/**
-      - platform/shared/**
+      - packages/knowledge-core/**
       - domains/healthcare/agent-service/**
-      - domains/healthcare/skills/**
+      - domains/healthcare/knowledge/skills/**
       - domains/healthcare/scripts/generate_agent_skills.py
       - domains/healthcare/scripts/validate_agent_skills.py
       - domains/supply-chain/rag-api/**
-      - domains/supply-chain/skills/**
+      - domains/supply-chain/knowledge/skills/**
       - domains/supply-chain/scripts/generate_agent_skills.py
       - domains/supply-chain/scripts/validate_agent_skills.py
       - scripts/lib/**
@@ -65,7 +65,7 @@ jobs:
         run: |
           run_validation() {
             echo "skills-ref detected; running upstream validation for each skill package"
-            for skill_dir in domains/healthcare/skills/* domains/supply-chain/skills/*; do
+            for skill_dir in domains/healthcare/knowledge/skills/* domains/supply-chain/knowledge/skills/*; do
               if [[ -d "$skill_dir" ]]; then
                 skills-ref validate "$skill_dir"
               fi
@@ -146,10 +146,10 @@ jobs:
           version: latest
 
       - name: Lint Helm chart
-        run: helm lint deploy/helm
+        run: helm lint infra/helm
 
       - name: Template dev values
-        run: helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null
+        run: helm template dev infra/helm -f infra/helm/values-dev.yaml > /dev/null
 
       - name: Template production values
-        run: helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null
+        run: helm template prd infra/helm -f infra/helm/values-production.yaml > /dev/null

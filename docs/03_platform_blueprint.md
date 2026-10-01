@@ -36,12 +36,12 @@ Key characteristics:
 
 What is implemented today:
 
-- ontology-driven ingestion modules exist in `platform/healthcare/flink-app/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
+- ontology-driven ingestion modules exist in `domains/healthcare/data-pipelines/flink-job/app` (`ontology_loader.py`, `normalization.py`, `rules_engine.py`),
 - dual persistence remains active across Qdrant and Neo4j,
 - `rag-api` query flow now includes request classification, retrieval planning, and deterministic evidence ranking,
 - LLM calls are routed through a provider adapter abstraction (`llm_provider.py`) with Ollama, OpenAI, Anthropic, and FallbackProvider,
 - dynamic model routing selects models by query complexity (`domain/model_router.py`: simple/moderate/complex tiers, cross-provider `provider:model` syntax),
-- domain-routed embeddings use named Qdrant vectors (`clinical`, `claims`, `device`) with per-domain model configurability (`platform/shared/embedding.py`),
+- domain-routed embeddings use named Qdrant vectors (`clinical`, `claims`, `device`) with per-domain model configurability (`packages/knowledge-core/src/knowledge_core/embedding.py`),
 - structured output generation via JSON-mode constrained prompts (`domain/structured_output.py`) with Pydantic response models,
 - input/output guardrails with classifier-based injection detection, off-topic filtering, and grounding validation (`domain/guardrails.py`),
 - session-scoped and cross-session conversation memory with pluggable Redis persistence (`orchestration/memory.py`),
@@ -189,7 +189,7 @@ flowchart LR
 
 ## Ontology Model
 
-The ontology layer is implemented under `platform/healthcare/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
+The ontology layer is implemented under `domains/healthcare/knowledge/ontology/` and consumed at runtime by the Flink ingestion pipeline, seed generation, and validation scripts.
 
 ### Implemented ontology packages
 
@@ -205,7 +205,7 @@ The ontology layer is implemented under `platform/healthcare/ontology/` and cons
 ### Repository shape
 
 ```text
-platform/healthcare/ontology/
+domains/healthcare/knowledge/ontology/
   entities.yaml
   relationships.yaml
   vocabularies.yaml
@@ -275,14 +275,14 @@ The skills layer maps business goals to agents, skills, and MCP tools. The runti
 
 | Capability area | Current state in repo | Target state | Primary repo touchpoints |
 | --- | --- | --- | --- |
-| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `platform/healthcare/schemas/medical_event.avsc`, `docs/04_data_platform.md`, `platform/healthcare/producer/produce_events.py` |
-| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `platform/healthcare/flink-app/healthcare_graph_rag_job.py`, `platform/healthcare/flink-app/healthcare_graph_rag_pyflink_job.py`, `platform/healthcare/flink-app/app/` |
-| Terminology mapping | 100% coverage: 36 labs→LOINC, 52 ICD-10, 48 meds→RxNorm, 36 CPT, 16 specialties→NUCC, 20 payers→NAIC across 8 mapping files; CI coverage gate enforces thresholds | governed mapping packs with broader SNOMED CT depth and formal governance workflows | `platform/healthcare/ontology/mappings/*.yaml`, `domains/healthcare/scripts/validate_terminology_coverage.py` |
+| Event contracts | shared Avro envelope with topic-specific payload JSON | canonical semantic contracts plus payload validation by domain type | `domains/healthcare/data-pipelines/schemas/medical_event.avsc`, `docs/04_data_platform.md`, `domains/healthcare/data-pipelines/producer/produce_events.py` |
+| Stream enrichment | ontology loader, normalization, and deterministic rules are implemented in the Flink app modules | ontology-driven normalization, mapping, and provenance tagging | `domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py`, `domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py`, `domains/healthcare/data-pipelines/flink-job/app/` |
+| Terminology mapping | 100% coverage: 36 labs→LOINC, 52 ICD-10, 48 meds→RxNorm, 36 CPT, 16 specialties→NUCC, 20 payers→NAIC across 8 mapping files; CI coverage gate enforces thresholds | governed mapping packs with broader SNOMED CT depth and formal governance workflows | `domains/healthcare/knowledge/ontology/mappings/*.yaml`, `domains/healthcare/scripts/validate_terminology_coverage.py` |
 | Entity resolution | mostly source ID based | patient, provider, medication, and device identity resolution policies | Flink enrichment layer, graph merge helpers |
-| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/04_data_platform.md`, `platform/healthcare/neo4j/init.cypher`, Flink graph writes |
-| Vector retrieval | domain-routed embedding (clinical / claims / device) with MiniLM-L6-v2, named Qdrant vectors, and query-time domain classification via `domain/retrieval.py` | neural reranking, domain-tuned models, optional cross-encoder | `domains/healthcare/agent-service/src/healthcare_agent/retrieval/search.py`, `platform/shared/embedding.py`, `platform/healthcare/flink-app/app/text_processing.py` |
+| Graph semantics | strong patient-centric graph, rules embedded in code and seed data | ontology-validated graph model with relationship constraints and conformance tests | `docs/04_data_platform.md`, `domains/healthcare/knowledge/graph-seeds/init.cypher`, Flink graph writes |
+| Vector retrieval | domain-routed embedding (clinical / claims / device) with MiniLM-L6-v2, named Qdrant vectors, and query-time domain classification via `domain/retrieval.py` | neural reranking, domain-tuned models, optional cross-encoder | `domains/healthcare/agent-service/src/healthcare_agent/retrieval/search.py`, `packages/knowledge-core/src/knowledge_core/embedding.py`, `domains/healthcare/data-pipelines/flink-job/app/text_processing.py` |
 | Query orchestration | request classification, retrieval plan selection, evidence ranking, and complexity-based model routing are implemented with deterministic planner logic; `ModelRouter` routes simple/moderate/complex queries to different models; LangGraph multi-agent mode adds specialist routing | benchmarked and continuously tuned planning, ranking, and model selection | `domains/healthcare/agent-service/src/healthcare_agent/main.py`, `domains/healthcare/agent-service/src/healthcare_agent/`, `domains/healthcare/agent-service/src/healthcare_agent/generation/model_router.py`, `domains/healthcare/agent-service/src/healthcare_agent/orchestration/` |
-| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `platform/healthcare/neo4j/generated_ontology_seeds.cypher`, `domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py` |
+| Safety reasoning | 41 interactions, 46 adverse reactions, 23 contraindications seeded; LangGraph `medication_safety_agent` extracts structured risk chains | composable safety assessment skill with terminology-aware rules and confidence scoring | `domains/healthcare/knowledge/graph-seeds/generated_ontology_seeds.cypher`, `domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py` |
 | Temporal reasoning | exposed through `timeline_explain` and supported by graph and vector context retrieval | deeper encounter and time-window semantics plus benchmarked timeline quality | Flink payload normalization, `domains/healthcare/agent-service/src/healthcare_agent/main.py` |
 | MCP surface | 10 tools implemented (`skills_plan_get`, timeline, medication risk, coding gap, cohort summary, export, patient context, vector search, graphrag answer, risk summary) with role policy enforcement | richer internal skill composition, broader role-matrix governance, structured output extraction | `docs/05_ai_agents.md`, `domains/healthcare/agent-service/src/healthcare_agent/main.py`, `domains/healthcare/agent-service/src/healthcare_agent/config/tool_policies.json` |
 | Policy and audit | role checks, evidence shaping, audit log | ontology-backed policy classes, provenance-aware redaction, richer audit events | `domains/healthcare/agent-service/src/healthcare_agent/main.py`, `domains/healthcare/agent-service/src/healthcare_agent/config/tool_policies.json` |
@@ -308,7 +308,7 @@ The architecture target is reached when:
 
 ## 1. Container Inventory
 
-All services are defined in `container/docker-compose.infra.yml` and `container/docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
+All services are defined in `infra/compose/docker-compose.infra.yml` and `infra/compose/docker-compose.healthcare.yml`. The local stack runs entirely in Docker Compose; no external cloud services are required for development.
 
 | Container | Image | Version | Host Ports | Role |
 |-----------|-------|---------|-----------|------|
@@ -325,10 +325,10 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
 | `healthcare-neodash` | neo4jlabs/neodash | latest | 5005 | Neo4j dashboard UI |
 | `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
-| `infra-flink-jobmanager` | custom (platform/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
-| `infra-flink-taskmanager` | custom (platform/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
-| `healthcare-flink-app` | custom (platform/healthcare/flink-app/Dockerfile) | — | — | PyFlink job submitter |
-| `healthcare-producer` | custom (platform/healthcare/producer/Dockerfile) | — | — | Synthetic event generator |
+| `infra-flink-jobmanager` | custom (infra/images/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
+| `infra-flink-taskmanager` | custom (infra/images/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
+| `healthcare-flink-app` | custom (domains/healthcare/data-pipelines/flink-job/Dockerfile) | — | — | PyFlink job submitter |
+| `healthcare-producer` | custom (domains/healthcare/data-pipelines/producer/Dockerfile) | — | — | Synthetic event generator |
 | `healthcare-rag-api` | custom (domains/healthcare/agent-service/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
 | `healthcare-webapp` | custom (domains/healthcare/webapp/Dockerfile) | — | 8088 | Provider web UI (React + TypeScript/Vite SPA on Nginx) |
 | `infra-prometheus` | prom/prometheus | latest | 9090 | Metrics scraper |
@@ -339,7 +339,7 @@ All services are defined in `container/docker-compose.infra.yml` and `container/
 
 ### Supply Chain Domain Containers (optional overlay)
 
-Launched via `docker compose -f container/docker-compose.infra.yml -f container/docker-compose.supply-chain.yml up -d`.
+Launched via `docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.supply-chain.yml up -d`.
 
 | Container | Image | Version | Host Ports | Role |
 |-----------|-------|---------|-----------|------|
@@ -347,7 +347,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | `supplychain-neo4j-init` | neo4j | 5.26.2 | — | One-shot supply chain Cypher seed |
 | `supplychain-qdrant` | qdrant/qdrant | latest | 6335 (HTTP), 6336 (gRPC) | Supply chain vector store |
 | `supplychain-kafka-init` | confluentinc/cp-kafka | 7.9.0 | — | One-shot supply chain topic creation |
-| `supplychain-producer` | custom (platform/supply-chain/producer/Dockerfile) | — | — | Supply chain event generator |
+| `supplychain-producer` | custom (domains/supply-chain/data-pipelines/producer/Dockerfile) | — | — | Supply chain event generator |
 | `localstack` | localstack/localstack | 3.8.0 | 4566, 4510–4559 | Local AWS-compatible services |
 
 ---
@@ -375,11 +375,11 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | sentence-transformers | 3.0.1 | Embedding model (`shared.embedding`) |
 | torch | ≥2.2 (CPU wheel on Linux) | sentence-transformers backend, from the PyTorch CPU index |
 | redis | ≥5.0.0,<6.0.0 | Optional session memory backend |
-| graphrag-shared | workspace | `platform/shared` packaged as `shared` |
+| knowledge-core | workspace | `packages/knowledge-core` packaged as `knowledge_core` |
 
 > **Note:** `pydantic` is pinned with a range (`>=2.11.7,<3.0.0`) rather than an exact version because `mcp==1.28.0` requires `pydantic>=2.12.0` on Python 3.14. The workspace pins Python to `>=3.11,<3.14` because `fastapi==0.115.0` and `mcp==1.28.0` do not co-resolve on 3.14+; exact versions (with hashes) live in `uv.lock`.
 
-### flink-app (`platform/healthcare/flink-app/requirements.txt`)
+### flink-app (`domains/healthcare/data-pipelines/flink-job/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -390,7 +390,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 | qdrant-client | 1.11.3 | Qdrant upsert client |
 | requests | 2.32.3 | HTTP utilities |
 
-### producer (`platform/healthcare/producer/requirements.txt`)
+### producer (`domains/healthcare/data-pipelines/producer/requirements.txt`)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -471,7 +471,7 @@ Launched via `docker compose -f container/docker-compose.infra.yml -f container/
 
 ## 4. Avro Envelope Schema
 
-**File:** `platform/healthcare/schemas/medical_event.avsc`  
+**File:** `domains/healthcare/data-pipelines/schemas/medical_event.avsc`  
 **Namespace:** `com.healthcare.graphrag`  
 **Record name:** `MedicalEvent`  
 **Schema version:** `1.0.0`
@@ -572,7 +572,7 @@ All three domains default to the same model. Set domain-specific env vars to act
 | HTTP port | 7474 |
 | Bolt port | 7687 |
 | Auth | `neo4j / ${NEO4J_PASSWORD:-healthcare123}` |
-| Init script | `platform/healthcare/neo4j/init.cypher` (mounted at startup) |
+| Init script | `domains/healthcare/knowledge/graph-seeds/init.cypher` (mounted at startup) |
 
 ### Node labels (19)
 
@@ -623,7 +623,7 @@ All three domains default to the same model. Set domain-specific env vars to act
 | `MANAGED_BY` | Patient → Provider | — |
 | `COVERED_BY` | Patient → Payer | — |
 
-### Seed data (from `platform/healthcare/neo4j/init.cypher`)
+### Seed data (from `domains/healthcare/knowledge/graph-seeds/init.cypher`)
 
 | Category | Count |
 |----------|-------|
@@ -830,7 +830,7 @@ When `MLFLOW_TRACKING_URI` is set, MLflow traces every query pipeline as a neste
 ## 11. CI / CD Pipeline
 
 **File:** `.github/workflows/rag-api-contracts.yml`  
-**Trigger:** push or PR to `dev` branch touching `domains/healthcare/agent-service/**`, `domains/healthcare/skills/**`, skill-generation scripts, or the workflow file itself
+**Trigger:** push or PR to `dev` branch touching `domains/healthcare/agent-service/**`, `domains/healthcare/knowledge/skills/**`, skill-generation scripts, or the workflow file itself
 
 | Job | Runner | Steps |
 |-----|--------|-------|
@@ -841,7 +841,7 @@ When `MLFLOW_TRACKING_URI` is set, MLflow traces every query pipeline as a neste
 Both jobs run in parallel. Neither requires live external services (all dependencies mocked in contract tests).
 
 **File:** `.github/workflows/deploy-ai-prd.yml`  
-Production deployment workflow using Helm. Deploys the `deploy/helm/` chart with `values-production.yaml` to AWS EKS.
+Production deployment workflow using Helm. Deploys the `infra/helm/` chart with `values-production.yaml` to AWS EKS.
 
 **File:** `.github/workflows/ontology-conformance.yml`  
 Includes ontology and pipeline checks plus `terminology-coverage-gate` that runs `python domains/healthcare/scripts/validate_terminology_coverage.py` and fails when LAB/CPT/ICD-10/MED/Specialty/Payer mapping coverage drops below configured thresholds.
@@ -931,7 +931,7 @@ Completed or largely implemented:
 - planner quality suites (`test_planner_evaluation.py`, `test_planner_edge_cases.py`),
 - provider adapter abstraction with Ollama, OpenAI, Anthropic, and FallbackProvider,
 - dynamic model routing with complexity-based tier selection (`generation/model_router.py`),
-- domain-routed embeddings with named Qdrant vectors and per-domain model configurability (`platform/shared/embedding.py`),
+- domain-routed embeddings with named Qdrant vectors and per-domain model configurability (`packages/knowledge-core/src/knowledge_core/embedding.py`),
 - structured output generation via JSON-mode constrained prompts (`generation/structured_output.py`),
 - input/output guardrails with classifier-based injection detection and grounding validation (`safety/guardrails.py`),
 - session-scoped and cross-session conversation memory with pluggable Redis persistence (`orchestration/memory.py`),
@@ -998,7 +998,7 @@ flowchart LR
 - [ ] Progressive delivery SLO gates: latency, error rate, and grounding score thresholds
 - [ ] Deployment rollout and rollback playbooks with explicit promotion criteria
 
-Touchpoints: `deploy/production/`, `docs/08_operation_runbook.md`, `.github/workflows/deploy-ai-prd.yml`
+Touchpoints: `infra/environments/production/`, `docs/08_operation_runbook.md`, `.github/workflows/deploy-ai-prd.yml`
 
 ### Stage 6 — Advanced agent capabilities
 
@@ -1066,14 +1066,14 @@ The `domains/supply-chain/` scaffold is in place with producer, graph_writes, pi
 - [ ] Supply-chain query examples script (`scripts/sc_query_examples.sh`)
 - [ ] BOM cascade impact analysis: given a disruption, traverse DEPENDS_ON to find all affected assemblies
 - [ ] Supplier scorecard aggregation from quality inspections, shipment lead times, and disruption history
-- [ ] Domain-routed embedding for supply-chain Qdrant collection (reuse `platform/shared/embedding.py` multi-model registry)
+- [ ] Domain-routed embedding for supply-chain Qdrant collection (reuse `packages/knowledge-core/src/knowledge_core/embedding.py` multi-model registry)
 
 ### New Domain Template
 
 To add a third domain (e.g., Insurance Claims, Cybersecurity SOC):
 
-1. Create `domains/<name>/` with: `rag-api/`, `scripts/`, `skills/`, `webapp/`
-2. Create `platform/<name>/` with: `ontology/`, `producer/`, `flink-app/app/`, `neo4j/`, `schemas/`
+1. Create `domains/<name>/` with: `agent-service/`, `scripts/`, `webapp/`
+2. Add `domains/<name>/data-pipelines/{producer,flink-job/app,schemas}/` and `domains/<name>/knowledge/{ontology,graph-seeds,skills}/`
 3. Define Avro envelope schema with domain-specific ID fields
 4. Write docker-compose overlay with isolated Neo4j + Qdrant + topic init
 5. Add Helm sub-charts or enable existing infra charts for the new domain

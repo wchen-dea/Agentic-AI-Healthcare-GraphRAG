@@ -68,7 +68,7 @@ The `LLM_FALLBACK_PROVIDER` env var enables automatic failover — if the primar
 ### Option A: Docker Compose (recommended for quick start)
 
 ```bash
-cd deploy/dev
+cd infra/environments/dev
 docker compose up -d                          # rag-api, neo4j, qdrant, ollama, provider-web
 docker compose -f docker-compose.monitoring.yml up -d  # prometheus, grafana, blackbox
 ```
@@ -98,7 +98,7 @@ docker compose -f docker-compose.monitoring.yml down -v
 make helm-dev    # one-command bootstrap
 # Or manually:
 minikube start --cpus=4 --memory=8192
-helm install healthcare-dev deploy/helm -f deploy/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
+helm install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
 ```
 
 Services exposed via NodePort:
@@ -146,8 +146,8 @@ minikube delete  # full reset
 ### Deploy (Helm)
 
 ```bash
-helm install healthcare deploy/helm \
-  -f deploy/helm/values-production.yaml \
+helm install healthcare infra/helm \
+  -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
   --set rag-api.secrets.NEO4J_PASSWORD=<value> \
   --set rag-api.secrets.OPENAI_API_KEY=<value> \
@@ -157,7 +157,7 @@ helm install healthcare deploy/helm \
 Upgrade:
 
 ```bash
-helm upgrade healthcare deploy/helm -f deploy/helm/values-production.yaml -n healthcare-ai
+helm upgrade healthcare infra/helm -f infra/helm/values-production.yaml -n healthcare-ai
 ```
 
 ### Platform Controls
@@ -168,11 +168,11 @@ helm upgrade healthcare deploy/helm -f deploy/helm/values-production.yaml -n hea
 ### Deploy (Docker Compose)
 
 ```bash
-cp deploy/production/rag-api.env.example deploy/production/rag-api.env
+cp infra/environments/production/rag-api.env.example infra/environments/production/rag-api.env
 # Edit rag-api.env with real credentials
 
-docker compose -f deploy/production/docker-compose.ai.yml up -d
-docker compose -f deploy/production/docker-compose.monitoring.yml up -d
+docker compose -f infra/environments/production/docker-compose.ai.yml up -d
+docker compose -f infra/environments/production/docker-compose.monitoring.yml up -d
 ```
 
 ---
