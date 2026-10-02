@@ -6,6 +6,8 @@
 - Supersedes: none
 - Superseded by: none
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`.
+
 ## Context
 
 The healthcare rag-api `app.py` grew to 1,410 lines containing configuration, external client setup, embedding logic, retrieval queries (including a 120-line Neo4j Cypher query), prompt construction, LLM synthesis, response sanitization, budget enforcement, HTTP routes, and MCP tools. The LangGraph agent nodes imported retrieval and synthesis functions from `app.py` at runtime, creating a circular dependency chain (`app` → `langgraph_agents` → `agents` → `app`).

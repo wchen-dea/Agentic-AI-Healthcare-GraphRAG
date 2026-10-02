@@ -324,8 +324,8 @@ All services are defined in `infra/compose/docker-compose.infra.yml` and `infra/
 | `healthcare-neo4j` | neo4j | 5.26.2 | 7474 (HTTP), 7687 (Bolt) | Graph database |
 | `healthcare-neo4j-init` | neo4j | 5.26.2 | — | One-shot Cypher seed |
 | `infra-ollama` | ollama/ollama | latest | 11434 | Local LLM inference |
-| `infra-flink-jobmanager` | custom (infra/images/flink-cluster/Dockerfile) | — | 8082 | Flink JobManager (shared) |
-| `infra-flink-taskmanager` | custom (infra/images/flink-cluster/Dockerfile) | — | — | Flink TaskManager (shared) |
+| `healthcare-flink-jobmanager` | custom (domains/healthcare/data-pipelines/flink-job/Dockerfile) | — | 8082 | Flink JobManager |
+| `healthcare-flink-taskmanager` | custom (domains/healthcare/data-pipelines/flink-job/Dockerfile) | — | — | Flink TaskManager |
 | `healthcare-flink-app` | custom (domains/healthcare/data-pipelines/flink-job/Dockerfile) | — | — | PyFlink job submitter |
 | `healthcare-producer` | custom (domains/healthcare/data-pipelines/producer/Dockerfile) | — | — | Synthetic event generator |
 | `healthcare-agent-service` | custom (domains/healthcare/agent-service/Dockerfile) | — | 8000 | GraphRAG REST + MCP API |
@@ -686,7 +686,7 @@ All three domains default to the same model. Set domain-specific env vars to act
 | `AGENT_MAX_ANSWER_CHARS` | 2000 | Max chars in LLM answer before truncation |
 | `AGENT_MAX_RESPONSE_BYTES` | 50 000 | Hard byte budget for entire response payload |
 | `LLM_TIMEOUT_SECONDS` | 120 | LLM request timeout |
-| `LLM_MAX_TOKENS` | 1200 | Max response tokens (Ollama `num_predict`) |
+| `LLM_MAX_TOKENS` | 1200 if unset (local compose sets 4096) | Max response tokens (Ollama `num_predict`, Databricks/OpenAI `max_tokens`); Databricks reasoning endpoints need ~4096 |
 | `LLM_MODEL` | provider default | Default model for generation (the only model variable) |
 | `LLM_MODEL_SIMPLE` | (= `LLM_MODEL`) | Model for simple queries (greetings, lookups) |
 | `LLM_MODEL_MODERATE` | (= `LLM_MODEL`) | Model for moderate queries (single-domain clinical) |
@@ -858,7 +858,7 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `QDRANT_URL` | `http://qdrant:6333` | flink-app, agent-service | Qdrant HTTP base URL |
 | `QDRANT_COLLECTION` | `healthcare_events` | flink-app, agent-service | Collection name |
 | `OLLAMA_URL` | `http://ollama:11434` | agent-service | Ollama inference endpoint |
-| `LLM_PROVIDER` | `ollama` | agent-service | Primary LLM provider: `ollama`, `databricks`, `openai`, `anthropic`, or `bedrock` |
+| `LLM_PROVIDER` | `ollama` if unset (local compose/`.env` set `databricks`) | agent-service | Primary LLM provider: `ollama`, `databricks`, `openai`, `anthropic`, or `bedrock` |
 | `LLM_MODEL` | provider default | agent-service | Model name for the selected provider (the only model variable; `OLLAMA_MODEL`/`DATABRICKS_MODEL`/`BEDROCK_MODEL_ID` are not read) |
 | `LLM_MODEL_SIMPLE` | (= `LLM_MODEL`) | agent-service | Model for simple queries (greetings, lookups). Used by `ModelRouter` |
 | `LLM_MODEL_MODERATE` | (= `LLM_MODEL`) | agent-service | Model for moderate queries (single-domain clinical). Used by `ModelRouter` |
@@ -1059,7 +1059,7 @@ The `domains/supply-chain/` scaffold is in place with producer, graph_writes, pi
 - [ ] Supply-chain RAG API with graph_context Cypher for supplier/part/facility traversal
 - [ ] Supply-chain planner evaluation fixtures and contract tests
 - [ ] Risk signal rules engine integration (single-source, lead-time, quality threshold rules)
-- [ ] Supply-chain query examples script (`scripts/sc_query_examples.sh`)
+- [x] Supply-chain query examples script (`domains/supply-chain/scripts/query_examples.sh`)
 - [ ] BOM cascade impact analysis: given a disruption, traverse DEPENDS_ON to find all affected assemblies
 - [ ] Supplier scorecard aggregation from quality inspections, shipment lead times, and disruption history
 - [ ] Domain-routed embedding for supply-chain Qdrant collection (reuse `packages/knowledge-core/src/knowledge_core/embedding.py` multi-model registry)

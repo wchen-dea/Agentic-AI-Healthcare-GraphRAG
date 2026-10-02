@@ -27,7 +27,7 @@ def main() -> int:
         fake_cypher_shell = fake_bin / "cypher-shell"
         fake_cypher_shell.write_text(
             "#!/bin/sh\n"
-            "printf '%s\n' \"$@\" > \"$BOOTSTRAP_CYPHER_LOG\"\n"
+            "printf '%s\n' \"$@\" >> \"$BOOTSTRAP_CYPHER_LOG\"\n"
             "exit 0\n",
             encoding="utf-8",
         )

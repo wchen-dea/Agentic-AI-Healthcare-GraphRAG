@@ -6,6 +6,8 @@
 - Supersedes: none
 - Superseded by: none
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`. LLM providers and routing are in `healthcare_agent/generation/providers.py` and `generation/model_router.py`. `deploy/dev/rag-api.env` was replaced by the root `.env` (canonical vars: `LLM_PROVIDER`, `LLM_MODEL`, `LLM_MAX_TOKENS`, `LLM_TIMEOUT_SECONDS`); Compose and Helm dev both default to Databricks, Helm production to Bedrock with Anthropic fallback.
+
 ## Context
 
 Local development should run without external dependencies, while production should support managed model providers.

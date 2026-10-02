@@ -21,7 +21,7 @@ def build_seed_cypher(bundle: dict) -> str:
     lines.append("// Adverse outcomes")
     for item in drug_safety.get("adverse_outcomes", []):
         lines.append(
-            f'MERGE (:AdverseOutcome {{code: "{item["code"]}", description: "{item["description"]}"}});'
+            f'MERGE (o:AdverseOutcome {{code: "{item["code"]}"}}) SET o.description = "{item["description"]}";'
         )
     lines.append("")
     lines.append("// Condition seeds")

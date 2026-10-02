@@ -125,7 +125,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 - Event-Driven Pipeline: [domains/healthcare/data-pipelines/producer/produce_events.py](../domains/healthcare/data-pipelines/producer/produce_events.py), [domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py](../domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py), [infra/compose/docker-compose.infra.yml](../infra/compose/docker-compose.infra.yml)
 - Dual Materialized Views: [domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py](../domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py), [docs/04_data_platform.md](04_data_platform.md)
 - Shared-Core, Multi-Interface: [domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py](../domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py) (`QueryService.run_query`/`stream` shared by REST `/query`, `/query/stream`, and MCP tools)
-- Policy Enforcement Point: [domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py](../domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py) (sanitization, truncation, budget), [domains/healthcare/agent-service/src/healthcare_agent/api/governance.py](../domains/healthcare/agent-service/src/healthcare_agent/api/governance.py) (`ToolGovernance` role policy, audit, and metrics)
+- Policy Enforcement Point: [domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py](../domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py) (sanitization, truncation, budget), [packages/agent-core/src/agent_core/governance.py](../packages/agent-core/src/agent_core/governance.py) (`ToolGovernance` role policy, audit, and metrics)
 - Contract-First Tooling: [domains/healthcare/agent-service/tests/integration/test_contracts.py](../domains/healthcare/agent-service/tests/integration/test_contracts.py), [docs/05_ai_agents.md](05_ai_agents.md)
 - Bounded Context Window: [domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py](../domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py) (`apply_response_budget`, `truncate_text`)
 - Observability by Design: [infra/observability/prometheus.yml](../infra/observability/prometheus.yml), [infra/observability/grafana/dashboards/healthcare-monitoring-overview.json](../infra/observability/grafana/dashboards/healthcare-monitoring-overview.json), [docs/08_operation_runbook.md](08_operation_runbook.md)
@@ -496,7 +496,7 @@ Schema Registry stores the MedicalEvent envelope under topic-value subjects for 
 
 ### Flink Runtime
 
-The Flink cluster (JobManager + TaskManager) is shared infrastructure defined in infra/compose/docker-compose.infra.yml using a domain-neutral image (infra/images/flink-cluster/Dockerfile).
+Each domain runs its own Flink cluster (JobManager + TaskManager) defined in its compose overlay: `healthcare-flink-jobmanager` / `healthcare-flink-taskmanager` in infra/compose/docker-compose.healthcare.yml and `supplychain-flink-jobmanager` / `supplychain-flink-taskmanager` in infra/compose/docker-compose.supply-chain.yml, each built from the domain's `data-pipelines/flink-job/Dockerfile`.
 
 Domain-specific job submitters are defined in each domain's compose overlay:
 
@@ -525,7 +525,7 @@ Execution details:
 
 domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py provides:
 
-- domain-routed embedding (clinical / claims / device) via `packages/knowledge-core/embedding.py`,
+- domain-routed embedding (clinical / claims / device) via `packages/knowledge-core/src/knowledge_core/embedding.py`,
 - clinical_text rendering with optional reference-data expansion,
 - in-memory reference store updates,
 - event enrichment,

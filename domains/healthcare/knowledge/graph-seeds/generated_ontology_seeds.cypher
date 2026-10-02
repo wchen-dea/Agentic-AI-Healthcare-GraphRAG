@@ -1,12 +1,12 @@
 // Generated from ontology/graph_seeds.yaml
 
 // Adverse outcomes
-MERGE (:AdverseOutcome {code: "DE", description: "Death"});
-MERGE (:AdverseOutcome {code: "LT", description: "Life-Threatening"});
-MERGE (:AdverseOutcome {code: "HO", description: "Hospitalization - Initial or Prolonged"});
-MERGE (:AdverseOutcome {code: "DS", description: "Disability"});
-MERGE (:AdverseOutcome {code: "CA", description: "Congenital Anomaly"});
-MERGE (:AdverseOutcome {code: "OT", description: "Other Serious (Important Medical Events)"});
+MERGE (o:AdverseOutcome {code: "DE"}) SET o.description = "Death";
+MERGE (o:AdverseOutcome {code: "LT"}) SET o.description = "Life-Threatening";
+MERGE (o:AdverseOutcome {code: "HO"}) SET o.description = "Hospitalization - Initial or Prolonged";
+MERGE (o:AdverseOutcome {code: "DS"}) SET o.description = "Disability";
+MERGE (o:AdverseOutcome {code: "CA"}) SET o.description = "Congenital Anomaly";
+MERGE (o:AdverseOutcome {code: "OT"}) SET o.description = "Other Serious (Important Medical Events)";
 
 // Condition seeds
 MERGE (:Condition {name: "Hyperkalemia"});

@@ -29,7 +29,7 @@ AI Client (Copilot, Claude Desktop, custom agent)
      - retrieval/search.py and retrieval/ranking.py (Qdrant + Neo4j context)
      - generation/synthesis.py, model_router.py, factory.py, providers.py
      - safety/guardrails.py, harness.py, response_policy.py
-     - api/governance.py and api/responses.py (tool policy, audit, response shaping)
+     - api/responses.py (response shaping); tool policy/audit in agent_core.governance
      - tools/mcp_server.py, langchain_tools.py, skills.py
      - evaluation/ and observability/ modules
   -> External stores:
@@ -595,7 +595,7 @@ Primary implementation and integration touchpoints:
 - `domains/healthcare/agent-service/src/healthcare_agent/main.py` — slim composition root that wires `HealthcareAgentSettings`, Qdrant/Neo4j adapters (`vector_context`, `graph_context`), LLM gateway, LangGraph runtime ports, FastAPI, and MCP.
 - `domains/healthcare/agent-service/src/healthcare_agent/config/settings.py` — `HealthcareAgentSettings`, a `pydantic-settings` class extending `agent_core.settings.AgentServiceSettings`; environment variable names intentionally retain the `AGENT_*`, `LLM_*`, `QDRANT_URL`, and `NEO4J_*` prefixes.
 - `domains/healthcare/agent-service/src/healthcare_agent/api/routes.py` — HTTP routes including `/query` and `/query/stream`.
-- `domains/healthcare/agent-service/src/healthcare_agent/api/governance.py` — `ToolGovernance` role policy, audit logging, and tool metrics.
+- `packages/agent-core/src/agent_core/governance.py` — shared `ToolGovernance` role policy, audit logging, and tool metrics (used by the healthcare agent service).
 - `domains/healthcare/agent-service/src/healthcare_agent/api/responses.py` — `ResponseShaper` response shaping.
 - `domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py` — `QueryService.run_query` and `QueryService.stream`, the shared query service used by HTTP and MCP.
 - `domains/healthcare/agent-service/src/healthcare_agent/orchestration/graph.py` — LangGraph `StateGraph` builder.
@@ -609,18 +609,20 @@ Primary implementation and integration touchpoints:
 - `domains/healthcare/agent-service/src/healthcare_agent/generation/factory.py` — `build_llm_provider`.
 - `domains/healthcare/agent-service/src/healthcare_agent/safety/` — guardrails, harness, and response policy.
 - `domains/healthcare/agent-service/src/healthcare_agent/evaluation/` — gates, LangSmith, MLflow evaluation, retrieval benchmarks, and grounding scorecards.
-- `domains/healthcare/agent-service/src/healthcare_agent/observability/metrics.py` — Prometheus `agent_service_*` collectors.
+- `packages/agent-core/src/agent_core/metrics.py` — shared Prometheus `agent_service_*` collectors.
 - `domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py` — MLflow tracing helpers.
 
 ## LangGraph Flow
 
 ```mermaid
 graph TD
-    A[triage_agent] --> B[vector_retrieval_agent]
-    B --> C[graph_retrieval_agent]
-    C -->|medication_safety| D[medication_safety_agent]
-    C -->|lab_interpretation| E[lab_interpretation_agent]
-    C -->|coding_review| F[coding_review_agent]
+    S[input_guardrail] -->|allowed| A[triage]
+    S -->|blocked| I[END]
+    A --> B[vector_retrieval]
+    B --> C[graph_retrieval]
+    C -->|medication_safety| D[medication_safety]
+    C -->|lab_interpretation| E[lab_interpretation]
+    C -->|coding_review| F[coding_review]
     C -->|patient_summary/cohort_triage| G[confidence_evaluator]
     D --> J{Pending delegation?}
     E --> J
@@ -628,24 +630,27 @@ graph TD
     J -->|yes| K[delegation_router]
     J -->|no| G
     K --> G
-    G -->|confidence >= threshold or max_iter| H[synthesis_agent]
+    G -->|confidence >= threshold or max_iter| H[synthesis]
     G -->|low confidence| B
-    H --> I[END]
+    H --> O[output_guardrail]
+    O --> I
 ```
 
-Nine LangGraph nodes share typed state (three retrieval agents, three specialist agents, two control agents, and synthesis):
+Eleven LangGraph nodes share typed state (two guardrails, three retrieval nodes, three specialist nodes, two control nodes, and synthesis). Node names are registered in `orchestration/graph.py`; the implementing functions live in `agents/nodes.py`:
 
-| Agent | Responsibility |
-|-------|---------------|
-| `triage_agent` | Classify question and select retrieval plan |
-| `vector_retrieval_agent` | Qdrant similarity search and evidence ranking |
-| `graph_retrieval_agent` | Neo4j patient graph traversal and evidence ranking |
-| `medication_safety_agent` | Interaction, contraindication, and adverse event analysis |
-| `lab_interpretation_agent` | Lab signal and abnormal observation extraction |
-| `coding_review_agent` | Claims gap detection and ICD-10 mapping analysis |
-| `delegation_router` | Resolve specialist-to-specialist capability requests |
-| `confidence_evaluator` | Evidence completeness scoring and loop control |
-| `synthesis_agent` | Grounded answer generation through the configured provider |
+| Node | Function | Responsibility |
+|------|----------|----------------|
+| `input_guardrail` | `input_guardrail` | Block unsafe or out-of-scope requests before any retrieval |
+| `triage` | `triage_agent` | Classify question and select retrieval plan |
+| `vector_retrieval` | `vector_retrieval_agent` | Qdrant similarity search and evidence ranking |
+| `graph_retrieval` | `graph_retrieval_agent` | Neo4j patient graph traversal and evidence ranking |
+| `medication_safety` | `medication_safety_agent` | Interaction, contraindication, and adverse event analysis |
+| `lab_interpretation` | `lab_interpretation_agent` | Lab signal and abnormal observation extraction |
+| `coding_review` | `coding_review_agent` | Claims gap detection and ICD-10 mapping analysis |
+| `delegation_router` | `delegation_router` | Resolve specialist-to-specialist capability requests |
+| `confidence_evaluator` | `confidence_evaluator` | Evidence completeness scoring and loop control |
+| `synthesis` | `synthesis_agent` | Grounded answer generation through the configured provider |
+| `output_guardrail` | `output_guardrail` | Validate and shape the final answer before it is returned |
 
 ## Observability and Configuration
 

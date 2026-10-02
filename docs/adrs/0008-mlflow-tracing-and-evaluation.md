@@ -6,6 +6,8 @@
 - Supersedes: none
 - Superseded by: none
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`. The MLflow service is defined in `infra/compose/docker-compose.infra.yml`.
+
 ## Context
 
 The healthcare rag-api supports three query orchestration modes (single-pass, ReAct, LangGraph multi-agent). Each mode has different agent topologies, latency profiles, and evidence assembly patterns. Comparing their effectiveness requires:
@@ -78,4 +80,4 @@ Trade-offs:
 - [ADR-0007: LangGraph multi-agent query orchestration](./0007-langgraph-multi-agent-orchestration.md)
 - [domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_tracing.py](../../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_tracing.py)
 - [domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_eval.py](../../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/mlflow_eval.py)
-- [container/docker-compose.infra.yml](../../container/docker-compose.infra.yml) (MLflow service)
+- [infra/compose/docker-compose.infra.yml](../../infra/compose/docker-compose.infra.yml) (MLflow service)

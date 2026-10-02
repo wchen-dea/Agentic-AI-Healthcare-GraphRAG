@@ -35,11 +35,16 @@ def compact_graph_context(
         age = patient.get("age", "?")
         sex = patient.get("sex", "?")
         risk_tier = patient.get("risk_tier", "?")
-        raw_conditions = patient.get("conditions", [])[:5]
+        raw_conditions = patient.get("conditions") or []
+        condition_names = (
+            c.get("name") if isinstance(c, dict) else c for c in raw_conditions
+        )
         conditions = ", ".join(
-            c.get("name", c) if isinstance(c, dict) else str(c) for c in raw_conditions
+            [str(name) for name in condition_names if name][:5]
         ) or "none"
-        symptoms = ", ".join(patient.get("symptoms", [])[:5]) or "none"
+        symptoms = ", ".join(
+            [str(s) for s in (patient.get("symptoms") or []) if s][:5]
+        ) or "none"
 
         observations = patient.get("observations", [])[:3]
         observation_summary = "; ".join(

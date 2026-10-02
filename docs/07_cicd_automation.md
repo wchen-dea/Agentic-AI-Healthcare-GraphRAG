@@ -5,11 +5,20 @@ This document covers deployment configurations and CI/CD automation for the Heal
 ## Directory Structure
 
 ```
-deploy/
+infra/
+├── compose/                    Local Docker Compose (infra + per-domain stacks)
+├── environments/
+│   ├── dev/
+│   │   └── setup-minikube.sh   Minikube bootstrap (local Compose lives in infra/compose/)
+│   └── production/             Production Docker Compose variant
+│       ├── docker-compose.ai.yml
+│       ├── docker-compose.monitoring.yml
+│       ├── monitoring/
+│       └── agent-service.env.example
 ├── helm/                       Helm umbrella chart (Kubernetes deployment)
 │   ├── Chart.yaml              Umbrella chart with sub-chart dependencies
 │   ├── values.yaml             Default values
-│   ├── values-dev.yaml         Dev overrides (single replica, Ollama, full infra)
+│   ├── values-dev.yaml         Dev overrides (single replica, Databricks LLM, full infra)
 │   ├── values-production.yaml  Production overrides (multi-replica, Bedrock+fallback)
 │   ├── templates/              Namespace, NetworkPolicy, helpers
 │   └── charts/
@@ -18,16 +27,14 @@ deploy/
 │       ├── flink/              Flink cluster (JobManager + TaskManager + job)
 │       ├── mlflow/             Tracing and evaluation server
 │       ├── kafka/              Confluent Kafka (Zookeeper + broker + Schema Registry)
+│       ├── conduktor/          Kafka console
+│       ├── producer/           Synthetic event producer
 │       ├── neo4j/              Neo4j graph database
 │       ├── qdrant/             Qdrant vector database
-│       └── ollama/             Local LLM inference server
-├── dev/                        Minikube bootstrap (local Compose lives in infra/compose/)
-│   └── setup-minikube.sh
-└── production/                 Production Docker Compose variant
-    ├── docker-compose.ai.yml
-    ├── docker-compose.monitoring.yml
-    ├── monitoring/
-    └── agent-service.env.example
+│       └── ollama/             Local LLM inference server (optional provider)
+├── images/flink-cluster/       Legacy shared Flink image (unused; Flink runs per-domain)
+├── observability/              Prometheus, alerts, blackbox, Grafana config
+└── web/nginx.conf              Frontend reverse-proxy config
 ```
 
 ## In-Scope Components
@@ -153,6 +160,8 @@ helm install healthcare infra/helm \
   --set agent-service.secrets.ANTHROPIC_API_KEY=<value>
 ```
 
+`OPENAI_API_KEY` is optional; set it only when using the OpenAI provider or fallback.
+
 Upgrade:
 
 ```bash
@@ -181,7 +190,7 @@ docker compose -f infra/environments/production/docker-compose.monitoring.yml up
 - Replace all `change_me` values before deployment.
 - Inject API keys and passwords from a secret manager or sealed secret workflow.
 - Never commit populated `.env` files or rendered secret manifests.
-- Required secrets (production): `NEO4J_PASSWORD`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
+- Required secrets (production): `NEO4J_PASSWORD`, `ANTHROPIC_API_KEY` (optional: `OPENAI_API_KEY`)
 - Dev uses hardcoded defaults (no external API keys needed).
 
 ---
@@ -247,5 +256,5 @@ Workflow: `.github/workflows/deploy-ai-prd.yml`
 - Triggers on push to `prd` branch or `workflow_dispatch`
 - Deploys to AWS EKS
 
-Required secrets: `NEO4J_PASSWORD`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
+Required secrets: `NEO4J_PASSWORD`, `ANTHROPIC_API_KEY` (optional: `OPENAI_API_KEY`)
 Required variables: `AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `EKS_CLUSTER_NAME`
