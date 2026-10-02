@@ -1,97 +1,178 @@
-# Agentic AI Healthcare Platform — Streaming GraphRAG with Multi-Agent Orchestration
+# Agentic AI Healthcare + Supply Chain GraphRAG
 
-End-to-end clinical decision-support system that streams healthcare events through Kafka and Flink, persists them as vector embeddings (Qdrant) and a knowledge graph (Neo4j), and answers clinical questions through multi-agent reasoning with domain-routed retrieval, guardrails, and structured output.
+A local-first multi-domain Python workspace for building and running GraphRAG-style AI systems across healthcare and supply-chain domains. The repository is organized as a uv-managed monorepo with shared runtime packages and domain-specific agent services, streaming pipelines, knowledge assets, and web apps.
 
-Runs fully local on Ollama, scales to AWS Bedrock in production with complexity-based model routing and optional fallback providers.
+The implementation is broader than the older single-platform README narrative: the codebase is currently structured around shared infrastructure plus two active domains,
+- Healthcare
+- Supply chain
 
-## Tech Stack
+with Docker Compose overlays, a Makefile-driven developer workflow, and domain-specific data pipelines and agent services.
 
-| Layer | Technologies |
-|-------|-------------|
-| Streaming | Apache Kafka, Schema Registry, Apache Flink (PyFlink) |
-| Data Stores | Qdrant (vector), Neo4j (graph) |
-| AI & API | FastAPI + embedded MCP, LangGraph, LangChain |
-| LLM | Ollama (dev), AWS Bedrock (prod, with fallback) |
-| Frontend | Nginx-served provider web app |
-| Observability | Prometheus, Grafana, MLflow Tracing, LangSmith |
-| Deployment | Helm, Docker Compose, minikube |
+## What the repo contains
 
-## Innovation Highlights
+The current project structure is a real workspace, not a single app package:
 
-- **Streaming intelligence** — Kafka + PyFlink; events queryable in seconds
-- **Hybrid GraphRAG** — Qdrant vectors + Neo4j relationships in every answer
-- **Multi-agent orchestration** — LangGraph with 8 specialist nodes and confidence-gated re-retrieval
-- **Pharmacovigilance knowledge graph** — 41 interaction + 46 reaction + 23 contraindication edges
-- **Explainability** — vector_context, graph_context, retrieval_plan, confidence returned with every answer
-- **10 MCP tools** — role-based auth, audit hashing, response budgets
-- **MLflow evaluation** — 6 healthcare scorers, cross-mode comparison
-- **Multi-domain** — Healthcare + Supply Chain on shared infrastructure
-- **Local-first** — full stack on a laptop, zero API fees
+- `packages/agent-core` — shared orchestration/runtime utilities
+- `packages/knowledge-core` — shared knowledge and graph-related abstractions
+- `domains/healthcare/` — healthcare agent service, data pipelines, knowledge seeds, scripts, web app
+- `domains/supply-chain/` — supply-chain agent service, data pipelines, knowledge seeds, scripts, web app
+- `infra/compose/` — shared infra stack and domain overlays
+- `infra/helm/` — Helm deployment assets
+- `scripts/` — validation and workflow helpers
+- `docs/` — architecture, operations, and domain documentation
 
-## Quick Start
+## Architecture summary
+
+The runtime model is organized into tiers:
+
+- Shared infrastructure: Kafka, Schema Registry, Ollama, Prometheus, Grafana, MLflow, LocalStack, and supporting services
+- Healthcare domain overlay: Neo4j, Qdrant, Kafka topics, Flink job, producer, agent service, webapp
+- Supply-chain domain overlay: separate Neo4j, Qdrant, Kafka topics, producer, Flink job, and agent service
+- Shared Python packages used by both domains
+
+This is a local development and experimentation platform with a multi-domain GraphRAG stack rather than a single product service.
+
+## Core stack
+
+The implementation currently reflects these technologies:
+
+- Python + uv workspace management
+- FastAPI + Uvicorn
+- LangGraph / LangChain / LangSmith
+- Neo4j for graph memory and ontology data
+- Qdrant for vector retrieval
+- Kafka + Schema Registry + Flink for streaming ingestion and processing
+- MLflow + Grafana + Prometheus for observability
+- Docker Compose and Helm for local and deployment workflows
+- Pydantic and typed Python services across the shared packages and domain services
+
+## Local developer workflow
+
+The project uses a Makefile as the main entry point for local orchestration.
+
+### Bootstrap and lifecycle
 
 ```bash
-make up          # Start all services (infra + healthcare + supply-chain)
-make ps          # Verify containers
+make up          # Start shared infra + healthcare + supply-chain
+make up-hc       # Start infra + healthcare domain
+make up-sc       # Start infra + supply-chain domain
+make down        # Stop everything and remove the network
+make ps          # Show running containers
+make logs        # Tail healthcare logs
+make logs-sc     # Tail supply-chain logs
+```
+
+### Domain and service access
+
+```bash
+make api-hc      # Health check for healthcare API
+make api-sc      # Health check for supply-chain API
 make query-hc    # Run healthcare query examples
 make query-sc    # Run supply-chain query examples
+make flink-hc    # Healthcare Flink overview
+make flink-sc    # Supply-chain Flink overview
+make topics      # List Kafka topics
+make mlflow      # MLflow health check
 ```
 
-Minikube (Kubernetes):
+### Validation and tests
 
 ```bash
-make helm-dev    # Deploy full stack to minikube
-make helm-ports  # Start port-forwards
+make validate            # Cross-domain stack validation
+make validate-docs       # Markdown validation
+make validate-skills     # Agent skill package sync checks
+make validate-ontology   # Ontology validation for both domains
+make test-unit           # Fast unit tests for agent-core + domains
+make test-integration    # Integration tests (no live services)
+make test-evals          # Offline evaluation suites
+make lint                # Ruff linting across packages and domains
 ```
 
-## Service Endpoints (Docker Compose)
+### Healthcare web UI
+
+```bash
+make web-hc-dev      # Vite dev server for healthcare UI
+make web-hc-test     # Typecheck and unit tests for healthcare web app
+make web-hc-build    # Production build for healthcare web app
+```
+
+## Service endpoints
+
+The current local stack exposes the following ports:
 
 | Service | URL |
 |---------|-----|
 | Healthcare agent service | http://localhost:8000 |
-| Healthcare Web UI | http://localhost:8088 |
-| Supply-chain RAG API | http://localhost:8001 |
-| Neo4j Browser (HC) | http://localhost:7474 |
-| Qdrant Dashboard | http://localhost:6333/dashboard |
-| Flink Dashboard | http://localhost:8082 |
+| Supply-chain agent service | http://localhost:8001 |
+| Healthcare web app | http://localhost:8088 |
+| Supply-chain web app | http://localhost:8089 |
+| Healthcare Neo4j Browser | http://localhost:7474 |
+| Supply-chain Neo4j Browser | http://localhost:7475 |
+| Healthcare Qdrant | http://localhost:6333 |
+| Supply-chain Qdrant | http://localhost:6335 |
+| Healthcare Flink dashboard | http://localhost:8082 |
+| Supply-chain Flink dashboard | http://localhost:8083 |
 | Grafana | http://localhost:3000 |
 | MLflow | http://localhost:5000 |
 
-## Default Credentials
+## Default credentials
 
-| Service | User | Password |
-|---------|------|----------|
-| Neo4j (healthcare) | neo4j | healthcare123 |
-| Neo4j (supply-chain) | neo4j | supplychain123 |
+| Service | Username | Password |
+|---------|----------|----------|
+| Healthcare Neo4j | neo4j | healthcare123 |
+| Supply-chain Neo4j | neo4j | supplychain123 |
 | Grafana | admin | admin123 |
+
+## Repository layout
+
+```text
+.
+├── Makefile
+├── pyproject.toml
+├── uv.lock
+├── docs/                          # Architecture, operations, and domain design docs
+├── domains/
+│   ├── healthcare/
+│   │   ├── agent-service/
+│   │   ├── data-pipelines/
+│   │   ├── knowledge/
+│   │   ├── scripts/
+│   │   └── webapp/
+│   └── supply-chain/
+│       ├── agent-service/
+│       ├── data-pipelines/
+│       ├── knowledge/
+│       ├── scripts/
+│       └── webapp/
+├── packages/
+│   ├── agent-core/
+│   └── knowledge-core/
+├── infra/
+│   ├── compose/
+│   ├── helm/
+│   ├── environments/
+│   ├── observability/
+│   ├── images/
+│   └── web/
+├── scripts/
+├── deploy/
+├── container/
+├── volume/
+└── README.md
+```
 
 ## Documentation
 
-| Document | Topic |
-|----------|-------|
-| [01_business_requirements.md](docs/01_business_requirements.md) | Use cases, stakeholders, governance |
-| [02_architecture.md](docs/02_architecture.md) | System architecture, design patterns |
-| [03_platform_blueprint.md](docs/03_platform_blueprint.md) | Platform blueprint, target architecture, specs, and backlog |
-| [04_data_platform.md](docs/04_data_platform.md) | Kafka schema, Neo4j graph model |
-| [05_ai_agents.md](docs/05_ai_agents.md) | MCP, Skills, LangGraph agents |
-| [06_quality_assurance.md](docs/06_quality_assurance.md) | Testing strategy, contract tests |
-| [07_cicd_automation.md](docs/07_cicd_automation.md) | CI/CD, Helm, Compose, minikube, tech matrix |
-| [08_operation_runbook.md](docs/08_operation_runbook.md) | Operations, troubleshooting, Makefile |
-| [09_supply_chain_domain.md](docs/09_supply_chain_domain.md) | Supply chain graph model, events |
-| [10_healthcare_landscape.md](docs/10_healthcare_landscape.md) | Industry AI landscape analysis |
-| [ADRs](docs/adrs/README.md) | Architecture Decision Records |
+See the project docs for the deeper architecture and operating model:
 
-## Project Layout
+- [docs/](docs/)
+- [docs/01_business_requirements.md](docs/01_business_requirements.md)
+- [docs/02_architecture.md](docs/02_architecture.md)
+- [docs/04_data_platform.md](docs/04_data_platform.md)
+- [docs/05_ai_agents.md](docs/05_ai_agents.md)
+- [docs/08_operation_runbook.md](docs/08_operation_runbook.md)
+- [docs/adrs/README.md](docs/adrs/README.md)
 
-```
-docs/                 Full documentation suite and ADRs
-domains/<d>/          Per-domain agent service, data-pipelines/ (Flink job, producer, schemas),
-                      knowledge/ (ontology, graph-seeds, skills), scripts, webapp
-packages/             Shared Python packages: agent-core (runtime), knowledge-core (streaming, ontology)
-infra/                compose/, helm/, environments/{dev,production}, observability/, images/, web/
-scripts/              Cross-domain validation, shared lib
-```
+## Safety note
 
-## Safety Disclaimer
-
-**Synthetic demo data only.** Not clinical software, not a medical device. All LLM answers are advisory-only and require independent clinical review before any action.
+This repository contains synthetic or demo-oriented data and local development assets. It is not a clinical system, not a regulated medical device, and any AI-generated output should be treated as advisory only and validated independently before use in operational or clinical settings.

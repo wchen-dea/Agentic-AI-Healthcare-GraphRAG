@@ -9,7 +9,7 @@ For production AI-only deployment boundaries and compose bundles, see [docs/07_c
 Scope note:
 
 - The commands and defaults in this runbook are for local development and synthetic-demo operation.
-- Production-ready deployment configuration lives under `deploy/` and should be operated with environment-specific security, secrets, networking, and platform controls.
+- Production-ready deployment configuration lives under `infra/` (Helm in `infra/helm/`, production Compose in `infra/environments/production/`) and should be operated with environment-specific security, secrets, networking, and platform controls.
 - For full deployment documentation including Helm charts, see [docs/07_cicd_automation.md](07_cicd_automation.md).
 
 ## Prerequisites
@@ -475,8 +475,8 @@ Symptom:
 Checks:
 
 ```bash
-docker exec infra-flink-taskmanager which python
-docker exec infra-flink-taskmanager which python3
+docker exec healthcare-flink-taskmanager which python
+docker exec healthcare-flink-taskmanager which python3
 ```
 
 Expected:
@@ -499,7 +499,7 @@ Symptom:
 Checks:
 
 ```bash
-docker exec infra-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-connector-kafka|kafka-clients'
+docker exec healthcare-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-connector-kafka|kafka-clients'
 ```
 
 Recovery:
@@ -618,6 +618,8 @@ helm install healthcare infra/helm \
   --set agent-service.secrets.ANTHROPIC_API_KEY=<value>
 ```
 
+`OPENAI_API_KEY` is optional; set it only when using the OpenAI provider or fallback.
+
 ### Upgrade
 
 ```bash
@@ -683,12 +685,17 @@ Services:
 
 ## LLM Provider Troubleshooting
 
+Provider selection is controlled by `LLM_PROVIDER`, `LLM_MODEL`, `LLM_MAX_TOKENS`, and `LLM_TIMEOUT_SECONDS` (see `.env.example`).
+
 | Env | Provider | Symptom | Check |
 |-----|----------|---------|-------|
-| Dev | Ollama | "no models installed" | `ollama pull llama3.1` in the ollama pod/container |
-| Prod | OpenAI | "OPENAI_API_KEY not set" | Verify secret injection via `kubectl get secret agent-service-secrets -o yaml` |
-| Prod | Anthropic (fallback) | "ANTHROPIC_API_KEY not set" | Same — check secret |
-| Prod | Both fail | "LLM error" in answer | Check network egress to `api.openai.com` and `api.anthropic.com` |
+| Local / Dev | Databricks | HTTP 404 from serving endpoint | `LLM_MODEL` must be the serving **endpoint** name (e.g. `databricks-gpt-5-6-luna`), not a Unity Catalog model name; verify `DATABRICKS_HOST` / `DATABRICKS_TOKEN` |
+| Local / Dev | Databricks | HTTP 400 mentioning `temperature` | Handled automatically — the provider retries without `temperature`; no action needed |
+| Local / Dev | Databricks | Truncated or empty answers, timeouts | Raise `LLM_MAX_TOKENS` (compose default `4096`) and `LLM_TIMEOUT_SECONDS` (default `120`); calls can take ~50s |
+| Local / Dev | Ollama (alternative) | "no models installed" | `ollama pull llama3.1` in the ollama pod/container, with `LLM_PROVIDER=ollama` |
+| Prod | Bedrock | Access denied / model not found | Verify IAM role / `AWS_REGION` and model access for `LLM_MODEL` |
+| Prod | Anthropic (fallback) | "ANTHROPIC_API_KEY not set" | Verify secret injection via `kubectl get secret agent-service-secrets -o yaml` |
+| Prod | Both fail | "LLM error" in answer | Check network egress to Bedrock and `api.anthropic.com` |
 
 ## Escalation Notes
 
@@ -696,7 +703,7 @@ For persistent stream failures, capture and share:
 
 - docker compose ps
 - docker logs --tail=400 healthcare-flink-app
-- docker logs --tail=400 infra-flink-taskmanager
+- docker logs --tail=400 healthcare-flink-taskmanager
 - `curl -s http://localhost:8082/jobs/overview | jq .`
 - `curl -s http://localhost:8082/jobs/JOB_ID/exceptions | jq .`
 

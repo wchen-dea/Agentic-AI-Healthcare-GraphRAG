@@ -112,16 +112,29 @@ def _route_specialist(state: HealthcareAgentState) -> str:
     return "confidence_evaluator"
 
 
+def _max_iterations() -> int:
+    try:
+        return max(1, min(int(os.getenv("LANGGRAPH_MAX_ITERATIONS", "3")), 6))
+    except (ValueError, TypeError):
+        return 3
+
+
+# Supersteps per iteration: retrieval, graph, specialist, delegation hops,
+# confidence. Generous headroom; this is a hard backstop, not the loop policy.
+_STEPS_PER_ITERATION = 10
+_STEP_OVERHEAD = 10
+
+
+def _recursion_limit() -> int:
+    return _max_iterations() * _STEPS_PER_ITERATION + _STEP_OVERHEAD
+
+
 def _should_continue(state: HealthcareAgentState) -> str:
     """After confidence evaluation, decide whether to synthesize or re-retrieve."""
     confidence = state.get("confidence", 0.0)
     iteration = state.get("iteration", 0)
-    try:
-        max_iterations = max(1, min(int(os.getenv("LANGGRAPH_MAX_ITERATIONS", "3")), 6))
-    except (ValueError, TypeError):
-        max_iterations = 3
 
-    if confidence >= 0.75 or iteration >= max_iterations:
+    if confidence >= 0.75 or iteration >= _max_iterations():
         return "synthesize"
     return "re_retrieve"
 
@@ -301,7 +314,7 @@ def _initial_state(
 
 
 def _run_config(patient_id: str | None) -> dict[str, Any]:
-    config: dict[str, Any] = {}
+    config: dict[str, Any] = {"recursion_limit": _recursion_limit()}
     if os.getenv("LANGSMITH_API_KEY"):
         config["callbacks"] = []  # LangSmith auto-instruments via env
         config["metadata"] = {

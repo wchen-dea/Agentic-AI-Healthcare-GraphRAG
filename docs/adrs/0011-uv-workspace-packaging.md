@@ -6,6 +6,8 @@
 - Supersedes: none
 - Superseded by: none
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`.
+
 ## Context
 
 Both rag-api services (`domains/healthcare/rag-api`, `domains/supply-chain/rag-api`) are pure Python, but they were not packaged:

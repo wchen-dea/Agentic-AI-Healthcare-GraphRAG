@@ -6,6 +6,8 @@
 - Supersedes: none (amends [ADR-0007](0007-langgraph-multi-agent-orchestration.md))
 - Superseded by: none
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`.
+
 ## Context
 
 The healthcare rag-api grew three ways to answer the same question: single-pass, ReAct, and the LangGraph graph from ADR-0007. Each one handled guardrails, structured output, and session memory slightly differently. The LangGraph agents imported `app` directly to reach retrieval and synthesis, so the orchestrator was coupled to the HTTP process. The provider web UI (`domains/healthcare/webapp`) could only show a skeleton until a full synchronous `/query` finished.

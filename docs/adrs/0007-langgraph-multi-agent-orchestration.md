@@ -7,6 +7,8 @@
 - Superseded by: none
 - Amended by: [ADR-0010](0010-layered-agentic-architecture.md) (runtime port, graph-level guardrails, SSE streaming, phased roadmap)
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`.
+
 ## Context
 
 The healthcare rag-api originally used a single-pass pipeline: classify request, retrieve from vector and graph stores, rank evidence, synthesize answer. ADR-0005 embedded MCP tools in rag-api. A feature-flagged ReAct controller added iterative retrieval but repeated the same fixed action each iteration without specialist reasoning.

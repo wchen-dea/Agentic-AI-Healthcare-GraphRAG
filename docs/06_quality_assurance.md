@@ -4,7 +4,7 @@
 
 This document maps the full quality validation strategy for the Healthcare GraphRAG platform
 across its three evidence paths: vector retrieval (Qdrant), graph traversal (Neo4j), and
-LLM answer generation (Ollama). Each path has distinct failure modes and requires a
+LLM answer generation (configured `LLM_PROVIDER`: Databricks, Ollama, OpenAI, or Anthropic). Each path has distinct failure modes and requires a
 different validation technique.
 
 Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [03_platform_blueprint.md](03_platform_blueprint.md) and [05_ai_agents.md](05_ai_agents.md).
@@ -18,7 +18,7 @@ Question
   │         │
   ├─► Graph traversal (Neo4j Cypher)      ←── Deterministic edge assertions
   │         │
-  └─► LLM synthesis (Ollama)              ←── Context grounding + golden-set scoring
+  └─► LLM synthesis (LLM_PROVIDER)        ←── Context grounding + golden-set scoring
               │
               └─► Response / guardrails   ←── Contract tests (CI-automated)
 ```
@@ -29,12 +29,12 @@ Question
 
 **File:** `domains/healthcare/agent-service/tests/integration/test_contracts.py`
 
-**Runner:** `python domains/healthcare/agent-service/tests/integration/test_contracts.py` (stdlib `unittest`, no pytest)
+**Runner:** `uv run --package healthcare-agent-service pytest tests/integration/test_contracts.py` (pytest, from `domains/healthcare/agent-service`)
 
 **CI trigger:** push or PR to `dev` touching `domains/healthcare/agent-service/**` — `.github/workflows/agent-service-contracts.yml`
 
 These tests run entirely in-process using `fastapi.testclient.TestClient`. All three
-external services (Qdrant, Neo4j, Ollama) are mocked with `unittest.mock.patch`, so no
+external services (Qdrant, Neo4j, the LLM provider) are mocked with `unittest.mock.patch`, so no
 live stack is required.
 
 ### Test inventory
@@ -93,16 +93,16 @@ make test-hc                                # = uv run --package healthcare-agen
 make test-sc
 # or a subset:
 cd domains/healthcare/agent-service
-uv run --package healthcare-agent-service pytest tests/test_contracts.py tests/test_planner_evaluation.py
+uv run --package healthcare-agent-service pytest tests/integration/test_contracts.py tests/evals/test_planner_evaluation.py
 ```
 
 Expected output:
 
 ```
-Ran 10 tests in ~1-3s
-
-OK
+... passed in ~Ns
 ```
+
+(The full healthcare suite is ~248 tests; the contract file alone runs in a few seconds.)
 
 ### Test harness internals
 
@@ -110,7 +110,7 @@ OK
 `importlib.import_module("healthcare_agent.main")` for each test, giving each test a fresh module with its
 own configuration and connections.
 
-**Prometheus registry fix:** `observability/metrics.py` defines the `agent_service_*` Prometheus
+**Prometheus registry fix:** `agent_core/metrics.py` (in `packages/agent-core`) defines the `agent_service_*` Prometheus
 collectors used by `healthcare_agent.main`. Because `prometheus_client.REGISTRY` is a
 process-wide singleton that survives module reloads, `tearDown` must explicitly unregister
 those collectors after each test, otherwise the second `load_module()` call raises
@@ -396,19 +396,18 @@ git push → dev branch
   │     └── optional skills-ref validate (best-effort install, non-blocking if unavailable)
   │
   ├── contract-tests job
-  │     ├── uv sync (or python 3.11 venv fallback)
-  │     ├── uv run python domains/healthcare/agent-service/tests/integration/test_contracts.py  ← 10 tests, ~2-4 s
-  │     ├── python domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py  ← fixture-driven planner assertions
-  │     ├── python domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py  ← negative/edge planner assertions
-  │     ├── python -m pytest domains/healthcare/agent-service/tests/unit/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
-  │     └── python -m pytest domains/healthcare/agent-service/tests/integration/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
+  │     ├── uv sync --frozen
+  │     ├── pytest -q tests/unit         (agent-core, healthcare, supply-chain)
+  │     ├── pytest -q tests/integration  (healthcare, supply-chain; includes test_contracts.py, MLflow, ontology conformance)
+  │     ├── pytest -q tests/evals        (healthcare planner + evaluation fixtures)
+  │     └── python -m healthcare_agent.evaluation.gates --min-score 0.5  ← evaluation quality gate
   │
   └── container-build job
         └── docker build -f domains/healthcare/agent-service/Dockerfile      ← validates image builds
 ```
 
 Neither job requires live external services. The contract tests mock all three
-dependencies (Qdrant, Neo4j, Ollama) and validate response shape, guardrail metadata,
+dependencies (Qdrant, Neo4j, the LLM provider) and validate response shape, guardrail metadata,
 role enforcement, text redaction, byte-budget trimming, and skills-plan resolution behavior.
 
 ---

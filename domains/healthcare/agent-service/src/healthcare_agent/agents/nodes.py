@@ -104,6 +104,22 @@ def graph_retrieval_agent(state: HealthcareAgentState) -> dict[str, Any]:
 
 # ── Medication Safety Agent ────────────────────────────────────────────────
 
+# Substrings in a contraindication's reason/condition that mean renal labs
+# (creatinine, eGFR, potassium) should be consulted. Matches the reason codes
+# in knowledge/ontology/rules/drug_safety.yaml, e.g. ARB_raises_serum_potassium.
+_RENAL_MARKERS = (
+    "potassium", "hyperkal", "renal", "kidney", "nephro",
+    "lactic", "creatinine", "egfr", "ckd",
+)
+
+
+def _needs_renal_context(contraindication: dict[str, Any]) -> bool:
+    text = " ".join(
+        str(contraindication.get(field) or "") for field in ("reason", "condition")
+    ).lower()
+    return any(marker in text for marker in _RENAL_MARKERS)
+
+
 def medication_safety_agent(state: HealthcareAgentState) -> dict[str, Any]:
     """Deep-dive into medication interactions, contraindications, and adverse events."""
     graph_ctx = state.get("graph_context", [])
@@ -125,10 +141,7 @@ def medication_safety_agent(state: HealthcareAgentState) -> dict[str, Any]:
         contras = patient.get("contraindications", [])
 
         # Delegate to lab agent when contraindicated drugs need renal/hepatic context
-        needs_renal = any(
-            (c.get("reason") or "").lower() in ("lactic_acidosis_risk", "worsens_hyperkalemia", "nephrotoxic")
-            for c in contras
-        )
+        needs_renal = any(_needs_renal_context(c) for c in contras)
         if needs_renal and not lab_context:
             delegation_requests.append(DelegationRequest(
                 from_agent="medication_safety",

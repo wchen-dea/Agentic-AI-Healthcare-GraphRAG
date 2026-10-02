@@ -25,7 +25,7 @@ class SeedGenerationTests(unittest.TestCase):
 
     def test_adverse_outcomes_match_seed_inventory(self):
         for outcome in self.drug_safety["adverse_outcomes"]:
-            snippet = f'MERGE (:AdverseOutcome {{code: "{outcome["code"]}", description: "{outcome["description"]}"}});'
+            snippet = f'MERGE (o:AdverseOutcome {{code: "{outcome["code"]}"}}) SET o.description = "{outcome["description"]}";'
             self.assertIn(snippet, self.generated)
 
     def test_generated_seed_cypher_is_in_sync(self):

@@ -6,6 +6,8 @@
 - Supersedes: none
 - Superseded by: none
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`. Skills live in `domains/<domain>/knowledge/skills/`; generator/validator scripts are in `domains/<domain>/scripts/`.
+
 ## Context
 
 The repository now exposes an explicit skills planning flow across REST and MCP surfaces:

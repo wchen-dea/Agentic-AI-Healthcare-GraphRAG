@@ -6,6 +6,8 @@
 - Supersedes: none
 - Superseded by: none
 
+> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`. The FastMCP server is `healthcare_agent/tools/mcp_server.py`.
+
 ## Context
 
 The project exposes two API surfaces:
