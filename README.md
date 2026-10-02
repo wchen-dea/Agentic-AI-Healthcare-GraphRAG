@@ -2,7 +2,8 @@
 
 A local-first multi-domain Python workspace for building and running GraphRAG-style AI systems across healthcare and supply-chain domains. The repository is organized as a uv-managed monorepo with shared runtime packages and domain-specific agent services, streaming pipelines, knowledge assets, and web apps.
 
-The implementation is broader than the older single-platform README narrative: the codebase is currently structured around shared infrastructure plus two active domains,
+The implementation is broader than the older single-platform README narrative: the codebase is currently structured around shared infrastructure plus two active domains.
+
 - Healthcare
 - Supply chain
 

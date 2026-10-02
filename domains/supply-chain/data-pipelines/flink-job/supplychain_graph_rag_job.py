@@ -4,17 +4,11 @@ import json
 import os
 
 from app.graph_writes import (
-    merge_base_event,
-    merge_disruption_alert,
     merge_facility_reference,
-    merge_inventory_level,
     merge_part_reference,
-    merge_purchase_order,
-    merge_quality_result,
-    merge_shipment,
     merge_supplier_reference,
 )
-from app.pipeline_service import SupplyChainPipelineService, clinical_text
+from app.pipeline_service import SupplyChainPipelineService
 from confluent_kafka import Consumer, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
@@ -54,14 +48,6 @@ REFERENCE_TOPICS = [
 ALL_TOPICS = TOPICS + REFERENCE_TOPICS
 TOPIC_SET = set(TOPICS)
 REFERENCE_TOPIC_SET = set(REFERENCE_TOPICS)
-
-EVENT_TYPE_HANDLER = {
-    "PURCHASE_ORDER": merge_purchase_order,
-    "SHIPMENT_UPDATE": merge_shipment,
-    "QUALITY_RESULT": merge_quality_result,
-    "DISRUPTION_ALERT": merge_disruption_alert,
-    "INVENTORY_LEVEL": merge_inventory_level,
-}
 
 REFERENCE_TYPE_HANDLER = {
     "SUPPLIER_MASTER_UPSERT": merge_supplier_reference,
@@ -134,16 +120,7 @@ class SupplyChainProcessor:
                     session.execute_write(handler, event, payload)
             return f"REF:{event_type}"
 
-        text = clinical_text(event)
-        vector = _embed(text)
-
-        self.pipeline._write_qdrant(event, payload, text, vector)
-
-        with self.neo4j.session() as session:
-            session.execute_write(merge_base_event, event, text)
-            handler = EVENT_TYPE_HANDLER.get(event_type)
-            if handler:
-                session.execute_write(handler, event, payload)
+        self.pipeline.process_event(event)
 
         print(f"Processed {event_type} event {event.get('event_id', '?')}")
         return f"OK:{event_type}"

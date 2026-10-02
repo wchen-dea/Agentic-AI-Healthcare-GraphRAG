@@ -5,8 +5,12 @@ and provide a single retrieval interface for all orchestration modes.
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
+
+from neo4j import Query
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from knowledge_core.embedding import EmbeddingDomain, stable_embedding
 
@@ -47,7 +51,11 @@ def _search_single_domain(
             query_filter=query_filter,
             limit=limit,
         )
-    except Exception:
+    except (UnexpectedResponse, ValueError) as exc:
+        # Fall back to the unnamed vector only for schema mismatches (collection
+        # without named vectors); transport and server errors must propagate.
+        if isinstance(exc, UnexpectedResponse) and exc.status_code not in (400, 404):
+            raise
         results = qdrant_client.search(
             collection_name=collection,
             query_vector=query_vector,
@@ -202,10 +210,17 @@ RETURN p.id AS patient_id,
 """
 
 
+graph_query_timeout_seconds = float(os.getenv("GRAPH_QUERY_TIMEOUT_SECONDS", "10"))
+max_graph_patient_ids = int(os.getenv("MAX_GRAPH_PATIENT_IDS", "25"))
+
+
 def graph_search(neo4j_driver, patient_ids: list[str]) -> list[dict[str, Any]]:
+    unique_ids = list(dict.fromkeys(pid for pid in patient_ids if pid))[:max_graph_patient_ids]
+    if not unique_ids:
+        return []
     with neo4j_driver.session() as session:
         records = session.run(
-            _GRAPH_QUERY,
-            {"patient_ids": patient_ids, "excluded_order_types": ["discontinued", "hold"]},
+            Query(_GRAPH_QUERY, timeout=graph_query_timeout_seconds),
+            {"patient_ids": unique_ids, "excluded_order_types": ["discontinued", "hold"]},
         )
         return [dict(record) for record in records]

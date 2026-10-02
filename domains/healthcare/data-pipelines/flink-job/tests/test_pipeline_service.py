@@ -9,11 +9,22 @@ from app.pipeline_service import HealthcareEventPipelineService
 
 
 class _SessionRecorder:
+    """Fake session; acts as its own tx so recording graph-write fakes log into it."""
+
     def __init__(self):
         self.calls: list[tuple[object, tuple[object, ...]]] = []
+        self.transactions = 0
 
     def execute_write(self, func, *args):
-        self.calls.append((func, args))
+        self.transactions += 1
+        return func(self, *args)
+
+
+def _recording_write():
+    def fn(tx, *args):
+        tx.calls.append((fn, args))
+
+    return fn
 
 
 class _SessionContext:
@@ -30,15 +41,15 @@ class _SessionContext:
 class PipelineServiceTests(unittest.TestCase):
     def _make_service(self):
         graph_writes = SimpleNamespace(
-            merge_base_event=lambda *args: None,
-            merge_reference_context=lambda *args: None,
-            merge_clinical_note=lambda *args: None,
-            merge_lab_result=lambda *args: None,
-            merge_lab_signals=lambda *args: None,
-            merge_device_reading=lambda *args: None,
-            merge_medication_order=lambda *args: None,
-            merge_claim=lambda *args: None,
-            merge_adverse_event_signal=lambda *args: None,
+            merge_base_event=_recording_write(),
+            merge_reference_context=_recording_write(),
+            merge_clinical_note=_recording_write(),
+            merge_lab_result=_recording_write(),
+            merge_lab_signals=_recording_write(),
+            merge_device_reading=_recording_write(),
+            merge_medication_order=_recording_write(),
+            merge_claim=_recording_write(),
+            merge_adverse_event_signal=_recording_write(),
         )
         qdrant = Mock()
         neo4j = Mock()
@@ -151,6 +162,7 @@ class PipelineServiceTests(unittest.TestCase):
         self.assertIn(svc.graph_writes.merge_lab_signals, funcs)
         lab_signal_call = [call for call in session.calls if call[0] is svc.graph_writes.merge_lab_signals][0]
         self.assertEqual(lab_signal_call[1][0], "evt-1")
+        self.assertEqual(session.transactions, 1)
 
     def test_write_neo4j_dispatches_claim_path_with_outcomes(self):
         svc = self._make_service()

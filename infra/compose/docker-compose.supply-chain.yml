@@ -149,7 +149,7 @@ services:
       neo4j-sc:
         condition: service_started
       neo4j-sc-init:
-        condition: service_started
+        condition: service_completed_successfully
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29093,kafka3:29094
       SCHEMA_REGISTRY_URL: http://schema-registry:8081

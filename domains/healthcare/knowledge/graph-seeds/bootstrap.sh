@@ -60,13 +60,12 @@ cs -f "$OUTPUT_FILE"
 verify_edges() {
   rel="$1"
   expected=$(grep -c ":$rel" "$SEEDS_FILE" || true)
-  actual=$(cs --format plain "MATCH ()-[r:\`$rel\`]->() RETURN count(r)" | tail -n 1)
-  case "$actual" in
-    ''|*[!0-9]*)
-      log "Could not read $rel edge count (got: '$actual'); skipping verification" >&2
-      return 0
-      ;;
-  esac
+  raw=$(cs --format plain "MATCH ()-[r:\`$rel\`]->() RETURN count(r)" 2>&1 || true)
+  actual=$(printf '%s\n' "$raw" | grep -Eo '[0-9]+' | tail -n 1 || true)
+  if [ -z "$actual" ]; then
+    log "Could not read $rel edge count from Neo4j output: $raw" >&2
+    return 1
+  fi
   if [ "$actual" -lt "$expected" ]; then
     log "Expected at least $expected $rel edges, found $actual" >&2
     return 1

@@ -16,6 +16,18 @@ from .graph_writes import (
 )
 
 
+EVENT_HANDLERS = {
+    "PURCHASE_ORDER": merge_purchase_order,
+    "SHIPMENT_UPDATE": merge_shipment,
+    "QUALITY_RESULT": merge_quality_result,
+    "DISRUPTION_ALERT": merge_disruption_alert,
+    "INVENTORY_LEVEL": merge_inventory_level,
+    "SUPPLIER_MASTER_UPSERT": merge_supplier_reference,
+    "PART_MASTER_UPSERT": merge_part_reference,
+    "FACILITY_MASTER_UPSERT": merge_facility_reference,
+}
+
+
 def clinical_text(event: dict) -> str:
     """Build searchable text from a supply-chain event."""
     payload = json.loads(event.get("payload_json", "{}"))
@@ -63,8 +75,11 @@ class SupplyChainPipelineService:
         text = clinical_text(event)
         vector = self.embed_fn(text)
 
-        self._write_qdrant(event, payload, text, vector)
+        # Neo4j first (single transaction), then Qdrant: both are idempotent
+        # (MERGE / deterministic point id), so a retry after partial failure
+        # converges instead of leaving vectors pointing at missing graph nodes.
         self._write_neo4j(event, payload, text)
+        self._write_qdrant(event, payload, text, vector)
 
     def _write_qdrant(self, event, payload, text, vector):
         import hashlib
@@ -90,22 +105,12 @@ class SupplyChainPipelineService:
         )
 
     def _write_neo4j(self, event, payload, text):
+        handler = EVENT_HANDLERS.get(event["event_type"])
+
+        def _tx(tx):
+            merge_base_event(tx, event, text)
+            if handler:
+                handler(tx, event, payload)
+
         with self.neo4j.session() as session:
-            session.execute_write(merge_base_event, event, text)
-            et = event["event_type"]
-            if et == "PURCHASE_ORDER":
-                session.execute_write(merge_purchase_order, event, payload)
-            elif et == "SHIPMENT_UPDATE":
-                session.execute_write(merge_shipment, event, payload)
-            elif et == "QUALITY_RESULT":
-                session.execute_write(merge_quality_result, event, payload)
-            elif et == "DISRUPTION_ALERT":
-                session.execute_write(merge_disruption_alert, event, payload)
-            elif et == "INVENTORY_LEVEL":
-                session.execute_write(merge_inventory_level, event, payload)
-            elif et == "SUPPLIER_MASTER_UPSERT":
-                session.execute_write(merge_supplier_reference, event, payload)
-            elif et == "PART_MASTER_UPSERT":
-                session.execute_write(merge_part_reference, event, payload)
-            elif et == "FACILITY_MASTER_UPSERT":
-                session.execute_write(merge_facility_reference, event, payload)
+            session.execute_write(_tx)

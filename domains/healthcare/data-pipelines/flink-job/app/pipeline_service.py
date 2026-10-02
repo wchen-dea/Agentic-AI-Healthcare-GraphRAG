@@ -61,8 +61,11 @@ class HealthcareEventPipelineService:
         text = clinical_text(event)
         domain = domain_for_event_type(event["event_type"])
         vector = stable_embedding(text, domain=domain)
-        self.write_qdrant(event, payload, text, vector, domain)
+        # Neo4j first (one transaction), then Qdrant. Both sinks are idempotent
+        # (MERGE / deterministic point id), so a replay after a partial failure
+        # converges instead of leaving vectors without graph context.
         self.write_neo4j(event, payload, text)
+        self.write_qdrant(event, payload, text, vector, domain)
         print(
             f"Processed event_id={event['event_id']} type={event['event_type']} "
             f"patient={event.get('patient_id')} enrich_hits={event.get('reference_hit_count', 0)}"
@@ -83,31 +86,46 @@ class HealthcareEventPipelineService:
         )
 
     def write_neo4j(self, event: dict[str, Any], payload: dict[str, Any], text: str) -> None:
+        operations = self._neo4j_operations(event, payload, text)
+
+        def _apply(tx) -> None:
+            for func, args in operations:
+                func(tx, *args)
+
         with self.neo4j.session() as session:
-            session.execute_write(self.graph_writes.merge_base_event, event, text)
-            session.execute_write(self.graph_writes.merge_reference_context, event, payload)
-            event_type = event["event_type"]
-            if event_type == "CLINICAL_NOTE":
-                session.execute_write(self.graph_writes.merge_clinical_note, event, payload)
-                session.execute_write(self.graph_writes.merge_adverse_event_signal, event, payload)
-                if payload.get("event_family") == "ALLERGY_INTOLERANCE":
-                    session.execute_write(self.graph_writes.merge_allergy_adverse_event, event, payload)
-            elif event_type == "LAB_RESULT":
-                session.execute_write(self.graph_writes.merge_lab_result, event, payload)
-                signals = evaluate_lab_signal_rules(self.lab_signal_rules, payload.get("lab_name"), payload.get("value"))
-                session.execute_write(self.graph_writes.merge_lab_signals, event["event_id"], signals)
-            elif event_type == "VITAL_SIGN":
-                session.execute_write(self.graph_writes.merge_device_reading, event, payload)
-            elif event_type == "MEDICATION_ORDER":
-                session.execute_write(self.graph_writes.merge_medication_order, event, payload)
-            elif event_type == "CLAIM_STATUS":
-                claim_outcomes = evaluate_claims_outcome_rules(
-                    self.claims_outcome_rules,
-                    event_type=event_type,
-                    claim_type=payload.get("claim_type"),
-                    procedure_code=payload.get("procedure_code"),
-                )
-                session.execute_write(self.graph_writes.merge_claim, event, payload, claim_outcomes)
+            session.execute_write(_apply)
+
+    def _neo4j_operations(
+        self, event: dict[str, Any], payload: dict[str, Any], text: str
+    ) -> list[tuple[Callable[..., Any], tuple[Any, ...]]]:
+        gw = self.graph_writes
+        ops: list[tuple[Callable[..., Any], tuple[Any, ...]]] = [
+            (gw.merge_base_event, (event, text)),
+            (gw.merge_reference_context, (event, payload)),
+        ]
+        event_type = event["event_type"]
+        if event_type == "CLINICAL_NOTE":
+            ops.append((gw.merge_clinical_note, (event, payload)))
+            ops.append((gw.merge_adverse_event_signal, (event, payload)))
+            if payload.get("event_family") == "ALLERGY_INTOLERANCE":
+                ops.append((gw.merge_allergy_adverse_event, (event, payload)))
+        elif event_type == "LAB_RESULT":
+            ops.append((gw.merge_lab_result, (event, payload)))
+            signals = evaluate_lab_signal_rules(self.lab_signal_rules, payload.get("lab_name"), payload.get("value"))
+            ops.append((gw.merge_lab_signals, (event["event_id"], signals)))
+        elif event_type == "VITAL_SIGN":
+            ops.append((gw.merge_device_reading, (event, payload)))
+        elif event_type == "MEDICATION_ORDER":
+            ops.append((gw.merge_medication_order, (event, payload)))
+        elif event_type == "CLAIM_STATUS":
+            claim_outcomes = evaluate_claims_outcome_rules(
+                self.claims_outcome_rules,
+                event_type=event_type,
+                claim_type=payload.get("claim_type"),
+                procedure_code=payload.get("procedure_code"),
+            )
+            ops.append((gw.merge_claim, (event, payload, claim_outcomes)))
+        return ops
 
     def handle_topic_message(
         self,

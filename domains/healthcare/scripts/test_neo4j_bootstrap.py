@@ -27,8 +27,11 @@ def main() -> int:
         fake_cypher_shell = fake_bin / "cypher-shell"
         fake_cypher_shell.write_text(
             "#!/bin/sh\n"
-            "printf '%s\n' \"$@\" >> \"$BOOTSTRAP_CYPHER_LOG\"\n"
-            "exit 0\n",
+            "printf '%s\\n' \"$@\" >> \"$BOOTSTRAP_CYPHER_LOG\"\n"
+            "case \"$*\" in\n"
+            "  *CONTRAINDICATED_FOR*|*INTERACTS_WITH*) printf '%s\\n' '1' ;;\n"
+            "  *) exit 0 ;;\n"
+            "esac\n",
             encoding="utf-8",
         )
         fake_cypher_shell.chmod(fake_cypher_shell.stat().st_mode | stat.S_IXUSR)

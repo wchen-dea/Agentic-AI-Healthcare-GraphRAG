@@ -8,8 +8,11 @@ from pathlib import Path
 FLINK_APP_DIR = Path(__file__).resolve().parents[1]
 DOMAIN_ROOT = Path(__file__).resolve().parents[3]
 KNOWLEDGE_DIR = DOMAIN_ROOT / "knowledge"
-if str(FLINK_APP_DIR) not in sys.path:
-    sys.path.insert(0, str(FLINK_APP_DIR))
+# Workspace package; lets host-run tests work without installing knowledge-core.
+KNOWLEDGE_CORE_SRC = Path(__file__).resolve().parents[5] / "packages" / "knowledge-core" / "src"
+for _path in (FLINK_APP_DIR, KNOWLEDGE_CORE_SRC):
+    if _path.is_dir() and str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 
 from app.normalization import normalize_event_payload  # noqa: E402
