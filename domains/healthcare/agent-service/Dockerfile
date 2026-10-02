@@ -1,0 +1,57 @@
+# syntax=docker/dockerfile:1.7
+# Build context: repository root. Same image for local Docker and Kubernetes.
+# See docs/adrs/0011-uv-workspace-packaging.md.
+
+ARG PYTHON_IMAGE=python:3.11-slim
+
+# --- builder: resolve locked deps, build wheel(s), install into /opt/venv ----
+FROM ${PYTHON_IMAGE} AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.12.11 /uv /uvx /bin/
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
+WORKDIR /src
+
+# Third-party dependencies only (cached layer; changes only when uv.lock does).
+# Every workspace member's pyproject.toml is needed for workspace discovery.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=packages/agent-core/pyproject.toml,target=packages/agent-core/pyproject.toml \
+    --mount=type=bind,source=packages/knowledge-core/pyproject.toml,target=packages/knowledge-core/pyproject.toml \
+    --mount=type=bind,source=domains/healthcare/agent-service/pyproject.toml,target=domains/healthcare/agent-service/pyproject.toml \
+    --mount=type=bind,source=domains/supply-chain/agent-service/pyproject.toml,target=domains/supply-chain/agent-service/pyproject.toml \
+    uv sync --frozen --no-dev --no-install-workspace --package healthcare-agent-service
+
+# First-party code: build wheel(s) from the workspace and install them (no deps;
+# the locked dependency set is already in /opt/venv).
+COPY uv.lock pyproject.toml ./
+COPY packages/agent-core/pyproject.toml packages/agent-core/pyproject.toml
+COPY packages/knowledge-core/pyproject.toml packages/knowledge-core/pyproject.toml
+COPY domains/healthcare/agent-service/pyproject.toml domains/healthcare/agent-service/pyproject.toml
+COPY domains/supply-chain/agent-service/pyproject.toml domains/supply-chain/agent-service/pyproject.toml
+COPY packages/knowledge-core/src packages/knowledge-core/src
+COPY packages/agent-core/src packages/agent-core/src
+COPY domains/healthcare/agent-service/src domains/healthcare/agent-service/src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv build --wheel --package agent-core --out-dir /dist && \
+    uv build --wheel --package knowledge-core --out-dir /dist && \
+    uv build --wheel --package healthcare-agent-service --out-dir /dist && \
+    uv pip install --python /opt/venv/bin/python --no-deps /dist/*.whl
+
+# --- runtime: slim base + venv only, non-root ---------------------------------
+FROM ${PYTHON_IMAGE} AS runtime
+RUN groupadd --system --gid 10001 app && \
+    useradd --system --uid 10001 --gid app --create-home --home-dir /home/app app && \
+    mkdir -p /app /var/log/agent-service && chown app:app /app /var/log/agent-service
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HF_HOME=/home/app/.cache/huggingface \
+    AGENT_AUDIT_LOG_PATH=/var/log/agent-service/audit.log
+WORKDIR /app
+USER 10001:10001
+EXPOSE 8000
+CMD ["uvicorn", "healthcare_agent.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,19 @@
+services:
+  agent-service:
+    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-agent-service:latest
+    container_name: healthcare-agent-service
+    env_file:
+      - path: ./agent-service.env
+        required: false
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  provider-web:
+    image: ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest
+    container_name: healthcare-webapp
+    depends_on:
+      - agent-service
+    ports:
+      - "8088:80"
+    restart: unless-stopped

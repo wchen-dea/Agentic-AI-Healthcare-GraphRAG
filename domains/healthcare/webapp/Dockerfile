@@ -1,6 +1,16 @@
+# Build context: repository root (see infra/compose/docker-compose.healthcare.yml).
+FROM node:22-alpine AS build
+# Mirror the repo layout so the contract-drift test can read the agent-service skills config.
+WORKDIR /src/domains/healthcare/webapp
+COPY domains/healthcare/webapp/package.json domains/healthcare/webapp/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY domains/healthcare/webapp/ ./
+COPY domains/healthcare/agent-service/src/healthcare_agent/config/skills_layer.json /src/domains/healthcare/agent-service/src/healthcare_agent/config/skills_layer.json
+# Default API base baked into the bundle; users can override it at runtime in the UI settings.
+ARG VITE_API_BASE_URL=http://localhost:8000
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+RUN npm test && npm run build
+
 FROM nginx:alpine
-COPY platform/shared/webapp/nginx.conf /etc/nginx/conf.d/default.conf
-COPY platform/shared/webapp/styles.css /usr/share/nginx/html/styles.css
-COPY platform/shared/webapp/query-helpers.js /usr/share/nginx/html/query-helpers.js
-COPY domains/healthcare/webapp/index.html /usr/share/nginx/html/index.html
-COPY domains/healthcare/webapp/domain.js /usr/share/nginx/html/domain.js
+COPY infra/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /src/domains/healthcare/webapp/dist /usr/share/nginx/html

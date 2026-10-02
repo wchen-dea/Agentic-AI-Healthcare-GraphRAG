@@ -1,8 +1,8 @@
 # Usage: make <target>
 
-INFRA    := container/docker-compose.infra.yml
-HC       := container/docker-compose.healthcare.yml
-SC       := container/docker-compose.supply-chain.yml
+INFRA    := infra/compose/docker-compose.infra.yml
+HC       := infra/compose/docker-compose.healthcare.yml
+SC       := infra/compose/docker-compose.supply-chain.yml
 NET      := graphrag-net
 DC_INFRA := docker compose -f $(INFRA) -p infra
 DC_HC    := docker compose -f $(HC) -p healthcare
@@ -16,7 +16,7 @@ DC_SC    := docker compose -f $(SC) -p supplychain
         flink-hc flink-sc mlflow \
         topics shell-kafka validate validate-docs \
         validate-skills generate-skills validate-ontology \
-        test-hc test-sc pull-model fresh \
+        sync test-core test-hc test-sc test-unit test-integration test-evals lint build-wheels web-hc-dev web-hc-test web-hc-build pull-model fresh \
         helm-dev helm-dev-down helm-ports helm-ports-stop helm-prd helm-lint
 
 help: ## Show this help
@@ -67,7 +67,7 @@ ps: ## Show running containers
 logs:    ## Tail healthcare logs
 	$(DC_HC) logs -f --tail 20
 logs-sc: ## Tail supply-chain logs
-	$(DC_SC) logs -f --tail 20 sc-producer sc-flink-app sc-rag-api
+	$(DC_SC) logs -f --tail 20 sc-producer sc-flink-app sc-agent-service
 
 # ── Service access ────────────────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ qdrant-hc: ## Healthcare Qdrant collection info
 qdrant-sc: ## Supply-chain Qdrant collection info
 	@curl -s http://localhost:6335/collections/supplychain_events | python3 -m json.tool
 
-api-hc: ## Healthcare RAG API health
+api-hc: ## Healthcare agent service health
 	@curl -s http://localhost:8000/health | python3 -m json.tool
 api-sc: ## Supply-chain RAG API health
 	@curl -s http://localhost:8001/health | python3 -m json.tool
@@ -105,6 +105,15 @@ shell-kafka: ## Kafka broker shell
 
 # ── Validate & test ───────────────────────────────────────────────────────────
 
+HC_WEB := domains/healthcare/webapp
+
+web-hc-dev: ## Healthcare web UI dev server (Vite, proxies /api -> :8000)
+	cd $(HC_WEB) && npm install && VITE_API_BASE_URL=/api npm run dev
+web-hc-test: ## Healthcare web UI unit tests + typecheck
+	cd $(HC_WEB) && npm ci && npm run typecheck && npm test
+web-hc-build: ## Healthcare web UI production bundle
+	cd $(HC_WEB) && npm ci && npm run build
+
 validate: ## Cross-domain stack validation
 	./scripts/validate_all_stacks.sh
 validate-docs: ## Markdown lint
@@ -124,10 +133,32 @@ validate-ontology: ## Validate ontology configs for both domains
 	python domains/healthcare/scripts/validate_ontology.py
 	python domains/supply-chain/scripts/validate_ontology.py
 
-test-hc: ## Healthcare agent + domain tests
-	cd domains/healthcare/agents && python -m pytest tests/ --tb=short
-test-sc: ## Supply-chain domain tests
-	cd domains/supply-chain/agents && python -m pytest tests/ --tb=short 2>/dev/null || echo "No supply-chain tests yet"
+sync: ## Sync the full dev venv (root depends on every workspace member)
+	uv sync
+
+test-core: ## Provider-neutral agent-core tests (uv workspace)
+	cd packages/agent-core && uv run --package agent-core pytest --tb=short
+test-hc: ## Healthcare agent-service tests (uv workspace)
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short
+test-sc: ## Supply-chain agent-service tests (uv workspace)
+	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short
+lint: ## Ruff lint (same scope as CI; blocking)
+	uv run ruff check packages domains scripts
+test-unit: ## Fast, isolated unit tests across agent-core and both domains
+	cd packages/agent-core && uv run --package agent-core pytest --tb=short tests/unit
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/unit
+	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/unit
+test-integration: ## HTTP/MCP contract, tracing and ontology integration tests (no live services)
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/integration
+	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/integration
+test-evals: ## Offline evaluation suites (planner fixtures, evaluation gates)
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/evals
+
+build-wheels: ## Build agent service wheels (+ agent-core, knowledge-core) into dist/
+	uv build --wheel --package agent-core --out-dir dist
+	uv build --wheel --package knowledge-core --out-dir dist
+	uv build --wheel --package healthcare-agent-service --out-dir dist
+	uv build --wheel --package supply-chain-agent-service --out-dir dist
 
 pull-model: ## Pull Ollama LLM model
 	docker exec infra-ollama ollama pull llama3.1
@@ -137,21 +168,21 @@ fresh: clean up pull-model ## Full fresh start with both domains
 # ── Helm / Minikube ───────────────────────────────────────────────────────────
 
 helm-dev: ## Deploy to minikube via Helm (dev values)
-	./deploy/dev/setup-minikube.sh
+	infra/environments/dev/setup-minikube.sh
 
 helm-dev-down: ## Tear down minikube dev release
 	helm uninstall healthcare-dev -n healthcare-ai-dev || true
 
 helm-ports: ## Start all port-forwards for minikube dev
 	@pkill -f "port-forward" 2>/dev/null || true
-	@kubectl -n healthcare-ai-dev port-forward svc/rag-api 8000:8000 &>/dev/null &
+	@kubectl -n healthcare-ai-dev port-forward svc/agent-service 8000:8000 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/provider-web 8088:80 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/neo4j 7474:7474 7687:7687 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/qdrant 6333:6333 &>/dev/null &
 	@kubectl -n healthcare-ai-dev port-forward svc/conduktor-console 9080:8080 &>/dev/null &
 	@sleep 2
 	@echo "Port-forwards active:"
-	@echo "  RAG API:   http://localhost:8000"
+	@echo "  Agent API: http://localhost:8000"
 	@echo "  Web UI:    http://localhost:8088"
 	@echo "  Neo4j:     http://localhost:7474"
 	@echo "  Qdrant:    http://localhost:6333/dashboard"
@@ -162,10 +193,10 @@ helm-ports-stop: ## Kill all port-forwards
 	@echo "Port-forwards stopped."
 
 helm-prd: ## Template production Helm chart (dry-run)
-	helm template healthcare deploy/helm -f deploy/helm/values-production.yaml
+	helm template healthcare infra/helm -f infra/helm/values-production.yaml
 
 helm-lint: ## Lint Helm chart and template both envs
-	helm lint deploy/helm
-	helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null
-	helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null
+	helm lint infra/helm
+	helm template dev infra/helm -f infra/helm/values-dev.yaml > /dev/null
+	helm template prd infra/helm -f infra/helm/values-production.yaml > /dev/null
 	@echo "Helm lint: OK"

@@ -5,8 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "platform" / "supply-chain"
-CONFIG_DIR = DATA_PLATFORM_DIR / "ontology"
+CONFIG_DIR = ROOT / "knowledge" / "ontology"
 
 try:
     import yaml
@@ -22,14 +21,14 @@ def validate():
             with path.open("r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             if data is None:
-                print(f"WARN: empty file {path.relative_to(DATA_PLATFORM_DIR)}")
+                print(f"WARN: empty file {path.relative_to(ROOT)}")
             elif not isinstance(data, dict):
-                print(f"FAIL: {path.relative_to(DATA_PLATFORM_DIR)} is not a mapping")
+                print(f"FAIL: {path.relative_to(ROOT)} is not a mapping")
                 errors += 1
             else:
-                print(f"OK:   {path.relative_to(DATA_PLATFORM_DIR)}")
+                print(f"OK:   {path.relative_to(ROOT)}")
         except Exception as ex:
-            print(f"FAIL: {path.relative_to(DATA_PLATFORM_DIR)}: {ex}")
+            print(f"FAIL: {path.relative_to(ROOT)}: {ex}")
             errors += 1
 
     if errors:

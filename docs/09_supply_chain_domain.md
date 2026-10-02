@@ -56,8 +56,8 @@ make up-sc       # or make up for both domains
 Or without the Makefile:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -p infra up -d
-docker compose -f container/docker-compose.supply-chain.yml -p supplychain up -d
+docker compose -f infra/compose/docker-compose.infra.yml -p infra up -d
+docker compose -f infra/compose/docker-compose.supply-chain.yml -p supplychain up -d
 ```
 
 Verify Neo4j:
@@ -72,20 +72,20 @@ docker compose exec supplychain-neo4j cypher-shell \
 
 ```
 domains/supply-chain/
-├── agents/                   # app.py, skills_layer.py, domain/, config/
+├── agent-service/            # supply_chain_agent: api/, orchestration/, agents/, retrieval/, safety/, tools/, config/
+├── data-pipelines/
+│   ├── flink-job/app/        # graph_writes.py, pipeline_service.py
+│   ├── producer/             # Dockerfile, produce_events.py, requirements.txt
+│   └── schemas/              # supply_chain_event.avsc
+├── knowledge/
+│   ├── ontology/             # Entity definitions, relationships, provenance, seeds, rules
+│   ├── graph-seeds/          # init.cypher, seeds, bootstrap.sh
+│   └── skills/               # Agent Skills packages (SKILL.md)
 ├── scripts/                  # query_examples.sh, validate_ontology.py, etc.
-├── skills/                   # Agent Skills packages (SKILL.md)
-└── webapp/                   # index.html, domain.js, Dockerfile
-
-platform/supply-chain/
-├── ontology/                 # Entity definitions, relationships, provenance, seeds, rules
-├── flink-app/app/            # graph_writes.py, pipeline_service.py
-├── neo4j/                    # init.cypher, seeds, bootstrap.sh
-├── producer/                 # Dockerfile, produce_events.py, requirements.txt
-└── schemas/                  # supply_chain_event.avsc
+└── webapp/                   # index.html, domain.js, styles.css, Dockerfile
 ```
 
-Note: `container/docker-compose.supply-chain.yml` lives in the `container/` directory.
+Note: the supply-chain compose file lives at `infra/compose/docker-compose.supply-chain.yml`.
 
 ## RAG Query Request Types
 

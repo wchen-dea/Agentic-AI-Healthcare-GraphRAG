@@ -48,7 +48,7 @@ make helm-ports  # Start port-forwards
 
 | Service | URL |
 |---------|-----|
-| Healthcare RAG API | http://localhost:8000 |
+| Healthcare agent service | http://localhost:8000 |
 | Healthcare Web UI | http://localhost:8088 |
 | Supply-chain RAG API | http://localhost:8001 |
 | Neo4j Browser (HC) | http://localhost:7474 |
@@ -73,7 +73,7 @@ make helm-ports  # Start port-forwards
 | [02_architecture.md](docs/02_architecture.md) | System architecture, design patterns |
 | [03_platform_blueprint.md](docs/03_platform_blueprint.md) | Platform blueprint, target architecture, specs, and backlog |
 | [04_data_platform.md](docs/04_data_platform.md) | Kafka schema, Neo4j graph model |
-| [05_ai_agents.md](docs/05_ai_agents.md) | MCP, Skills, ReAct, LangGraph agents |
+| [05_ai_agents.md](docs/05_ai_agents.md) | MCP, Skills, LangGraph agents |
 | [06_quality_assurance.md](docs/06_quality_assurance.md) | Testing strategy, contract tests |
 | [07_cicd_automation.md](docs/07_cicd_automation.md) | CI/CD, Helm, Compose, minikube, tech matrix |
 | [08_operation_runbook.md](docs/08_operation_runbook.md) | Operations, troubleshooting, Makefile |
@@ -84,12 +84,11 @@ make helm-ports  # Start port-forwards
 ## Project Layout
 
 ```
-container/            Docker Compose orchestration files
-deploy/               Helm charts, Docker Compose, monitoring
-docs/                 Full documentation suite
-domains/              Domain agents, scripts, skills, webapps
-monitoring/           Prometheus, Grafana, alerting configs
-platform/             Streaming infrastructure (Flink, producers, ontology)
+docs/                 Full documentation suite and ADRs
+domains/<d>/          Per-domain agent service, data-pipelines/ (Flink job, producer, schemas),
+                      knowledge/ (ontology, graph-seeds, skills), scripts, webapp
+packages/             Shared Python packages: agent-core (runtime), knowledge-core (streaming, ontology)
+infra/                compose/, helm/, environments/{dev,production}, observability/, images/, web/
 scripts/              Cross-domain validation, shared lib
 ```
 

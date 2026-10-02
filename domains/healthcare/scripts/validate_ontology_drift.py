@@ -18,11 +18,11 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-PLATFORM_DIR = Path(__file__).resolve().parents[3] / "platform" / "healthcare"
-MAPPINGS_DIR = PLATFORM_DIR / "ontology" / "mappings"
-SEEDS_FILE = PLATFORM_DIR / "neo4j" / "generated_ontology_seeds.cypher"
+DOMAIN_DIR = Path(__file__).resolve().parents[1]
+MAPPINGS_DIR = DOMAIN_DIR / "knowledge" / "ontology" / "mappings"
+SEEDS_FILE = DOMAIN_DIR / "knowledge" / "graph-seeds" / "generated_ontology_seeds.cypher"
 GENERATOR_FILE = Path(__file__).resolve().parent / "generate_ontology_seed_cypher.py"
-FLINK_APP_DIR = PLATFORM_DIR / "flink-app"
+FLINK_APP_DIR = DOMAIN_DIR / "data-pipelines" / "flink-job"
 
 if str(FLINK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLINK_APP_DIR))

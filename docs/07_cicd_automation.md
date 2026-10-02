@@ -13,7 +13,7 @@ deploy/
 │   ├── values-production.yaml  Production overrides (multi-replica, Bedrock+fallback)
 │   ├── templates/              Namespace, NetworkPolicy, helpers
 │   └── charts/
-│       ├── rag-api/            Healthcare AI agents with embedded MCP
+│       ├── agent-service/      Healthcare AI agents with embedded MCP
 │       ├── provider-web/       Frontend UI
 │       ├── flink/              Flink cluster (JobManager + TaskManager + job)
 │       ├── mlflow/             Tracing and evaluation server
@@ -21,17 +21,13 @@ deploy/
 │       ├── neo4j/              Neo4j graph database
 │       ├── qdrant/             Qdrant vector database
 │       └── ollama/             Local LLM inference server
-├── dev/                        Local development (Docker Compose)
-│   ├── docker-compose.yml
-│   ├── docker-compose.monitoring.yml
-│   ├── rag-api.env
-│   ├── monitoring/
+├── dev/                        Minikube bootstrap (local Compose lives in infra/compose/)
 │   └── setup-minikube.sh
 └── production/                 Production Docker Compose variant
     ├── docker-compose.ai.yml
     ├── docker-compose.monitoring.yml
     ├── monitoring/
-    └── rag-api.env.example
+    └── agent-service.env.example
 ```
 
 ## In-Scope Components
@@ -67,20 +63,24 @@ The `LLM_FALLBACK_PROVIDER` env var enables automatic failover — if the primar
 
 ### Option A: Docker Compose (recommended for quick start)
 
+Uses the canonical stacks in `infra/compose/`, configured by the repo-root `.env` (copy `.env.example`).
+
 ```bash
-cd deploy/dev
-docker compose up -d                          # rag-api, neo4j, qdrant, ollama, provider-web
-docker compose -f docker-compose.monitoring.yml up -d  # prometheus, grafana, blackbox
+make up-hc    # infra stack (kafka, ollama, prometheus, grafana, blackbox, ...) + healthcare stack
+# Equivalent:
+# docker compose -f infra/compose/docker-compose.infra.yml -p infra up -d
+# docker compose -f infra/compose/docker-compose.healthcare.yml -p healthcare up -d
 ```
 
 Services on localhost:
 
 | Service | Port | URL |
 |---------|------|-----|
-| RAG API | 8000 | `http://localhost:8000` |
+| Agent API | 8000 | `http://localhost:8000` |
 | Provider Web | 8088 | `http://localhost:8088` |
 | Neo4j Browser | 7474 | `http://localhost:7474` |
 | Qdrant | 6333 | `http://localhost:6333` |
+| Flink UI | 8082 | `http://localhost:8082` |
 | Ollama | 11434 | `http://localhost:11434` |
 | Prometheus | 9090 | `http://localhost:9090` |
 | Grafana | 3000 | `http://localhost:3000` |
@@ -88,8 +88,7 @@ Services on localhost:
 Tear down:
 
 ```bash
-docker compose down -v
-docker compose -f docker-compose.monitoring.yml down -v
+make down
 ```
 
 ### Option B: Helm on Minikube
@@ -98,14 +97,14 @@ docker compose -f docker-compose.monitoring.yml down -v
 make helm-dev    # one-command bootstrap
 # Or manually:
 minikube start --cpus=4 --memory=8192
-helm install healthcare-dev deploy/helm -f deploy/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
+helm install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
 ```
 
 Services exposed via NodePort:
 
 | Service | NodePort | URL |
 |---------|----------|-----|
-| RAG API | 30800 | `http://$(minikube ip):30800` |
+| Agent API | 30800 | `http://$(minikube ip):30800` |
 
 On macOS with Docker driver, NodePorts aren't directly accessible. Use port-forwards:
 
@@ -116,7 +115,7 @@ make helm-ports-stop  # kill them
 
 | Service | Port-forward URL |
 |---------|-----------------|
-| RAG API | `http://localhost:8000` |
+| Agent API | `http://localhost:8000` |
 | Web UI | `http://localhost:8088` |
 | Neo4j | `http://localhost:7474` |
 | Qdrant | `http://localhost:6333/dashboard` |
@@ -127,7 +126,7 @@ Dev differences from production:
 - All deployments scaled to 1 replica
 - LLM provider: local Ollama (no external API keys needed)
 - Kafka, Neo4j, Qdrant, Ollama deployed in-cluster
-- `RAG_API_ALLOW_ROLE_HEADER: true` for testing
+- `AGENT_ALLOW_ROLE_HEADER: true` for testing
 - No NetworkPolicy enforcement
 - No HPA (autoscaling disabled)
 - Default model: `qwen2.5:1.5b` (fits in 16GB minikube)
@@ -146,33 +145,33 @@ minikube delete  # full reset
 ### Deploy (Helm)
 
 ```bash
-helm install healthcare deploy/helm \
-  -f deploy/helm/values-production.yaml \
+helm install healthcare infra/helm \
+  -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
-  --set rag-api.secrets.NEO4J_PASSWORD=<value> \
-  --set rag-api.secrets.OPENAI_API_KEY=<value> \
-  --set rag-api.secrets.ANTHROPIC_API_KEY=<value>
+  --set agent-service.secrets.NEO4J_PASSWORD=<value> \
+  --set agent-service.secrets.OPENAI_API_KEY=<value> \
+  --set agent-service.secrets.ANTHROPIC_API_KEY=<value>
 ```
 
 Upgrade:
 
 ```bash
-helm upgrade healthcare deploy/helm -f deploy/helm/values-production.yaml -n healthcare-ai
+helm upgrade healthcare infra/helm -f infra/helm/values-production.yaml -n healthcare-ai
 ```
 
 ### Platform Controls
 
 - NetworkPolicy: default deny ingress for namespace (enabled in production values)
-- HPA: `rag-api` (2–6), `provider-web` (2–5); requires metrics-server
+- HPA: `agent-service` (2–6), `provider-web` (2–5); requires metrics-server
 
 ### Deploy (Docker Compose)
 
 ```bash
-cp deploy/production/rag-api.env.example deploy/production/rag-api.env
-# Edit rag-api.env with real credentials
+cp infra/environments/production/agent-service.env.example infra/environments/production/agent-service.env
+# Edit agent-service.env with real credentials
 
-docker compose -f deploy/production/docker-compose.ai.yml up -d
-docker compose -f deploy/production/docker-compose.monitoring.yml up -d
+docker compose -f infra/environments/production/docker-compose.ai.yml up -d
+docker compose -f infra/environments/production/docker-compose.monitoring.yml up -d
 ```
 
 ---
@@ -201,7 +200,7 @@ docker compose -f deploy/production/docker-compose.monitoring.yml up -d
 | Neo4j | 5.26.2 (Docker) / 5-community (Helm) | Knowledge graph |
 | Qdrant | v1.12.1 | Vector store |
 | Ollama | latest | Local LLM inference |
-| FastAPI | 0.115.0 | RAG API framework |
+| FastAPI | 0.115.0 | Agent API framework |
 | LangGraph | >=0.4.1 | Multi-agent orchestration |
 | LangChain Core | >=0.3.0 | Agent framework |
 | MCP SDK | 1.28.0 | Tool protocol |
@@ -223,8 +222,8 @@ docker compose -f deploy/production/docker-compose.monitoring.yml up -d
 | Images | Pin to immutable tags or digests; promote same artifact across envs |
 | Namespaces | Dedicated per environment with scoped RBAC |
 | Networking | TLS at ingress; restrict with NetworkPolicy/security groups |
-| Origins | Set `RAG_API_ALLOW_ORIGINS` to explicit trusted origins |
-| Scaling | Size rag-api and provider-web independently; validate HPA thresholds |
+| Origins | Set `AGENT_ALLOW_ORIGINS` to explicit trusted origins |
+| Scaling | Size agent-service and provider-web independently; validate HPA thresholds |
 | MLflow | PostgreSQL backend + object store for production (not SQLite) |
 | Observability | Ship logs to centralized store; alert on health/latency/errors |
 
@@ -234,7 +233,7 @@ docker compose -f deploy/production/docker-compose.monitoring.yml up -d
 
 | Endpoint | Path |
 |----------|------|
-| RAG API health | `/health` |
+| Agent API health | `/health` |
 | Embedded MCP diagnostics | `/mcp/health` |
 | Embedded MCP protocol | `/mcp` |
 | Provider web | `/` |

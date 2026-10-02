@@ -27,9 +27,11 @@ Question
 
 ## 1. Contract Tests (CI-Automated)
 
-**File:** `domains/healthcare/agents/tests/test_contracts.py`  
-**Runner:** `python domains/healthcare/agents/tests/test_contracts.py` (stdlib `unittest`, no pytest)  
-**CI trigger:** push or PR to `dev` touching `domains/healthcare/agents/**` — `.github/workflows/rag-api-contracts.yml`
+**File:** `domains/healthcare/agent-service/tests/integration/test_contracts.py`
+
+**Runner:** `python domains/healthcare/agent-service/tests/integration/test_contracts.py` (stdlib `unittest`, no pytest)
+
+**CI trigger:** push or PR to `dev` touching `domains/healthcare/agent-service/**` — `.github/workflows/agent-service-contracts.yml`
 
 These tests run entirely in-process using `fastapi.testclient.TestClient`. All three
 external services (Qdrant, Neo4j, Ollama) are mocked with `unittest.mock.patch`, so no
@@ -44,7 +46,7 @@ live stack is required.
 | `test_mcp_export_defaults_to_bounded_text_and_denies_raw_payload` | `export` role returns bounded (truncated) text; `include_raw_payload=True` is silently denied; `graph_access_level` is `broader` |
 | `test_generation_and_export_have_different_evidence_defaults` | `graphrag_answer_generate` redacts text (`access_level: none`); `evidence_bundle_export` returns bounded text (`access_level: bounded`) |
 | `test_query_accepts_explicit_generation_role_header` | `X-Caller-Role: generation` header is respected |
-| `test_query_trims_response_to_configured_budget` | Response byte budget (`RAG_API_MAX_RESPONSE_BYTES`) is enforced; `guardrails.response_truncated` is set when trimmed |
+| `test_query_trims_response_to_configured_budget` | Response byte budget (`AGENT_MAX_RESPONSE_BYTES`) is enforced; `guardrails.response_truncated` is set when trimmed |
 | `test_skills_plan_endpoint_returns_flow_and_tools` | `/skills/plan` resolves the configured skill flow and returns MCP/runtime tool chains |
 | `test_skills_plan_endpoint_rejects_unknown_goal` | `/skills/plan` returns a validation error for unknown business goals |
 | `test_query_includes_planner_metadata` | `/query` response includes deterministic planner metadata (`request_type`, `retrieval_plan`) |
@@ -52,8 +54,9 @@ live stack is required.
 
 ### Planner evaluation suite (Stage 2)
 
-**Files:** `domains/healthcare/agents/tests/test_planner_evaluation.py`, `domains/healthcare/agents/tests/fixtures/planner_route_fixtures.json`  
-**Runner:** `python domains/healthcare/agents/tests/test_planner_evaluation.py`
+**Files:** `domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py`, `domains/healthcare/agent-service/tests/evals/fixtures/planner_route_fixtures.json`
+
+**Runner:** `python domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py`
 
 This suite validates planner route selection and plan generation with fixture-driven assertions:
 
@@ -64,8 +67,9 @@ This suite validates planner route selection and plan generation with fixture-dr
 
 ### Planner edge-case suite (Stage 2)
 
-**File:** `domains/healthcare/agents/tests/test_planner_edge_cases.py`  
-**Runner:** `python domains/healthcare/agents/tests/test_planner_edge_cases.py`
+**File:** `domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py`
+
+**Runner:** `python domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py`
 
 This suite focuses on negative and edge conditions that are easy to miss in happy-path fixtures:
 
@@ -77,26 +81,19 @@ This suite focuses on negative and edge conditions that are easy to miss in happ
 
 ### How to run locally
 
-The contract tests must be run with **Python 3.11** (matching Docker and CI). Running with
-Python 3.14+ causes a dependency conflict: `mcp==1.28.0` requires `pydantic>=2.12.0` on
-3.14, and pydantic 2.12.x has no wheel for that version yet.
+The agent service packages are members of the root **uv workspace** (see
+[ADR-0011](adrs/0011-uv-workspace-packaging.md)). Run them with Python 3.11 (matching
+Docker and CI); the members declare `requires-python = ">=3.11,<3.14"` because
+`mcp==1.28.0` and `fastapi==0.115.0` cannot co-resolve on Python 3.14+.
 
 ```bash
 cd /path/to/Agentic-AI-Healthcare-GraphRAG
-uv sync
-uv run python domains/healthcare/agents/tests/test_contracts.py
-uv run python domains/healthcare/agents/tests/test_planner_evaluation.py
-uv run python domains/healthcare/agents/tests/test_planner_edge_cases.py
-```
-
-Or with a manual venv (if uv is not available):
-
-```bash
-python3.11 -m venv .venv311
-.venv311/bin/pip install -r domains/healthcare/agents/requirements.txt
-.venv311/bin/python domains/healthcare/agents/tests/test_contracts.py
-.venv311/bin/python domains/healthcare/agents/tests/test_planner_evaluation.py
-.venv311/bin/python domains/healthcare/agents/tests/test_planner_edge_cases.py
+uv sync                                     # once, and after changing packages/knowledge-core
+make test-hc                                # = uv run --package healthcare-agent-service pytest
+make test-sc
+# or a subset:
+cd domains/healthcare/agent-service
+uv run --package healthcare-agent-service pytest tests/test_contracts.py tests/test_planner_evaluation.py
 ```
 
 Expected output:
@@ -109,22 +106,22 @@ OK
 
 ### Test harness internals
 
-**Module isolation:** `load_module()` pops `app` from `sys.modules` and calls
-`importlib.import_module("app")` for each test, giving each test a fresh module with its
-own settings and connections.
+**Module isolation:** `load_module()` pops `healthcare_agent.main` from `sys.modules` and calls
+`importlib.import_module("healthcare_agent.main")` for each test, giving each test a fresh module with its
+own configuration and connections.
 
-**Prometheus registry fix:** `app.py` registers three Prometheus metrics (`Histogram`,
-`Histogram`, `Counter`) at module scope. Because `prometheus_client.REGISTRY` is a
+**Prometheus registry fix:** `observability/metrics.py` defines the `agent_service_*` Prometheus
+collectors used by `healthcare_agent.main`. Because `prometheus_client.REGISTRY` is a
 process-wide singleton that survives module reloads, `tearDown` must explicitly unregister
-all `rag_api_*` collectors after each test, otherwise the second `load_module()` call
-raises `ValueError: Duplicated timeseries`.
+those collectors after each test, otherwise the second `load_module()` call raises
+`ValueError: Duplicated timeseries`.
 
 ```python
 # tearDown — Prometheus cleanup (from test_contracts.py)
 rag_collectors = set(
     c
     for name, c in list(prometheus_client.REGISTRY._names_to_collectors.items())
-    if name.startswith("rag_api_")
+    if name.startswith("agent_service_")
 )
 for collector in rag_collectors:
     try:
@@ -354,7 +351,7 @@ style produces structurally distinct output:
 
 ## 5. Integration Smoke Tests (Live Stack)
 
-**File:** `domains/healthcare/scripts/mcp_smoke_test.py`  
+**File:** `domains/healthcare/scripts/mcp_smoke_test.py`
 **Requires:** running stack (`docker compose up -d`)
 
 ```bash
@@ -400,14 +397,14 @@ git push → dev branch
   │
   ├── contract-tests job
   │     ├── uv sync (or python 3.11 venv fallback)
-  │     ├── uv run python domains/healthcare/agents/tests/test_contracts.py  ← 10 tests, ~2-4 s
-  │     ├── python domains/healthcare/agents/tests/test_planner_evaluation.py  ← fixture-driven planner assertions
-  │     ├── python domains/healthcare/agents/tests/test_planner_edge_cases.py  ← negative/edge planner assertions
-  │     ├── python -m pytest domains/healthcare/agents/tests/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
-  │     └── python -m pytest domains/healthcare/agents/tests/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
+  │     ├── uv run python domains/healthcare/agent-service/tests/integration/test_contracts.py  ← 10 tests, ~2-4 s
+  │     ├── python domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py  ← fixture-driven planner assertions
+  │     ├── python domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py  ← negative/edge planner assertions
+  │     ├── python -m pytest domains/healthcare/agent-service/tests/unit/test_langgraph_agents.py  ← 25 LangGraph agent, routing, evaluation tests
+  │     └── python -m pytest domains/healthcare/agent-service/tests/integration/test_mlflow_integration.py  ← 32 MLflow tracing and scorer tests
   │
   └── container-build job
-        └── docker build -f domains/healthcare/agents/Dockerfile      ← validates image builds
+        └── docker build -f domains/healthcare/agent-service/Dockerfile      ← validates image builds
 ```
 
 Neither job requires live external services. The contract tests mock all three
@@ -420,8 +417,8 @@ role enforcement, text redaction, byte-budget trimming, and skills-plan resoluti
 
 | Gap | Recommended next step |
 |-----|-----------------------|
-| Ontology and rule-pack conformance | Validate `platform/healthcare/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
-| Graph integration tests after event injection | Add `domains/healthcare/agents/tests/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
+| Ontology and rule-pack conformance | Validate `domains/healthcare/knowledge/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
+| Graph integration tests after event injection | Add `domains/healthcare/agent-service/tests/integration/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
 | Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
 | Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |
 | Adverse event detection end-to-end | Inject known medication + symptom pair, assert `AdverseEvent` node via Cypher |

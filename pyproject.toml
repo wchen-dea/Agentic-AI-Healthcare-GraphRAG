@@ -2,30 +2,26 @@
 name = "agentic-healthcare"
 version = "0.1.0"
 description = "Production-grade multi-agent healthcare intelligence platform with streaming GraphRAG, pharmacovigilance knowledge graph, and LangGraph orchestration"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
+# The root project is the local development environment. It depends on every
+# workspace member, so `uv sync` and `uv sync --all-packages` install the same
+# packages. Runtime pins for the APIs live in the member pyproject.toml files;
+# do not duplicate them here.
 dependencies = [
-    # Shared across domains for local development/testing
+    "agent-core",
+    "knowledge-core",
+    "healthcare-agent-service[bedrock]",
+    "supply-chain-agent-service",
+    # Platform tooling (producers, Flink job tests, ontology scripts)
     "pyyaml>=6.0.2",
-    "requests>=2.32.3",
-    "neo4j>=5.24.0",
-    "qdrant-client>=1.11.3",
     "confluent-kafka>=2.5.3",
     "fastavro>=1.9.5",
     "faker>=25.8.0",
     "boto3>=1.34.0",
-    # RAG API
-    "fastapi>=0.115.0",
-    "uvicorn>=0.31.1",
-    "pydantic>=2.11.7,<3.0.0",
-    "mcp>=1.28.0",
-    "httpx>=0.27.2",
-    "email-validator>=2.2.0",
-    "prometheus-client>=0.23.1",
-    # Embedding (optional heavy dep)
-    "sentence-transformers>=3.0.1",
 ]
 
-[project.optional-dependencies]
+# Installed by default by `uv sync` / `uv run` (exclude with --no-dev).
+[dependency-groups]
 dev = [
     "pytest>=8.0",
     "ruff>=0.5.0",
@@ -34,9 +30,36 @@ dev = [
 [tool.uv]
 managed = true
 
+# Deployable Python packages share one lockfile (uv.lock). Each member builds a
+# wheel that is installed into the service container images (see ADR-0011).
+[tool.uv.workspace]
+members = [
+    "packages/agent-core",
+    "packages/knowledge-core",
+    "domains/healthcare/agent-service",
+    "domains/supply-chain/agent-service",
+]
+
+# Linux (containers/CI) resolves torch from the CPU-only index so images do not
+# pull multi-GB CUDA wheels; macOS/Windows use PyPI (already CPU/MPS builds).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+agent-core = { workspace = true }
+knowledge-core = { workspace = true }
+healthcare-agent-service = { workspace = true }
+supply-chain-agent-service = { workspace = true }
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+# Line length is a formatting concern; long prompt, Cypher and fixture literals
+# are clearer unwrapped. Correctness (E/F) and import order (I) are enforced.
+ignore = ["E501"]

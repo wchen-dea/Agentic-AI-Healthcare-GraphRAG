@@ -1,0 +1,14 @@
+[project]
+name = "knowledge-core"
+version = "0.1.0"
+description = "Knowledge-plane primitives shared by data pipelines and agent services: embeddings, ontology loading, rules engine, storage payloads, consumer loop"
+requires-python = ">=3.10"
+# Imported by the PyFlink jobs (flink:1.20 image ships system Python 3.10) and the
+# agent services (3.11+). Keep the code 3.10-compatible.
+# Keep runtime dependencies minimal; sentence-transformers is optional and
+# loaded lazily by `knowledge_core.embedding`.
+dependencies = ["pyyaml>=6.0.2"]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

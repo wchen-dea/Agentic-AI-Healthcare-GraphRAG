@@ -8,8 +8,8 @@ sys.path.insert(0, str(DOMAIN_ROOT.parents[1] / "scripts"))
 
 from lib.skill_validator import validate_skills  # noqa: E402
 
-SKILLS_LAYER_PATH = DOMAIN_ROOT / "agents" / "config" / "skills_layer.json"
-SKILLS_ROOT = DOMAIN_ROOT / "skills"
+SKILLS_LAYER_PATH = DOMAIN_ROOT / "agent-service" / "src" / "supply_chain_agent" / "config" / "skills_layer.json"
+SKILLS_ROOT = DOMAIN_ROOT / "knowledge" / "skills"
 
 
 def main() -> int:

@@ -56,73 +56,44 @@ make help        # Show all targets
 Start or refresh services:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
 ```
 
 Start supply-chain domain alongside healthcare:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml \
-  -f container/docker-compose.healthcare.yml \
-  -f container/docker-compose.supply-chain.yml \
+docker compose -f infra/compose/docker-compose.infra.yml \
+  -f infra/compose/docker-compose.healthcare.yml \
+  -f infra/compose/docker-compose.supply-chain.yml \
   up -d --build
 ```
 
 Apply compose changes and remove deleted services:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
-If you change `rag-api` source code, rebuild the image before recreating the service:
+If you change `agent-service` source code, rebuild the image before recreating the service:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
 ```
 
-### Optional: Enable ReAct Loop In Local `rag-api`
+### LangGraph Query Path
 
-Add or update these variables in `.env`:
-
-```bash
-RAG_API_REACT_ENABLED=true
-RAG_API_REACT_MAX_ITERS=3
-RAG_API_REACT_MIN_CONFIDENCE=0.75
-RAG_API_REACT_MAX_NO_PROGRESS_STEPS=1
-```
-
-Rebuild and recreate `rag-api`:
+ADR-0012 removed the former ReAct and single-pass rollback paths. LangGraph is now the only healthcare query path for `/query`, `/query/stream`, and MCP tools. To tune the bounded re-retrieval loop, set:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
-```
-
-Verify with a smoke query and ensure a `react` object is present in the response:
-
-```bash
-curl -s -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Summarize hyperkalemia risk","patient_id":"patient-0001"}' | jq '.react'
-```
-
-Expected: non-null object with `enabled`, `iterations`, and `final_reason`.
-
-### Optional: Enable LangGraph Multi-Agent Mode
-
-Add or update these variables in `.env`:
-
-```bash
-RAG_API_LANGGRAPH_ENABLED=true
 LANGGRAPH_MAX_ITERATIONS=3
 ```
 
-Rebuild and recreate `rag-api`:
+Rebuild and recreate `agent-service` after source or configuration changes:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
 ```
 
 Verify with a smoke query and ensure a `langgraph` object is present in the response:
@@ -135,8 +106,6 @@ curl -s -X POST "http://localhost:8000/query" \
 
 Expected: non-null object with `enabled`, `iterations`, `final_reason`, `confidence`, and `agent_trace`.
 
-LangGraph takes priority over ReAct when both are enabled. See [05_ai_agents.md](05_ai_agents.md) for details.
-
 ### Optional: Enable MLflow Tracing
 
 Add or update these variables in `.env`:
@@ -146,11 +115,11 @@ MLFLOW_TRACKING_URI=http://mlflow:5000
 MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
 ```
 
-Rebuild and recreate `rag-api`:
+Rebuild and recreate `agent-service`:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build rag-api
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate rag-api
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
 ```
 
 Verify MLflow UI is reachable:
@@ -159,24 +128,24 @@ Verify MLflow UI is reachable:
 curl -s http://localhost:5000/health
 ```
 
-After running queries, traces appear in the MLflow Tracing UI at http://localhost:5000. Tracing works for all three query modes (single-pass, ReAct, LangGraph).
+After running queries, LangGraph traces appear in the MLflow Tracing UI at http://localhost:5000.
 
-Run only ReAct and planner test suites (CI-safe shortcut):
+Run planner test suites (CI-safe shortcut):
 
 ```bash
-./domains/healthcare/scripts/test_react_planner.sh
+./domains/healthcare/scripts/test_planner.sh
 ```
 
 Stop all services:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down
 ```
 
 Stop and delete volumes (destructive):
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down -v
 ```
 
 ## Service Health Checklist
@@ -184,10 +153,10 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 ### 1) Container Status
 
 ```bash
-make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps
+make ps  # or: docker compose -f infra/compose/docker-compose.infra.yml -p infra ps
 ```
 
-Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, rag-api, producer, localstack.
+Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, agent-service, producer, localstack.
 
 Note: MCP is embedded in the agents service in the current architecture; MCP is embedded in the agents process.
 
@@ -330,17 +299,17 @@ docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
 
 Expected: rows appear as lab results cross clinical thresholds.
 
-### 9) RAG API Metrics Endpoint
+### 9) Agent API Metrics Endpoint
 
 ```bash
-curl -s http://localhost:8000/metrics | grep -E 'rag_api_(http_request_duration_seconds|tool_execution_duration_seconds|tool_execution_total)'
+curl -s http://localhost:8000/metrics | grep -E 'agent_service_(http_request_duration_seconds|tool_execution_duration_seconds|tool_execution_total)'
 ```
 
 Expected result includes metric families:
 
-- rag_api_http_request_duration_seconds
-- rag_api_tool_execution_duration_seconds
-- rag_api_tool_execution_total
+- agent_service_http_request_duration_seconds
+- agent_service_tool_execution_duration_seconds
+- agent_service_tool_execution_total
 
 ### 10) Grafana Query Latency Panel
 
@@ -468,7 +437,7 @@ Symptom:
 Fix:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 ### 2) Unexpected Non-Healthcare Flink Job Running
@@ -485,16 +454,16 @@ Fix:
 curl -s -X PATCH http://localhost:8082/jobs/<demo_job_id>
 ```
 
-2. Ensure no legacy submitter container exists:
+2. Ensure no old submitter container exists:
 
 ```bash
-make ps  # or: docker compose -f container/docker-compose.infra.yml -p infra ps
+make ps  # or: docker compose -f infra/compose/docker-compose.infra.yml -p infra ps
 ```
 
 3. Re-run with orphan cleanup:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --remove-orphans
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
 ```
 
 ### 3) PyFlink Python Worker Not Found
@@ -518,7 +487,7 @@ Expected:
 Recovery:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build --force-recreate flink-jobmanager flink-taskmanager flink-app
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build --force-recreate flink-jobmanager flink-taskmanager flink-app
 ```
 
 ### 4) Kafka Connector Class Errors In Flink
@@ -536,8 +505,8 @@ docker exec infra-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-connect
 Recovery:
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml build --no-cache flink-jobmanager flink-taskmanager flink-app
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --force-recreate flink-jobmanager flink-taskmanager flink-app
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build --no-cache flink-jobmanager flink-taskmanager flink-app
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate flink-jobmanager flink-taskmanager flink-app
 ```
 
 ### 5) Ollama Model Not Available
@@ -589,8 +558,8 @@ Note:
 ### Soft Restart (keep volumes)
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
 ```
 
 ### Hard Reset (delete all local data)
@@ -598,8 +567,8 @@ docker compose -f container/docker-compose.infra.yml -f container/docker-compose
 Warning: this removes Kafka, Qdrant, Neo4j, and Grafana/Prometheus local state.
 
 ```bash
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml down -v
-docker compose -f container/docker-compose.infra.yml -f container/docker-compose.healthcare.yml up -d --build
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down -v
+docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
 ```
 
 ## Post-Change Validation
@@ -617,8 +586,8 @@ curl -s http://localhost:8082/jobs/overview | jq .
 For Helm deployments:
 
 ```bash
-helm template dev deploy/helm -f deploy/helm/values-dev.yaml > /dev/null && echo OK
-helm template prd deploy/helm -f deploy/helm/values-production.yaml > /dev/null && echo OK
+helm template dev infra/helm -f infra/helm/values-dev.yaml > /dev/null && echo OK
+helm template prd infra/helm -f infra/helm/values-production.yaml > /dev/null && echo OK
 ```
 
 Confirm:
@@ -632,27 +601,27 @@ Confirm:
 ### Deploy dev (minikube)
 
 ```bash
-./deploy/dev/setup-minikube.sh
+infra/environments/dev/setup-minikube.sh
 # Or manually:
 minikube start --cpus=4 --memory=8192
-helm install healthcare-dev deploy/helm -f deploy/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
+helm install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
 ```
 
 ### Deploy production
 
 ```bash
-helm install healthcare deploy/helm \
-  -f deploy/helm/values-production.yaml \
+helm install healthcare infra/helm \
+  -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
-  --set rag-api.secrets.NEO4J_PASSWORD=<value> \
-  --set rag-api.secrets.OPENAI_API_KEY=<value> \
-  --set rag-api.secrets.ANTHROPIC_API_KEY=<value>
+  --set agent-service.secrets.NEO4J_PASSWORD=<value> \
+  --set agent-service.secrets.OPENAI_API_KEY=<value> \
+  --set agent-service.secrets.ANTHROPIC_API_KEY=<value>
 ```
 
 ### Upgrade
 
 ```bash
-helm upgrade healthcare deploy/helm -f deploy/helm/values-production.yaml -n healthcare-ai
+helm upgrade healthcare infra/helm -f infra/helm/values-production.yaml -n healthcare-ai
 ```
 
 ### Rollback
@@ -665,8 +634,8 @@ helm rollback healthcare 1 -n healthcare-ai
 
 ```bash
 kubectl -n healthcare-ai-dev get pods
-kubectl -n healthcare-ai-dev logs deploy/rag-api --tail=50
-kubectl -n healthcare-ai-dev exec deploy/rag-api -- curl -s localhost:8000/health
+kubectl -n healthcare-ai-dev logs deploy/agent-service --tail=50
+kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000/health
 ```
 
 ### Tear down dev
@@ -687,7 +656,7 @@ make helm-ports-stop  # kill all port-forwards
 
 Services:
 
-- RAG API: `http://localhost:8000`
+- Agent API: `http://localhost:8000`
 - Web UI: `http://localhost:8088`
 - Neo4j: `http://localhost:7474`
 - Qdrant: `http://localhost:6333/dashboard`
@@ -717,7 +686,7 @@ Services:
 | Env | Provider | Symptom | Check |
 |-----|----------|---------|-------|
 | Dev | Ollama | "no models installed" | `ollama pull llama3.1` in the ollama pod/container |
-| Prod | OpenAI | "OPENAI_API_KEY not set" | Verify secret injection via `kubectl get secret rag-api-secrets -o yaml` |
+| Prod | OpenAI | "OPENAI_API_KEY not set" | Verify secret injection via `kubectl get secret agent-service-secrets -o yaml` |
 | Prod | Anthropic (fallback) | "ANTHROPIC_API_KEY not set" | Same — check secret |
 | Prod | Both fail | "LLM error" in answer | Check network egress to `api.openai.com` and `api.anthropic.com` |
 

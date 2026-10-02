@@ -1,0 +1,25 @@
+[project]
+name = "agent-core"
+version = "0.1.0"
+description = "Provider-neutral agent platform contracts: runtime ports, guardrails, tool policy, audit, streaming, settings"
+requires-python = ">=3.11,<3.14"
+# Keep this package free of domain, cloud, and framework dependencies
+# (no FastAPI, LangGraph, Qdrant, Neo4j, or LLM SDKs). See ADR-0012.
+dependencies = [
+    "pydantic>=2.11.7,<3.0.0",
+    "pydantic-settings>=2.6.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+# Prometheus exporter for agent_core.metrics.
+metrics = ["prometheus-client==0.23.1"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

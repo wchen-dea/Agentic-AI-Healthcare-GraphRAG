@@ -2,7 +2,7 @@
 set -euo pipefail
 # Validate supply-chain domain stack health.
 
-SC_API="${SC_RAG_API_URL:-http://localhost:8001}"
+SC_API="${SC_AGENT_SERVICE_URL:-http://localhost:8001}"
 SC_NEO4J="${SC_NEO4J_HTTP_URL:-http://localhost:7475}"
 SC_QDRANT="${SC_QDRANT_URL:-http://localhost:6335}"
 

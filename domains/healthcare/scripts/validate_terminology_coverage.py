@@ -20,9 +20,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_PLATFORM_DIR = Path(__file__).resolve().parents[3] / "platform" / "healthcare"
-PRODUCER_FILE = DATA_PLATFORM_DIR / "producer" / "produce_events.py"
-MAPPINGS_DIR = DATA_PLATFORM_DIR / "ontology" / "mappings"
+KNOWLEDGE_DIR = ROOT / "knowledge"
+PRODUCER_FILE = ROOT / "data-pipelines" / "producer" / "produce_events.py"
+MAPPINGS_DIR = KNOWLEDGE_DIR / "ontology" / "mappings"
 
 LAB_MAPPINGS_FILE = MAPPINGS_DIR / "lab_mappings.yaml"
 CPT_MAPPINGS_FILE = MAPPINGS_DIR / "cpt_mappings.yaml"

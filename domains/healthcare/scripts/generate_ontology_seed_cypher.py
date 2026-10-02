@@ -3,9 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FLINK_APP_DIR = Path(__file__).resolve().parents[3] / "platform" / "healthcare" / "flink-app"
+FLINK_APP_DIR = REPO_ROOT / "data-pipelines" / "flink-job"
 if str(FLINK_APP_DIR) not in sys.path:
     sys.path.insert(0, str(FLINK_APP_DIR))
 
@@ -79,7 +78,7 @@ def build_seed_cypher(bundle: dict) -> str:
 
 def main() -> int:
     bundle = load_ontology_bundle()
-    target = Path(__file__).resolve().parents[3] / "platform" / "healthcare" / "neo4j" / "generated_ontology_seeds.cypher"
+    target = REPO_ROOT / "knowledge" / "graph-seeds" / "generated_ontology_seeds.cypher"
     target.write_text(build_seed_cypher(bundle), encoding="utf-8")
     return 0
 
