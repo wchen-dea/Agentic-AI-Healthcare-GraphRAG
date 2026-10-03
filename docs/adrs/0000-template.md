@@ -8,7 +8,7 @@
 
 ## Context
 
-What problem, constraint, or trade-off is driving this decision?
+What problem, trade-off or constraint is driving the decision?
 
 ## Decision
 
@@ -28,8 +28,8 @@ Trade-offs:
 
 ## Alternatives Considered
 
-- Option A: short rationale for rejection
-- Option B: short rationale for rejection
+- Option A: reason for rejection
+- Option B: reason for rejection
 
 ## Rollout and Verification
 
@@ -39,4 +39,4 @@ Trade-offs:
 
 ## Related
 
-- Links to impacted docs, code, PRs, or prior ADRs
+- Links to impacted docs, code, or prior ADRs

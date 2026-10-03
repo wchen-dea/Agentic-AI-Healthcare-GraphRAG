@@ -1,427 +1,175 @@
-# AI QA — Accuracy and Quality Validation
+# 06 — Quality Assurance
 
-## Overview
+This document describes how the platform is verified: which test layers exist, what each suite asserts, how evaluation gates score agent behaviour, and how to run live smoke checks. CI wiring for these suites is described in [07 — CI/CD Automation](07_cicd_automation.md); runtime design under test is in [05 — AI Agents](05_ai_agents.md) and [04 — Data Platform](04_data_platform.md).
 
-This document maps the full quality validation strategy for the Healthcare GraphRAG platform
-across its three evidence paths: vector retrieval (Qdrant), graph traversal (Neo4j), and
-LLM answer generation (configured `LLM_PROVIDER`: Databricks, Ollama, OpenAI, or Anthropic). Each path has distinct failure modes and requires a
-different validation technique.
+## 1. QA strategy
 
-Roadmap evaluation additions for ontology conformance, planner behavior, and rule-pack validation are defined in [03_platform_blueprint.md](03_platform_blueprint.md) and [05_ai_agents.md](05_ai_agents.md).
+Quality is layered from fast, hermetic tests to live-stack smoke checks. Every layer except the last runs without Kafka, Flink, Neo4j, Qdrant or an LLM.
 
-Multi-agent architecture comparison and evaluation framework details are in [05_ai_agents.md](05_ai_agents.md).
-
-```
-Question
-  │
-  ├─► Vector retrieval (Qdrant ANN)       ←── Precision@k / semantic hit rate
-  │         │
-  ├─► Graph traversal (Neo4j Cypher)      ←── Deterministic edge assertions
-  │         │
-  └─► LLM synthesis (LLM_PROVIDER)        ←── Context grounding + golden-set scoring
-              │
-              └─► Response / guardrails   ←── Contract tests (CI-automated)
+```mermaid
+flowchart LR
+    U[Unit tests<br/>agent-core, HC, SC, Flink] --> I[Integration / contract tests<br/>TestClient, mocked stores]
+    I --> E[Offline evals<br/>planner fixtures, scorecards]
+    E --> G[Evaluation gate<br/>gates CLI, soft in CI]
+    G --> O[Ontology gates<br/>conformance, drift, coverage]
+    O --> S[Live smoke tests<br/>MCP smoke, Cypher checks, validate_all_stacks]
 ```
 
----
+| Layer | Scope | External services | Where it runs |
+| --- | --- | --- | --- |
+| Unit | Pure functions, agents, planner, memory, HITL, embeddings | None | CI + `make test-unit` |
+| Integration | HTTP/MCP contracts, MLflow tracing, ontology conformance | Mocked | CI + `make test-integration` |
+| Evals | Planner routing fixtures, evaluation stage 4 | None | CI + `make test-evals` |
+| Ontology | Loader, runtime rules, seeds, drift, terminology coverage | None (bootstrap smoke uses fixtures) | CI `ontology-conformance` |
+| Smoke | End-to-end queries, MCP tools, graph content | Full local stack | Manual / `make validate` |
 
-## 1. Contract Tests (CI-Automated)
+## 2. Test inventory
 
-**File:** `domains/healthcare/agent-service/tests/integration/test_contracts.py`
+| Package | Path | Suites |
+| --- | --- | --- |
+| `agent-core` | `packages/agent-core/tests/unit/` | `test_agent_core`, `test_mcp_server` |
+| Healthcare agent | `domains/healthcare/agent-service/tests/unit/` | `test_agent_delegation`, `test_embedding_parity`, `test_harness`, `test_hitl_and_graph_cache`, `test_langgraph_agents`, `test_layered_runtime`, `test_loop_hardening`, `test_memory`, `test_model_router`, `test_planner_edge_cases`, `test_provider_failover`, `test_retrieval`, `test_schemas`, `test_structured_output`, `test_tool_catalog` |
+| Healthcare agent | `domains/healthcare/agent-service/tests/integration/` | `test_contracts`, `test_mlflow_integration`, `test_ontology_conformance` |
+| Healthcare agent | `domains/healthcare/agent-service/tests/evals/` | `test_evaluation_stage4`, `test_planner_evaluation` (fixtures in `evals/fixtures/`) |
+| Supply-chain agent | `domains/supply-chain/agent-service/tests/unit/` | `test_domain`, `test_embedding`, `test_graph_cache`, `test_schemas`, `test_tool_catalog` |
+| Supply-chain agent | `domains/supply-chain/agent-service/tests/integration/` | `test_contracts` |
+| Healthcare Flink | `domains/healthcare/data-pipelines/flink-job/tests/` | `test_embedding`, `test_embedding_provider`, `test_graph_writes`, `test_ontology_loader`, `test_pipeline_service`, `test_runtime_rules`, `test_seed_generation`, `test_storage` |
+| Supply-chain Flink | `domains/supply-chain/data-pipelines/flink-job/tests/` | `test_job_embedding` |
+| Bootstrap | `domains/*/scripts/test_neo4j_bootstrap.py` | Seed and constraint bootstrap smoke |
 
-**Runner:** `uv run --package healthcare-agent-service pytest tests/integration/test_contracts.py` (pytest, from `domains/healthcare/agent-service`)
+Agent-service suites use `pytest` through the uv workspace; Flink suites use `unittest` with the Flink requirements and `packages/knowledge-core` installed.
 
-**CI trigger:** push or PR to `dev` touching `domains/healthcare/agent-service/**` — `.github/workflows/agent-service-contracts.yml`
+## 3. Contract tests
 
-These tests run entirely in-process using `fastapi.testclient.TestClient`. All three
-external services (Qdrant, Neo4j, the LLM provider) are mocked with `unittest.mock.patch`, so no
-live stack is required.
+`tests/integration/test_contracts.py` drives the FastAPI app in-process with `TestClient`. Qdrant, Neo4j and the LLM are replaced with fakes, and the harness reloads the module per test and unregisters `agent_service_*` Prometheus collectors so metrics do not leak between cases.
 
-### Test inventory
+The healthcare suite asserts:
 
-| Test | What is verified |
-|------|-----------------|
-| `test_query_redacts_vector_text_and_writes_audit_log` | Vector text is stripped from generation-role responses; audit log is written with correct `tool_name`, `outcome`, `patient_scope`, `caller_id` |
-| `test_query_enforces_role_policy` | `read_only` role returns HTTP 401 for `/query`; `generation` role succeeds |
-| `test_mcp_export_defaults_to_bounded_text_and_denies_raw_payload` | `export` role returns bounded (truncated) text; `include_raw_payload=True` is silently denied; `graph_access_level` is `broader` |
-| `test_generation_and_export_have_different_evidence_defaults` | `graphrag_answer_generate` redacts text (`access_level: none`); `evidence_bundle_export` returns bounded text (`access_level: bounded`) |
-| `test_query_accepts_explicit_generation_role_header` | `X-Caller-Role: generation` header is respected |
-| `test_query_trims_response_to_configured_budget` | Response byte budget (`AGENT_MAX_RESPONSE_BYTES`) is enforced; `guardrails.response_truncated` is set when trimmed |
-| `test_skills_plan_endpoint_returns_flow_and_tools` | `/skills/plan` resolves the configured skill flow and returns MCP/runtime tool chains |
-| `test_skills_plan_endpoint_rejects_unknown_goal` | `/skills/plan` returns a validation error for unknown business goals |
-| `test_query_includes_planner_metadata` | `/query` response includes deterministic planner metadata (`request_type`, `retrieval_plan`) |
-| `test_expanded_mcp_tools_return_expected_shapes` | Expanded MCP tools (`timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`) return expected payload shapes |
+- **Redaction and audit** — identifiers are masked in responses and every call writes an audit event.
+- **Role policy** — `read_only` callers receive 401 on `/query`; `X-Caller-Role` is honoured only when `AGENT_ALLOW_ROLE_HEADER=true`.
+- **Evidence modes** — `generation` returns bounded evidence by default; `export` returns bounded text and raw payload requests are denied.
+- **Response budget** — oversized responses are trimmed to `AGENT_MAX_RESPONSE_BYTES` and flagged with `guardrails.response_truncated`.
+- **Skills planning** — `/skills/plan` returns a plan for known goals and a structured error for unknown goals, including planner metadata.
+- **MCP tool shapes** — `timeline_explain`, `medication_risk_assess`, `coding_gap_detect` and `cohort_risk_summary` return the documented schemas (see [05 — AI Agents](05_ai_agents.md#9-mcp-tools-and-skills)).
 
-### Planner evaluation suite (Stage 2)
+The supply-chain suite covers the same policy surface for its own tools and roles.
 
-**Files:** `domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py`, `domains/healthcare/agent-service/tests/evals/fixtures/planner_route_fixtures.json`
+## 4. Planner suites
 
-**Runner:** `python domains/healthcare/agent-service/tests/evals/test_planner_evaluation.py`
+The planner is deterministic, so its behaviour is pinned by fixtures rather than LLM judgements.
 
-This suite validates planner route selection and plan generation with fixture-driven assertions:
+| Suite | Assertions |
+| --- | --- |
+| `tests/evals/test_planner_evaluation.py` + `fixtures/planner_route_fixtures.json` | Request-type classification for medication safety, lab interpretation, coding review, cohort triage and patient summary; precedence between overlapping intents; every plan step has `name`, `query_text`, `top_k`, `reason`; `top_k` stays bounded |
+| `tests/unit/test_planner_edge_cases.py` | Ambiguous precedence, empty patient scope falls back to cohort routing, non-positive `max_top_k`, deterministic vector ranking, deterministic cohort ranking |
 
-- request-type classification for medication safety, lab interpretation, coding review, cohort triage, and patient summary
-- precedence behavior when multiple semantic cues appear in one question
-- expected plan fields (`name`, `query_text` prefix, `top_k`, `reason`)
-- bounded `top_k` behavior so plan limits do not exceed configured caps
+Request types and routing rules are documented in [05 — AI Agents](05_ai_agents.md#request-types).
 
-### Planner edge-case suite (Stage 2)
+## 5. Evaluation gates and MLflow evaluation
 
-**File:** `domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py`
+The `healthcare_agent.evaluation` package scores agent runs offline.
 
-**Runner:** `python domains/healthcare/agent-service/tests/unit/test_planner_edge_cases.py`
+| Module | Responsibility |
+| --- | --- |
+| `gates.py` | `GateThresholds` (routing 0.6, evidence 0.5, answer 0.5, overall 0.55) and a CLI: `--results-file`, `--min-score` |
+| `agent_eval.py` | `run_evaluation_suite` over a case set |
+| `grounding_scorecard.py` | `score_grounding(answer, context_texts)` — overlap of answer claims with retrieved evidence |
+| `mlflow_eval.py` | Scorers for routing, coverage, evidence, answer, safety caveat and latency (30 s budget); `run_mlflow_evaluation`; `compare_modes` for A/B of agent modes |
+| `retrieval_benchmark.py` | `precision_at_k`, `recall_at_k`, `score_all` |
 
-This suite focuses on negative and edge conditions that are easy to miss in happy-path fixtures:
-
-- ambiguous prompt precedence (medication semantics over mixed cues)
-- empty patient scope transition to cohort routing
-- non-positive `max_top_k` bound handling
-- deterministic vector ranking order (priority, score, stable tie-break)
-- deterministic cohort graph ranking order
-
-### How to run locally
-
-The agent service packages are members of the root **uv workspace** (see
-[ADR-0011](adrs/0011-uv-workspace-packaging.md)). Run them with Python 3.11 (matching
-Docker and CI); the members declare `requires-python = ">=3.11,<3.14"` because
-`mcp==1.28.0` and `fastapi==0.115.0` cannot co-resolve on Python 3.14+.
+Run the gate against stored results:
 
 ```bash
-cd /path/to/Agentic-AI-Healthcare-GraphRAG
-uv sync                                     # once, and after changing packages/knowledge-core
-make test-hc                                # = uv run --package healthcare-agent-service pytest
-make test-sc
-# or a subset:
 cd domains/healthcare/agent-service
-uv run --package healthcare-agent-service pytest tests/integration/test_contracts.py tests/evals/test_planner_evaluation.py
+uv run --package healthcare-agent-service \
+  python -m healthcare_agent.evaluation.gates \
+  --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
 ```
 
-Expected output:
+In CI the gate runs with `--min-score 0.5` as a **soft gate** (`continue-on-error: true`): regressions are visible but do not block merges. MLflow runs and traces are browsed via `make mlflow` (see [05 — AI Agents](05_ai_agents.md#observability)).
 
-```
-... passed in ~Ns
-```
+## 6. Retrieval and embedding tests
 
-(The full healthcare suite is ~248 tests; the contract file alone runs in a few seconds.)
+- **Embedding parity** — `test_embedding_parity` (healthcare) and `test_embedding` (supply-chain) assert that the agent query embedder uses the same provider, model and dimension as the Flink ingest embedder, so vectors are comparable.
+- **Provider selection** — `test_embedding_provider` (Flink) and `test_job_embedding` cover `EMBEDDING_PROVIDER=local` (MiniLM, 384 dims) and `databricks` (`databricks-gte-large-en`, 1024 dims), including dimension checks. See [04 — Data Platform](04_data_platform.md#embeddings).
+- **Retrieval** — `test_retrieval` checks filter construction and ranking; `retrieval_benchmark.py` computes precision/recall@k against labelled fixtures.
+- **Graph cache** — `test_hitl_and_graph_cache` / `test_graph_cache` verify cache hits, TTL expiry and key isolation.
 
-### Test harness internals
+## 7. Graph logic checks
 
-**Module isolation:** `load_module()` pops `healthcare_agent.main` from `sys.modules` and calls
-`importlib.import_module("healthcare_agent.main")` for each test, giving each test a fresh module with its
-own configuration and connections.
-
-**Prometheus registry fix:** `agent_core/metrics.py` (in `packages/agent-core`) defines the `agent_service_*` Prometheus
-collectors used by `healthcare_agent.main`. Because `prometheus_client.REGISTRY` is a
-process-wide singleton that survives module reloads, `tearDown` must explicitly unregister
-those collectors after each test, otherwise the second `load_module()` call raises
-`ValueError: Duplicated timeseries`.
-
-```python
-# tearDown — Prometheus cleanup (from test_contracts.py)
-rag_collectors = set(
-    c
-    for name, c in list(prometheus_client.REGISTRY._names_to_collectors.items())
-    if name.startswith("agent_service_")
-)
-for collector in rag_collectors:
-    try:
-        prometheus_client.REGISTRY.unregister(collector)
-    except Exception:
-        pass
-```
-
-**pydantic pin:** `requirements.txt` pins `pydantic>=2.11.7,<3.0.0` (relaxed from
-`==2.11.7`) so pip can resolve `mcp==1.28.0`'s `pydantic>=2.12.0` constraint on Python
-3.11 without conflict.
-
-### Guardrail fields validated by tests
-
-Every `/query` and MCP tool response carries a `guardrails` block. The contract tests
-assert its values explicitly:
-
-| Field | What it means | Tested value |
-|-------|--------------|--------------|
-| `evidence_text_redacted` | Whether vector event text was stripped | `true` for `generation` role |
-| `evidence_access_level` | `none` / `bounded` | `none` for generation, `bounded` for export |
-| `graph_access_level` | `standard` / `broader` | `standard` for generation, `broader` for export |
-| `response_truncated` | Budget enforcement was triggered | `true` when `MAX_RESPONSE_BYTES` exceeded |
-| `raw_payload_returned` | Whether raw payload was included | Always `false` |
-
----
-
-## 2. Graph Logic Validation (Deterministic Assertions)
-
-Graph relationships written by the Flink processor are **deterministic** — given a known
-input event, the output edges are fully predictable. These can be verified against a live
-Neo4j instance after controlled event injection.
-
-### 2a. Lab signal rules (`MAY_INDICATE` edges)
-
-Produce a synthetic `LAB_RESULT` event for a known patient, then assert:
+Ontology and seed correctness is gated in CI (see [07 — CI/CD Automation](07_cicd_automation.md#3-ontology-conformance-workflow)). Against a running stack, these Cypher checks confirm the clinical rules materialised correctly:
 
 ```bash
-# Potassium ≥ 5.5 → Hyperkalemia
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (p:Patient {id:"patient-0001"})-[:HAS_OBSERVATION]->(o:Observation)
-   -[:MAY_INDICATE]->(c:Condition)
-   WHERE o.name = "Potassium" AND o.value >= 5.5
-   RETURN o.value, c.name'
+make neo4j-hc   # or: docker exec -it healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD"
 ```
 
-| Lab | Threshold | Expected `c.name` |
-|-----|-----------|-------------------|
-| Potassium | ≥ 5.5 mmol/L | Hyperkalemia |
-| Glucose | ≥ 180 mg/dL | Hyperglycemia |
-| HbA1c | ≥ 6.5 % | Diabetes Mellitus |
-| Creatinine | > 1.2 mg/dL | Chronic Kidney Disease |
-| eGFR | < 60 mL/min | Chronic Kidney Disease |
-| Troponin I | > 0.04 ng/mL | Acute Myocardial Infarction |
-| WBC | > 11.0 10³/µL | Infection |
-| INR | > 3.0 | Anticoagulation Concern |
-| LDL | > 130 mg/dL | Hyperlipidemia |
-| TSH | > 4.5 mIU/L | Hypothyroidism |
-| TSH | < 0.5 mIU/L | Hyperthyroidism |
-| Hemoglobin | < 12.0 g/dL | Anemia |
-| Sodium | < 135 mmol/L | Hyponatremia |
-| Sodium | > 145 mmol/L | Hypernatremia |
+```cypher
+// Lab thresholds, e.g. Potassium >= 5.5 -> Hyperkalemia
+MATCH (l:LabTest)-[r:MAY_INDICATE]->(c:Condition) RETURN l.name, r.threshold, c.name LIMIT 10;
 
-### 2b. Adverse event detection (`REPORTED_ADVERSE_REACTION`)
+// Contraindication with reason
+MATCH (m:Medication {name:'Metformin'})-[r:CONTRAINDICATED_FOR]->(c:Condition)
+RETURN c.name, r.reason;  // expect CKD, lactic_acidosis_risk
 
-Produce a `CLINICAL_NOTE` with a symptom that is a known adverse reaction for a medication
-the patient is currently ordered:
+// Adverse outcome catalogue (expect 6 codes)
+MATCH (a:AdverseOutcome) RETURN count(a);
+
+// Known reactions (expect >= 20)
+MATCH ()-[r:HAS_KNOWN_REACTION]->() RETURN count(r);
+
+// Interactions carry a mechanism
+MATCH ()-[r:INTERACTS_WITH]->() WHERE r.mechanism IS NULL RETURN count(r);  // expect 0
+
+// Patient-reported reactions
+MATCH ()-[r:REPORTED_ADVERSE_REACTION]->() RETURN count(r);
+```
+
+## 8. Grounding and response styles
+
+Answers must be grounded in retrieved evidence and cite it. `score_grounding` is used both offline and in MLflow evaluation. The `response_style` request field (`concise`, `clinical`, `audit`) changes format only — not evidence selection or guardrails — and is covered by `test_structured_output`.
+
+## 9. Live smoke tests
+
+With the stack running (`make up` — see [08 — Operation Runbook](08_operation_runbook.md)):
 
 ```bash
-# Patient on Lisinopril documents "cough" in a clinical note
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (ae:AdverseEvent)-[:ASSOCIATED_WITH_MEDICATION]->(m:Medication {name:"Lisinopril"})
-   WHERE ae.symptom_name = "cough"
-   RETURN ae.symptom_name, ae.meddra_term, ae.severity'
-# Expected: meddra_term="Cough", severity="moderate"
+make validate                                   # cross-domain stack validation
+make query-hc                                   # sample healthcare query
+make query-sc                                   # sample supply-chain query
+python domains/healthcare/scripts/mcp_smoke_test.py   # MCP initialize, list and call tools
+domains/healthcare/scripts/test_planner.sh      # planner routes over HTTP
 ```
 
-### 2c. Contraindication violations
+## 10. Running locally
+
+| Command | Runs |
+| --- | --- |
+| `make sync` | `uv sync` for the workspace |
+| `make lint` | Ruff (`E,F,I`, line length 120) over `packages domains scripts` |
+| `make test-unit` | Unit suites for agent-core, healthcare and supply-chain |
+| `make test-integration` | Contract, MLflow and ontology integration suites |
+| `make test-evals` | Healthcare offline evaluation suites |
+| `make test-core` / `test-hc` / `test-sc` | All suites for one package |
+| `make validate-skills` | Generated skill packages are in sync and valid |
+| `make validate-ontology` | Ontology configs for both domains |
+| `make validate-docs` | Markdown lint |
+
+Flink suites:
 
 ```bash
-# Patients currently on Metformin who have CKD in the graph
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (p:Patient)-[:HAS_CONDITION]->(c:Condition {name:"Chronic Kidney Disease"})
-   <-[:CONTRAINDICATED_FOR {reason:"lactic_acidosis_risk"}]-(m:Medication {name:"Metformin"})
-   WHERE EXISTS {
-     MATCH (p)-[:HAS_MEDICATION_ORDER]->(:MedicationOrder)-[:ORDERS_MEDICATION]->(m)
-   }
-   RETURN p.id, m.name, c.name'
+python -m unittest discover -s domains/healthcare/data-pipelines/flink-job/tests
+python -m unittest discover -s domains/supply-chain/data-pipelines/flink-job/tests
 ```
 
-### 2d. Drug safety seed verification (startup check)
+## 11. Known gaps
 
-```bash
-# AdverseOutcome vocabulary seeded correctly
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (ao:AdverseOutcome) RETURN ao.code, ao.description ORDER BY ao.code'
-# Expected: 6 rows — CA, DE, DS, HO, LT, OT
+- No adversarial tests for prompt or Cypher injection through graph content.
+- No curated golden question set executed against a live LLM in CI.
+- The evaluation gate is soft; promoting it to a hard gate requires a stable baseline.
+- Supply-chain has no offline evaluation suite.
 
-# HAS_KNOWN_REACTION edges present
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (:Medication)-[r:HAS_KNOWN_REACTION]->(:Symptom) RETURN count(r) AS edges'
-# Expected: ≥ 20
+## Related
 
-# INTERACTS_WITH edges carry mechanism annotations
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (m1:Medication)-[r:INTERACTS_WITH]->(m2:Medication)
-   WHERE r.mechanism IS NOT NULL
-   RETURN m1.name, m2.name, r.mechanism LIMIT 5'
-```
-
----
-
-## 3. Vector Retrieval Quality (Semantic Hit Rate)
-
-Vector retrieval uses domain-routed embeddings (clinical, claims, device) with
-`sentence-transformers/all-MiniLM-L6-v2` by default. Each domain can be configured
-with a specialised model via `EMBEDDING_MODEL_CLINICAL`, `EMBEDDING_MODEL_CLAIMS`,
-or `EMBEDDING_MODEL_DEVICE`. Query-time domain classification routes questions to
-the appropriate vector space for improved recall.
-
-### Hit-rate check against a live stack
-
-```bash
-# Run the full query suite and capture vector scores
-./domains/healthcare/scripts/query_examples.sh 2>/dev/null \\
-  | jq -r 'select(.vector_context) | .question[:60], (.vector_context | map(.score))'
-```
-
-Expected: top hit score ≥ 0.7 for patient-scoped queries; ≥ 0.5 for cohort queries.
-
-### Precision@k evaluation
-
-Build a small labelled set and measure retrieval accuracy:
-
-```python
-# golden_retrieval.jsonl  — one JSON object per line
-# {"question": "elevated potassium", "patient_id": "patient-0001",
-#  "expected_event_types": ["LAB_RESULT"]}
-
-import json, requests
-
-hits, total = 0, 0
-for row in open("golden_retrieval.jsonl"):
-    q = json.loads(row)
-    r = requests.post("http://localhost:8000/query", json={
-        "question": q["question"], "patient_id": q["patient_id"]
-    }).json()
-    returned_types = {h["event_type"] for h in r.get("vector_context", [])}
-    hits += any(t in returned_types for t in q["expected_event_types"])
-    total += 1
-
-print(f"Precision@k: {hits/total:.0%} ({hits}/{total})")
-```
-
----
-
-## 4. Answer Grounding Validation (LLM Output Quality)
-
-### 4a. Context citation check (no judge model needed)
-
-Assert that facts present in `graph_context` appear in the answer text. This proves the
-LLM consumed the context rather than generating unsupported claims:
-
-```python
-import requests
-
-result = requests.post("http://localhost:8000/query", json={
-    "question": "Is this patient on Warfarin and Aspirin concurrently?",
-    "patient_id": "patient-0001"
-}).json()
-
-# Graph interaction must be present
-interactions = [
-    i for p in result["graph_context"]
-    for i in p.get("interactions", [])
-    if i.get("from") == "Warfarin" and i.get("to") == "Aspirin"
-]
-assert interactions, "Warfarin+Aspirin interaction must appear in graph_context"
-
-# Answer must reference the clinical risk
-answer = result["answer"].lower()
-assert any(kw in answer for kw in ["bleeding", "interaction", "risk", "warfarin"]), \
-    f"Answer did not cite drug interaction evidence: {answer[:200]}"
-```
-
-### 4b. Golden-set scoring
-
-Manually curate 10–20 known patient scenarios. Each entry lists facts that a correct
-answer must contain given the available graph and vector context.
-
-```python
-# golden_answers.jsonl
-# {"question": "...", "patient_id": "...",
-#  "required_facts": ["Warfarin", "bleeding_risk", "Aspirin"]}
-
-import json, requests
-
-scores = []
-for row in open("golden_answers.jsonl"):
-    q = json.loads(row)
-    r = requests.post("http://localhost:8000/query", json={
-        "question": q["question"], "patient_id": q["patient_id"]
-    }).json()
-    answer = r["answer"].lower()
-    hits = sum(1 for f in q["required_facts"] if f.lower() in answer)
-    score = hits / len(q["required_facts"])
-    scores.append(score)
-    print(f"{score:.0%}  {q['question'][:60]}")
-
-print(f"\nMean grounding score: {sum(scores)/len(scores):.0%}")
-```
-
-Target: ≥ 70 % mean grounding score across the golden set.
-
-### 4c. Response style variants
-
-The `graphrag_answer_generate` tool accepts a `response_style` parameter. Validate each
-style produces structurally distinct output:
-
-| Style | Expected answer characteristics |
-|-------|----------------------------------|
-| `concise` | Short, bullet-point friendly, ≤ 3 sentences |
-| `clinical` | Uses medical terminology, references conditions by name |
-| `audit` | Cites `trace_id`, mentions evidence sources explicitly |
-
----
-
-## 5. Integration Smoke Tests (Live Stack)
-
-**File:** `domains/healthcare/scripts/mcp_smoke_test.py`
-**Requires:** running stack (`docker compose up -d`)
-
-```bash
-# MCP handshake + tool-list validation
-python3 domains/healthcare/scripts/mcp_smoke_test.py
-
-# Dual-path evidence smoke query
-curl -s -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{"question":"hyperkalemia risk evidence","patient_id":"patient-0001"}' \
-  | jq '{
-      patients,
-      vector_hits: (.vector_context | length),
-      graph_patients: (.graph_context | length),
-      has_lab_signals: (.graph_context[0].lab_signals | length > 0),
-      has_answer: (.answer | length > 0)
-    }'
-```
-
-Expected output:
-
-```json
-{
-  "patients": ["patient-0001"],
-  "vector_hits": 5,
-  "graph_patients": 1,
-  "has_lab_signals": true,
-  "has_answer": true
-}
-```
-
----
-
-## 6. CI Pipeline Summary
-
-```
-git push → dev branch
-  │
-  ├── skills-layer-validation job
-  │     ├── python domains/healthcare/scripts/generate_agent_skills.py --check
-  │     ├── python domains/healthcare/scripts/validate_agent_skills.py
-  │     └── optional skills-ref validate (best-effort install, non-blocking if unavailable)
-  │
-  ├── contract-tests job
-  │     ├── uv sync --frozen
-  │     ├── pytest -q tests/unit         (agent-core, healthcare, supply-chain)
-  │     ├── pytest -q tests/integration  (healthcare, supply-chain; includes test_contracts.py, MLflow, ontology conformance)
-  │     ├── pytest -q tests/evals        (healthcare planner + evaluation fixtures)
-  │     └── python -m healthcare_agent.evaluation.gates --min-score 0.5  ← evaluation quality gate
-  │
-  └── container-build job
-        └── docker build -f domains/healthcare/agent-service/Dockerfile      ← validates image builds
-```
-
-Neither job requires live external services. The contract tests mock all three
-dependencies (Qdrant, Neo4j, the LLM provider) and validate response shape, guardrail metadata,
-role enforcement, text redaction, byte-budget trimming, and skills-plan resolution behavior.
-
----
-
-## 7. What Is Not Yet Automated
-
-| Gap | Recommended next step |
-|-----|-----------------------|
-| Ontology and rule-pack conformance | Validate `domains/healthcare/knowledge/ontology/` files against duplicate IDs, missing relationships, and seed-data parity |
-| Graph integration tests after event injection | Add `domains/healthcare/agent-service/tests/integration/test_graph_signals.py` using `neo4j` driver against a test Neo4j container in CI |
-| Vector precision@k regression | Build `golden_retrieval.jsonl` with 20 labelled queries and run in CI |
-| Golden-set answer grounding | Build `golden_answers.jsonl` and run grounding score check in CI |
-| Adverse event detection end-to-end | Inject known medication + symptom pair, assert `AdverseEvent` node via Cypher |
-| Contraindication alert end-to-end | Inject known condition + medication order, assert contraindication in `graph_context` |
-| Response style regression | Add contract test variant for `response_style: audit` verifying `trace_id` in answer |
-| LangGraph agent integration tests | Add end-to-end tests for specialist agent routing with live infrastructure |
-| MLflow evaluation gate | CI job runs `domain/evaluation_gates.py` against fixture data; fails when aggregate scores drop below threshold (routing ≥ 0.6, evidence ≥ 0.5, answer ≥ 0.5, overall ≥ 0.55). Currently soft gate (`continue-on-error`); promote to hard gate when baseline stabilizes. |
+- [05 — AI Agents](05_ai_agents.md)
+- [07 — CI/CD Automation](07_cicd_automation.md)
+- [08 — Operation Runbook](08_operation_runbook.md)

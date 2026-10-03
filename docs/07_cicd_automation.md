@@ -1,260 +1,201 @@
-# CI/CD and Deployment Automation
+# 07 — CI/CD Automation
 
-This document covers deployment configurations and CI/CD automation for the Healthcare AI GraphRAG platform.
+This guide covers how code moves from a branch to a running cluster. It describes the three GitHub Actions workflows, the branch model, ownership rules, and the version matrix. For what the tests check, see [06 — Quality Assurance](06_quality_assurance.md). For Helm charts, environments, and secrets, see [03 — Platform Blueprint](03_platform_blueprint.md).
 
-## Directory Structure
+## 1. Pipeline overview
 
-```
-infra/
-├── compose/                    Local Docker Compose (infra + per-domain stacks)
-├── environments/
-│   ├── dev/
-│   │   └── setup-minikube.sh   Minikube bootstrap (local Compose lives in infra/compose/)
-│   └── production/             Production Docker Compose variant
-│       ├── docker-compose.ai.yml
-│       ├── docker-compose.monitoring.yml
-│       ├── monitoring/
-│       └── agent-service.env.example
-├── helm/                       Helm umbrella chart (Kubernetes deployment)
-│   ├── Chart.yaml              Umbrella chart with sub-chart dependencies
-│   ├── values.yaml             Default values
-│   ├── values-dev.yaml         Dev overrides (single replica, Databricks LLM, full infra)
-│   ├── values-production.yaml  Production overrides (multi-replica, Bedrock+fallback)
-│   ├── templates/              Namespace, NetworkPolicy, helpers
-│   └── charts/
-│       ├── agent-service/      Healthcare AI agents with embedded MCP
-│       ├── provider-web/       Frontend UI
-│       ├── flink/              Flink cluster (JobManager + TaskManager + job)
-│       ├── mlflow/             Tracing and evaluation server
-│       ├── kafka/              Confluent Kafka (Zookeeper + broker + Schema Registry)
-│       ├── conduktor/          Kafka console
-│       ├── producer/           Synthetic event producer
-│       ├── neo4j/              Neo4j graph database
-│       ├── qdrant/             Qdrant vector database
-│       └── ollama/             Local LLM inference server (optional provider)
-├── images/flink-cluster/       Legacy shared Flink image (unused; Flink runs per-domain)
-├── observability/              Prometheus, alerts, blackbox, Grafana config
-└── web/nginx.conf              Frontend reverse-proxy config
+```mermaid
+flowchart LR
+  PR[PR / push to dev] --> C[agent-service-contracts]
+  PR --> O[ontology-conformance]
+  C --> M{merge to prd}
+  O --> M
+  M --> D[deploy-ai-prd]
+  D --> EKS[(EKS: healthcare-ai)]
 ```
 
-## In-Scope Components
+| Workflow | File | Trigger | Purpose |
+| --- | --- | --- | --- |
+| Agent-service contracts | `.github/workflows/agent-service-contracts.yml` | push / PR to `dev` (path filtered) | Skills sync, lint, unit/integration/eval tests, image builds, Helm lint |
+| Ontology conformance | `.github/workflows/ontology-conformance.yml` | push / PR to `dev` (path filtered) | Ontology loader, runtime rules, seeds, terminology, drift, bootstrap |
+| Production deploy | `.github/workflows/deploy-ai-prd.yml` | push to `prd` (path filtered), `workflow_dispatch` | Helm upgrade of the healthcare release on EKS |
 
-- Healthcare agents service (embedded FastMCP at `/mcp`)
-- Provider web UI
-- Flink cluster (JobManager + TaskManager)
-- Flink job submitter (healthcare domain)
-- MLflow tracing server
-- Monitoring stack (Prometheus, Grafana, Blackbox Exporter)
+All workflows run on `ubuntu-latest`. Path filters keep doc-only changes from triggering builds.
 
-### Infrastructure (deployed in dev, external in production)
+## 2. Agent-service contracts workflow
 
-| Component | Dev (in-cluster) | Production |
-|-----------|-----------------|------------|
-| Kafka + Schema Registry | Helm sub-chart | Managed Confluent platform |
-| Neo4j | Helm sub-chart | Managed service |
-| Qdrant | Helm sub-chart | Managed service |
-| Ollama (LLM) | Helm sub-chart | Not deployed (uses AWS Bedrock) |
+Path filters include `pyproject.toml`, `uv.lock`, `packages/**`, both agent services, both skill trees and their generator/validator scripts, `scripts/lib/**`, `domains/*/scripts/**`, and Python files under `domains/*/data-pipelines/`.
 
-## LLM Provider Routing
+| Job | Steps | Blocking |
+| --- | --- | --- |
+| `skills-layer-validation` | `generate_agent_skills.py --check` and `validate_agent_skills.py` for both domains; optional upstream `skills-ref validate` (skipped if it cannot be installed) | Yes, except `skills-ref` |
+| `ruff-lint` | `ruff check` with uv | Yes |
+| `contract-tests` | `uv sync --frozen` for `agent-core`, `healthcare-agent-service`, `supply-chain-agent-service`; `pytest tests/unit` for all three; `pytest tests/integration` for both domains; healthcare `tests/evals`; evaluation gates CLI | Yes, except the gates step |
+| `container-build` | `docker build` for both agent-service Dockerfiles (repo-root context) | Yes |
+| `helm-lint` | `helm lint infra/helm`; `helm template` with dev and production values | Yes |
 
-| Environment | Primary Provider | Fallback Provider |
-|-------------|-----------------|-------------------|
-| Dev / Local | Ollama (`llama3.1`) | none |
-| Production | Bedrock (`anthropic.claude-3-5-haiku-20241022-v1:0`) | Anthropic (`claude-sonnet-4-20250514`) |
+`uv sync --frozen` fails if `uv.lock` is out of date. Run `uv lock` locally and commit the lockfile with any dependency change.
 
-The `LLM_FALLBACK_PROVIDER` env var enables automatic failover — if the primary returns an error, the request is retried against the fallback.
+## 3. Ontology conformance workflow
 
----
+This workflow guards the ontology, seed Cypher, and the healthcare Flink job. Every job installs the healthcare Flink `requirements.txt` and `./packages/knowledge-core`.
 
-## Local Development
+| Job | Runs |
+| --- | --- |
+| `ontology-loader-tests` | `flink-job/tests/test_ontology_loader.py` |
+| `runtime-rule-tests` | `flink-job/tests/test_runtime_rules.py` |
+| `module-unit-tests` | `test_storage`, `test_graph_writes`, `test_pipeline_service` |
+| `seed-generation-tests` | `test_seed_generation`, then `scripts/validate_ontology.py` |
+| `terminology-coverage-gate` | `scripts/validate_terminology_coverage.py` |
+| `ontology-drift-gate` | `scripts/validate_ontology_drift.py` |
+| `bootstrap-smoke-test` | `test_neo4j_bootstrap.py` for healthcare and supply-chain |
 
-### Option A: Docker Compose (recommended for quick start)
+When you change an ontology YAML, regenerate the seeds (`generate_ontology_seed_cypher.py`) and commit `generated_ontology_seeds.cypher` in the same PR. Otherwise the drift gate fails.
 
-Uses the canonical stacks in `infra/compose/`, configured by the repo-root `.env` (copy `.env.example`).
+The supply-chain Flink unit tests are not in this workflow. Run them locally (see [06 — Quality Assurance](06_quality_assurance.md)).
+
+## 4. Production deploy workflow
+
+`deploy-ai-prd.yml` deploys the healthcare umbrella chart to EKS. It triggers on push to `prd` when any of these change: the workflow file, `infra/helm/**`, the healthcare agent-service or webapp, `packages/**`, `pyproject.toml`, or `uv.lock`. It can also be run manually.
+
+```mermaid
+sequenceDiagram
+  participant GH as GitHub Actions
+  participant AWS as AWS STS (OIDC)
+  participant EKS as EKS
+  GH->>AWS: assume AWS_ROLE_TO_ASSUME
+  GH->>EKS: aws eks update-kubeconfig (EKS_CLUSTER_NAME)
+  GH->>EKS: helm upgrade --install healthcare --wait --timeout 5m
+  GH->>EKS: rollout status agent-service, provider-web (300s)
+  GH->>EKS: kubectl get pods,svc
+```
+
+The workflow runs:
 
 ```bash
-make up-hc    # infra stack (kafka, ollama, prometheus, grafana, blackbox, ...) + healthcare stack
-# Equivalent:
-# docker compose -f infra/compose/docker-compose.infra.yml -p infra up -d
-# docker compose -f infra/compose/docker-compose.healthcare.yml -p healthcare up -d
-```
-
-Services on localhost:
-
-| Service | Port | URL |
-|---------|------|-----|
-| Agent API | 8000 | `http://localhost:8000` |
-| Provider Web | 8088 | `http://localhost:8088` |
-| Neo4j Browser | 7474 | `http://localhost:7474` |
-| Qdrant | 6333 | `http://localhost:6333` |
-| Flink UI | 8082 | `http://localhost:8082` |
-| Ollama | 11434 | `http://localhost:11434` |
-| Prometheus | 9090 | `http://localhost:9090` |
-| Grafana | 3000 | `http://localhost:3000` |
-
-Tear down:
-
-```bash
-make down
-```
-
-### Option B: Helm on Minikube
-
-```bash
-make helm-dev    # one-command bootstrap
-# Or manually:
-minikube start --cpus=4 --memory=8192
-helm install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
-```
-
-Services exposed via NodePort:
-
-| Service | NodePort | URL |
-|---------|----------|-----|
-| Agent API | 30800 | `http://$(minikube ip):30800` |
-
-On macOS with Docker driver, NodePorts aren't directly accessible. Use port-forwards:
-
-```bash
-make helm-ports       # start all port-forwards
-make helm-ports-stop  # kill them
-```
-
-| Service | Port-forward URL |
-|---------|-----------------|
-| Agent API | `http://localhost:8000` |
-| Web UI | `http://localhost:8088` |
-| Neo4j | `http://localhost:7474` |
-| Qdrant | `http://localhost:6333/dashboard` |
-| Conduktor | `http://localhost:9080` |
-
-Dev differences from production:
-
-- All deployments scaled to 1 replica
-- LLM provider: local Ollama (no external API keys needed)
-- Kafka, Neo4j, Qdrant, Ollama deployed in-cluster
-- `AGENT_ALLOW_ROLE_HEADER: true` for testing
-- No NetworkPolicy enforcement
-- No HPA (autoscaling disabled)
-- Default model: `qwen2.5:1.5b` (fits in 16GB minikube)
-
-Tear down:
-
-```bash
-make helm-dev-down
-minikube delete  # full reset
-```
-
----
-
-## Production
-
-### Deploy (Helm)
-
-```bash
-helm install healthcare infra/helm \
+helm upgrade --install healthcare infra/helm \
   -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
-  --set agent-service.secrets.NEO4J_PASSWORD=<value> \
-  --set agent-service.secrets.OPENAI_API_KEY=<value> \
-  --set agent-service.secrets.ANTHROPIC_API_KEY=<value>
+  --set agent-service.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
+  --set agent-service.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  --wait --timeout 5m
 ```
 
-`OPENAI_API_KEY` is optional; set it only when using the OpenAI provider or fallback.
+| Kind | Name | Use |
+| --- | --- | --- |
+| Permission | `id-token: write`, `contents: read` | OIDC federation, no static AWS keys |
+| Repository variable | `AWS_ROLE_TO_ASSUME` | IAM role trusted for this repo |
+| Repository variable | `AWS_REGION` | Cluster region |
+| Repository variable | `EKS_CLUSTER_NAME` | Target cluster |
+| Secret | `NEO4J_PASSWORD` | Passed to the agent-service secret |
+| Secret | `ANTHROPIC_API_KEY` | Fallback LLM key |
 
-Upgrade:
+`values-production.yaml` ships `secrets: {}`. The two `--set` flags are the only secrets the workflow injects. Other secrets, such as `DATABRICKS_TOKEN` for `EMBEDDING_PROVIDER=databricks`, must come from an external secret manager. See [03 — Platform Blueprint](03_platform_blueprint.md#5-configuration-and-secrets).
+
+The workflow does not build or push images. It deploys the image tags already set in the values file.
+
+## 5. Evaluation gate policy
+
+The gates step runs offline against committed fixtures:
 
 ```bash
-helm upgrade healthcare infra/helm -f infra/helm/values-production.yaml -n healthcare-ai
+uv run --package healthcare-agent-service python -m healthcare_agent.evaluation.gates \
+  --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
 ```
 
-### Platform Controls
+It is a soft gate (`continue-on-error: true`). A failing score shows in the job log but does not block a merge. To make it blocking, remove `continue-on-error` and raise `--min-score` once the fixtures are stable. Metric definitions are in [06 — Quality Assurance](06_quality_assurance.md#5-evaluation-gates-and-mlflow-evaluation).
 
-- NetworkPolicy: default deny ingress for namespace (enabled in production values)
-- HPA: `agent-service` (2–6), `provider-web` (2–5); requires metrics-server
+## 6. Branch and release flow
 
-### Deploy (Docker Compose)
-
-```bash
-cp infra/environments/production/agent-service.env.example infra/environments/production/agent-service.env
-# Edit agent-service.env with real credentials
-
-docker compose -f infra/environments/production/docker-compose.ai.yml up -d
-docker compose -f infra/environments/production/docker-compose.monitoring.yml up -d
+```mermaid
+gitGraph
+  commit
+  branch feature
+  commit
+  checkout main
+  branch dev
+  merge feature
+  branch prd
+  commit id: "deploy"
 ```
 
----
+1. Open a PR from a feature branch into `dev`. The contracts and ontology workflows must pass.
+2. Promote `dev` to `prd` with a PR or fast-forward merge.
+3. A push to `prd` that touches deployable paths triggers `deploy-ai-prd`.
+4. To redeploy without a code change, run the workflow manually with `workflow_dispatch`.
 
-## Secrets and Credentials
+To roll back, revert on `prd` and let the workflow redeploy, or run `helm rollback healthcare -n healthcare-ai`.
 
-- Replace all `change_me` values before deployment.
-- Inject API keys and passwords from a secret manager or sealed secret workflow.
-- Never commit populated `.env` files or rendered secret manifests.
-- Required secrets (production): `NEO4J_PASSWORD`, `ANTHROPIC_API_KEY` (optional: `OPENAI_API_KEY`)
-- Dev uses hardcoded defaults (no external API keys needed).
+## 7. Code ownership
 
----
+`.github/CODEOWNERS` assigns `@wchen-dea` as required reviewer for:
 
-## Technology Version Matrix
+- `domains/healthcare/knowledge/ontology/` and `domains/supply-chain/knowledge/ontology/`
+- Both `knowledge/graph-seeds/generated_ontology_seeds.cypher` files
+- Healthcare `validate_ontology.py`, `validate_terminology_coverage.py`, and `generate_ontology_seed_cypher.py`
 
-| Technology | Version | Component |
-|------------|---------|-----------|
-| Python | 3.11 | All Python services |
-| Java | 17 | Flink runtime |
-| Apache Flink | 1.20.5 | Stream processing cluster |
-| PyFlink | 1.20.5 | Python stream jobs |
-| Flink Kafka Connector | 3.4.0 | Flink–Kafka integration |
-| Confluent Kafka (Docker) | 7.9.0 | Kafka brokers, Zookeeper, Schema Registry |
-| Confluent Kafka (Helm) | 7.6.0 | Kafka brokers (minikube) |
-| Neo4j | 5.26.2 (Docker) / 5-community (Helm) | Knowledge graph |
-| Qdrant | v1.12.1 | Vector store |
-| Ollama | latest | Local LLM inference |
-| FastAPI | 0.115.0 | Agent API framework |
-| LangGraph | >=0.4.1 | Multi-agent orchestration |
-| LangChain Core | >=0.3.0 | Agent framework |
-| MCP SDK | 1.28.0 | Tool protocol |
-| MLflow | v2.21.3 | Tracing and evaluation |
-| Conduktor Console | 1.25.1 | Kafka management UI |
-| sentence-transformers | 3.0.1 | Embedding model |
-| neo4j (Python driver) | 5.24.0 | Graph client |
-| qdrant-client | 1.11.3 | Vector client |
-| confluent-kafka (Python) | 2.5.3 | Kafka producer |
-| Prometheus | latest | Metrics collection |
-| Grafana | latest | Dashboards |
+Ontology changes change graph semantics for every consumer, so they need an explicit owner review. See [ADR 0003](adrs/0003-ontology-governance-and-seed-generation.md).
 
----
+## 8. Helm and environments summary
 
-## Configuration Guidelines
+| Environment | Entry point | Release / namespace | Notes |
+| --- | --- | --- | --- |
+| Local compose | `make up`, `make up-hc`, `make up-sc` | n/a | Full stack, local embeddings |
+| Minikube dev | `make helm-dev` (`infra/environments/dev/setup-minikube.sh`) | `healthcare-dev` / `healthcare-ai-dev` | `values-dev.yaml`, 1 replica, NodePort 30800 |
+| Production (EKS) | `deploy-ai-prd.yml` (`make helm-prd` renders a dry-run) | `healthcare` / `healthcare-ai` | `values-production.yaml`, HPA, external Neo4j/Qdrant, Bedrock |
+| Production compose | `infra/environments/production/docker-compose.ai.yml` | n/a | Single-host AI tier plus monitoring compose |
 
-| Area | Guidance |
-|------|----------|
-| Images | Pin to immutable tags or digests; promote same artifact across envs |
-| Namespaces | Dedicated per environment with scoped RBAC |
-| Networking | TLS at ingress; restrict with NetworkPolicy/security groups |
-| Origins | Set `AGENT_ALLOW_ORIGINS` to explicit trusted origins |
-| Scaling | Size agent-service and provider-web independently; validate HPA thresholds |
-| MLflow | PostgreSQL backend + object store for production (not SQLite) |
-| Observability | Ship logs to centralized store; alert on health/latency/errors |
+Chart layout, values, and secret handling are described in [03 — Platform Blueprint](03_platform_blueprint.md#3-kubernetes-with-helm).
 
----
+## 9. Version matrix
 
-## Endpoint Checks
+| Component | Version |
+| --- | --- |
+| Python | 3.11 (packages declare `>=3.11,<3.14`) |
+| Java | 17 |
+| Flink / PyFlink | 1.20.5 |
+| Flink Kafka connector | 3.4.0 |
+| Confluent Platform | 7.9.0 (Docker), 7.6.0 (Helm) |
+| Neo4j | 5.26.2 (Docker), 5-community (Helm) |
+| Neo4j Python driver | 5.24.0 |
+| Qdrant | v1.12.1 |
+| qdrant-client | 1.11.3 |
+| confluent-kafka | 2.5.3 |
+| FastAPI | 0.115.0 |
+| LangGraph | >=0.4.1 |
+| langchain-core | >=0.3 |
+| MCP SDK | 1.28.0 |
+| MLflow | v2.21.3 |
+| sentence-transformers | 3.0.1 |
+| Conduktor | 1.25.1 |
 
-| Endpoint | Path |
-|----------|------|
-| Agent API health | `/health` |
-| Embedded MCP diagnostics | `/mcp/health` |
-| Embedded MCP protocol | `/mcp` |
-| Provider web | `/` |
+The upper bound `<3.14` exists because `mcp==1.28.0` and `fastapi==0.115.0` do not resolve together on Python 3.14.
 
----
+## 10. Configuration guidelines
 
-## GitHub Actions CD
+- Pin runtime dependencies in each package `pyproject.toml` and commit `uv.lock`. CI uses `--frozen`.
+- Keep secrets out of values files. Pass them with `--set` from CI secrets or mount them from a secret manager.
+- Use repository variables, not secrets, for non-sensitive identifiers such as role ARN, region, and cluster name.
+- Set `AGENT_ALLOW_ROLE_HEADER=false` in every shared environment so callers cannot choose their own role.
+- Keep `EMBEDDING_PROVIDER` and `EMBEDDING_DIM` the same for ingest and query. Changing them needs a Qdrant re-index. See [04 — Data Platform](04_data_platform.md#embeddings).
 
-Workflow: `.github/workflows/deploy-ai-prd.yml`
+## 11. Local equivalents
 
-- Triggers on push to `prd` branch or `workflow_dispatch`
-- Deploys to AWS EKS
+| CI step | Local command |
+| --- | --- |
+| Ruff | `make lint` |
+| Unit tests | `make test-unit` |
+| Integration tests | `make test-integration` |
+| Evaluation suites | `make test-evals` |
+| Skills sync and validation | `make validate-skills` |
+| Ontology validation | `make validate-ontology` |
+| Helm lint and template | `make helm-lint` |
+| Docs lint | `make validate-docs` |
+| Full stack validation | `make validate` |
 
-Required secrets: `NEO4J_PASSWORD`, `ANTHROPIC_API_KEY` (optional: `OPENAI_API_KEY`)
-Required variables: `AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `EKS_CLUSTER_NAME`
+## Related
+
+- [03 — Platform Blueprint](03_platform_blueprint.md)
+- [06 — Quality Assurance](06_quality_assurance.md)
+- [08 — Operation Runbook](08_operation_runbook.md)
+- [ADR 0011 — uv workspace](adrs/0011-uv-workspace-packaging.md)

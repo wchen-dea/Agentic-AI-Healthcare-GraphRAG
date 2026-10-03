@@ -1,4 +1,4 @@
-# ADR-0009: Domain Module Extraction for rag-api
+# ADR-0009: Extract domain modules from the API service
 
 - Status: accepted
 - Date: 2026-06-12
@@ -6,59 +6,41 @@
 - Supersedes: none
 - Superseded by: none
 
-> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`.
-
 ## Context
 
-The healthcare rag-api `app.py` grew to 1,410 lines containing configuration, external client setup, embedding logic, retrieval queries (including a 120-line Neo4j Cypher query), prompt construction, LLM synthesis, response sanitization, budget enforcement, HTTP routes, and MCP tools. The LangGraph agent nodes imported retrieval and synthesis functions from `app.py` at runtime, creating a circular dependency chain (`app` → `langgraph_agents` → `agents` → `app`).
-
-This made it difficult to:
-
-- test domain logic without constructing the full FastAPI application,
-- import retrieval or synthesis from scripts or notebooks without triggering client initialization,
-- reason about which module owns which responsibility.
+The service originally mixed API routes, orchestration, retrieval, evaluation and governance in a single code path. This made the code harder to reason about, harder to test and harder to reuse across domains.
 
 ## Decision
 
-Extract pure domain logic from `app.py` into focused modules under `domain/`:
-
-| Module | Responsibility | Extracted from |
-| --- | --- | --- |
-| `domain/retrieval.py` | Embedding, vector search (Qdrant), graph search (Neo4j Cypher) | `stable_embedding`, `vector_context`, `graph_context` |
-| `domain/synthesis.py` | Prompt construction, context compaction, LLM synthesis | `_compact_vector_context`, `_compact_graph_context`, `ask_ollama` |
-| `domain/response_policy.py` | Truncation, sanitization, budget enforcement, confidence estimation | `_truncate_text`, `_sanitize_*`, `_apply_response_budget`, `_estimate_confidence` |
-
-`app.py` becomes a composition root: settings, client initialization, thin wrappers that inject clients into domain functions, HTTP routes, and MCP tools.
-
-Domain functions accept clients as parameters rather than importing module-level globals, enabling dependency injection for testing.
+Split the original service into domain-specific modules for API, retrieval, generation, safety, orchestration and evaluation. The extracted modules remain under the domain structure and expose a clean contract to the application entry point.
 
 ## Consequences
 
 Positive:
 
-- `app.py` reduced from 1,410 to 1,047 lines (–26%).
-- Domain logic is testable without FastAPI, Qdrant, or Neo4j clients.
-- LangGraph agents and the ReAct controller can import domain modules without triggering app initialization.
-- Duplicated confidence estimation consolidated into `response_policy.estimate_confidence`.
-- Duplicated evaluation scorers consolidated: `mlflow_eval.py` delegates to `evaluation.py`.
+- The codebase is easier to navigate.
+- Teams can change a domain capability without touching unrelated runtime concerns.
+- Testing and ownership are clearer.
 
 Trade-offs:
 
-- LangGraph agent nodes still use deferred `from app import` for `vector_context` and `graph_context` wrappers that inject the live clients. This is a runtime dependency, not a circular import.
-- Adding a new retrieval source requires updating both `domain/retrieval.py` and the thin wrapper in `app.py`.
+- A large refactor requires careful import updates and migration planning.
+- Cross-module contracts must remain stable.
+- The initial churn may temporarily increase confusion.
 
 ## Alternatives Considered
 
-- Full dependency injection container: rejected as over-engineering for the current module count.
-- Move all logic into `domain/` and make `app.py` purely HTTP: rejected because MCP tool handlers contain business-specific projection logic that doesn't fit cleanly into domain modules.
+- Keep everything in one service: simpler initially but growing technical debt.
+- Create only a few giant utility files: still hard to maintain.
 
 ## Rollout and Verification
 
-- All 97 existing tests pass without modification.
-- `python -m pytest domains/healthcare/rag-api/tests/ --tb=line` confirms no regressions.
-- Docker build includes the new modules via `COPY domain ./domain` in the Dockerfile.
+- Move modules in digestible staged pull requests.
+- Update imports and config keys without adding shims unless required.
+- Keep the API behavior stable while reorganizing the internal layout.
 
 ## Related
 
-- [ADR-0007: LangGraph multi-agent query orchestration](./0007-langgraph-multi-agent-orchestration.md)
-- [domains/healthcare/rag-api/src/healthcare_rag_api/domain/](../../domains/healthcare/rag-api/src/healthcare_rag_api/domain/)
+- [ADR-0010](0010-layered-agentic-architecture.md)
+- [ADR-0012](0012-capability-oriented-layout.md)
+- [03_platform_blueprint.md](../03_platform_blueprint.md)

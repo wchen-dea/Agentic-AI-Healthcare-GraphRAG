@@ -1,708 +1,199 @@
-# Healthcare Hybrid GraphRAG Architecture
+# 02 — Architecture
 
-## Purpose
+This document describes the **logical architecture**: the components, how data and
+requests flow between them, and the cross-cutting design principles. Deployment
+topology is in [03 — Platform Blueprint](03_platform_blueprint.md); the data pipeline is
+in [04 — Data Platform](04_data_platform.md); agent internals are in
+[05 — AI Agents](05_ai_agents.md).
 
-This document defines the technical architecture for a production-grade multi-agent healthcare intelligence platform. The system combines:
-
-- **Streaming data platform** — Kafka + PyFlink for real-time event enrichment with Avro schema governance
-- **Dual evidence stores** — Qdrant (semantic retrieval) + Neo4j (relationship reasoning) as complementary evidence channels
-- **Multi-agent orchestration** — LangGraph StateGraph with specialist agents for domain-specific reasoning
-- **Agent harness** — retry, guardrails, prompt injection detection, confidence gating, and MLflow observability
-- **Grounded generation** — deterministic evidence assembly before probabilistic LLM synthesis
-
-The architecture is optimized for reproducible local experimentation with clear lineage, full observability, and a path to production deployment.
-
-## Architectural Principles
-
-1. **Evidence before generation** — deterministic retrieval, ranking, and safety checks complete before any LLM call
-2. **Separation of data platform and AI** — `domains/<d>/data-pipelines/` and `packages/knowledge-core` own ingestion and stores; `domains/<d>/agent-service` and `packages/agent-core` own reasoning and delivery
-3. **Domain-specific agents share infrastructure** — harness, response policy, MLflow tracing, and MCP protocol are reusable across domains
-4. **LangGraph-only orchestration** — ADR-0012 removed the former single-pass and ReAct paths; REST, SSE, and MCP share the LangGraph query service
-5. **Observable by default** — every query produces Prometheus metrics, audit records, and optional MLflow traces
-
-## ADR References
-
-Key architecture decisions are tracked in [docs/adrs/README.md](adrs/README.md):
-
-- [ADR-0001: Dual persistence (Qdrant + Neo4j)](adrs/0001-dual-persistence-qdrant-neo4j.md)
-- [ADR-0002: Qdrant as the streaming vector store](adrs/0002-qdrant-streaming-vector-store.md)
-- [ADR-0003: Ontology governance and seed generation](adrs/0003-ontology-governance-and-seed-generation.md)
-- [ADR-0004: Local-first LLM with provider routing](adrs/0004-local-first-llm-provider-routing.md)
-- [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
-- [ADR-0006: Skills layer standardization](adrs/0006-skills-layer-standardization-and-validation.md)
-- [ADR-0007: LangGraph multi-agent orchestration](adrs/0007-langgraph-multi-agent-orchestration.md)
-- [ADR-0008: MLflow tracing and evaluation](adrs/0008-mlflow-tracing-and-evaluation.md)
-- [ADR-0009: Domain module extraction](adrs/0009-domain-module-extraction.md)
-- [ADR-0010: Layered agentic architecture](adrs/0010-layered-agentic-architecture.md)
-
-Roadmap design strategy and execution backlog details are documented in [docs/03_platform_blueprint.md](03_platform_blueprint.md).
-
-Runtime skill orchestration flow and contracts are documented in [docs/05_ai_agents.md](05_ai_agents.md).
-
-## Why This Architecture Scales Across Healthcare Sections
-
-The design separates stable platform capabilities from domain-specific healthcare logic.
-
-Platform capabilities:
-
-- streaming ingestion and replay,
-- hybrid vector plus graph persistence,
-- retrieval-grounded generation pipeline,
-- observability and operational controls.
-
-Domain extension points:
-
-- Kafka topic contracts and schema variants,
-- enrichment and normalization rules,
-- graph labels, properties, and relationships,
-- prompt templates and response policies.
-
-This keeps new sections additive and modular.
-
-## Multi-Domain Architecture
-
-The platform supports parallel domain deployments sharing infrastructure (Kafka cluster, Schema Registry, monitoring) while isolating domain-specific concerns (Neo4j instance, Qdrant collection, Kafka topics, ontology rules).
-
-| Domain | Directory | Neo4j Port | Qdrant Port | Topic Prefix |
-| --- | --- | --- | --- | --- |
-| Healthcare Provider | root (`domains/healthcare/data-pipelines/producer/`, `domains/healthcare/data-pipelines/flink-job/`, `domains/healthcare/agent-service/`) | 7474/7687 | 6333 | `healthcare.*` |
-| Supply Chain Resilience | `domains/supply-chain/` | 7475/7688 | 6335 | `supplychain.*` |
-
-Each domain brings its own: Avro envelope schema, ontology YAML (entities, seeds, rules), graph write functions, producer event generators, and Agent API planner/classifier. The streaming pipeline, embedding infrastructure, and observability stack are reused.
-
-## Healthcare Extension Matrix
-
-| Section | Example Inputs | Graph/Vector Emphasis | Primary Users | Expected Outcome |
-| --- | --- | --- | --- | --- |
-| Acute Clinical Ops | EHR notes, vitals, labs, encounters | Condition progression, symptom-observation linkage | Care teams, command center | Faster deterioration signal detection and context-rich escalation |
-| Medication Management | Orders, interaction knowledge base, FAERS adverse event data | Medication-order linkage, HAS_KNOWN_REACTION adverse event detection, CONTRAINDICATED_FOR validation, INTERACTS_WITH mechanism annotation | Pharmacists, inpatient teams | Reduced adverse-drug-risk exposure, real-time pharmacovigilance signals, and clearer intervention rationale |
-| Revenue Cycle Intelligence | Claims events, coding metadata, auth records | Clinical-claim traceability and mismatch signals | RCM analysts, coding teams | Lower denial rates and earlier documentation/coding correction |
-| Payer Utilization Review | Authorization outcomes, utilization events | Coverage patterns and utilization trajectory | UM teams, payer analysts | Better high-cost-case triage and utilization governance |
-| Population Health | Longitudinal events, risk tiers, chronic indicators | Cohort similarity + graph risk factors | Population health teams | Prioritized outreach and proactive risk management |
-| Device and Remote Care | Telemetry, device inventory, alert streams | Device-patient-event lineage | Monitoring teams, biomedical ops | Faster anomaly triage and reduced alert fatigue |
-
-## Supply Chain Extension Matrix
-
-| Section | Example Inputs | Graph/Vector Emphasis | Primary Users | Expected Outcome |
-| --- | --- | --- | --- | --- |
-| Supplier Risk | Supplier profiles, geopolitical data, financial signals | SUPPLIES edges, HAS_RISK_SIGNAL, single-source DEPENDS_ON chains | Procurement, risk management | Earlier single-source and geopolitical exposure detection |
-| Procurement | Purchase orders, incoterms, pricing | ORDERED_FROM, ORDERS_PART, DELIVERS_TO | Category managers, buyers | PO lifecycle visibility, cost variance analysis |
-| Logistics | Shipment tracking, customs, transport modes | SHIPPED_FROM, SHIPPED_TO, CONTAINS_PART, lead-time deviation | Logistics coordinators | Delay detection, carrier performance, customs hold alerts |
-| Quality | Inspections, defect rates, corrective actions | INSPECTED_PART, SUPPLIED_BY, defect_rate signals | Quality engineers, supplier management | Quality trend detection, supplier scorecard, CAPA triggers |
-| Disruption | Facility alerts, natural disaster, cyber incidents | DISRUPTED_BY, AFFECTS_PART, cascade via DEPENDS_ON BOM | Supply chain command center | Impact propagation assessment, mitigation tracking |
-| Inventory | Warehouse levels, reorder points, days-of-supply | HOLDS_INVENTORY, below_reorder signals | Planners, warehouse ops | Stockout risk detection, reorder optimization |
-
-## Extension Playbook
-
-For each new section, follow the same sequence:
-
-1. Define or extend topic contracts and payload schema.
-2. Add enrichment rules and map new entities into graph merges.
-3. Add retrieval filters and prompt templates for that workflow.
-4. Validate with section-specific test queries and outcome metrics.
-
-This keeps platform code stable while allowing domain growth by module.
-
-## Design Patterns Used
-
-This architecture intentionally combines several patterns so streaming ingestion, retrieval quality, and API surfaces can evolve independently.
-
-| Pattern | Where Used | Why It Is Used Here | Current Status |
-| --- | --- | --- | --- |
-| Event-Driven Pipeline | producer -> Kafka -> PyFlink -> Qdrant/Neo4j | Decouples producers from downstream processing and supports replay/backfill | Implemented |
-| Dual Materialized Views | Qdrant (semantic view) + Neo4j (relationship view) | Keeps retrieval optimized for both similarity search and graph reasoning | Implemented |
-| Shared-Core, Multi-Interface (Hexagonal-style boundary) | One query core reused by REST and embedded MCP tools | Avoids duplicated business logic across API surfaces | Implemented |
-| Policy Enforcement Point | Role/tool authorization and response guardrails in the agents service | Centralizes access control and output safety rules | Implemented |
-| Contract-First Tooling | MCP tool request/response schemas, annotations, and contract tests via the shared `agent_core.mcp_server` factory | Keeps tool semantics stable while internals change | Implemented |
-| Bounded Context Window | Max question/context/evidence/answer and response-byte budgets | Prevents unbounded prompt/output growth and latency spikes | Implemented |
-| Observability by Design | Prometheus metrics + Grafana latency dashboards + health probes | Makes latency and failure modes visible during iteration | Implemented |
-| Adapter Pattern for LLM Providers | OllamaProvider, OpenAIProvider, AnthropicProvider, FallbackProvider in llm_provider.py | Enables provider routing and automatic failover without rewriting retrieval | Implemented |
-| Multi-Agent Orchestration (LangGraph) | LangGraph StateGraph with specialist agents and conditional routing | Enables domain-specific reasoning branches and iterative confidence-gated retrieval | Implemented |
-| MLflow Tracing | Nested span hierarchy across agent nodes, retrievers, and LLM calls | Enables cross-mode pipeline comparison and healthcare-specific evaluation | Implemented (feature-flagged) |
-
-### Pattern Mapping to Repository Components
-
-- Event-Driven Pipeline: [domains/healthcare/data-pipelines/producer/produce_events.py](../domains/healthcare/data-pipelines/producer/produce_events.py), [domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py](../domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py), [infra/compose/docker-compose.infra.yml](../infra/compose/docker-compose.infra.yml)
-- Dual Materialized Views: [domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py](../domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py), [docs/04_data_platform.md](04_data_platform.md)
-- Shared-Core, Multi-Interface: [domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py](../domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py) (`QueryService.run_query`/`stream` shared by REST `/query`, `/query/stream`, and MCP tools)
-- Policy Enforcement Point: [domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py](../domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py) (sanitization, truncation, budget), [packages/agent-core/src/agent_core/governance.py](../packages/agent-core/src/agent_core/governance.py) (`ToolGovernance` role policy, audit, and metrics)
-- Contract-First Tooling: [domains/healthcare/agent-service/tests/integration/test_contracts.py](../domains/healthcare/agent-service/tests/integration/test_contracts.py), [docs/05_ai_agents.md](05_ai_agents.md)
-- Bounded Context Window: [domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py](../domains/healthcare/agent-service/src/healthcare_agent/safety/response_policy.py) (`apply_response_budget`, `truncate_text`)
-- Observability by Design: [infra/observability/prometheus.yml](../infra/observability/prometheus.yml), [infra/observability/grafana/dashboards/healthcare-monitoring-overview.json](../infra/observability/grafana/dashboards/healthcare-monitoring-overview.json), [docs/08_operation_runbook.md](08_operation_runbook.md)
-- Adapter Pattern: [docs/adrs/0004-local-first-llm-provider-routing.md](adrs/0004-local-first-llm-provider-routing.md), [domains/healthcare/agent-service/src/healthcare_agent/generation/providers.py](../domains/healthcare/agent-service/src/healthcare_agent/generation/providers.py)
-- Multi-Agent Orchestration: [domains/healthcare/agent-service/src/healthcare_agent/orchestration/](../domains/healthcare/agent-service/src/healthcare_agent/orchestration/) (`graph.py`, `runtime.py`, `state.py`) and [agents/nodes.py](../domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py)
-- MLflow Tracing: [domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py](../domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py), [domains/healthcare/agent-service/src/healthcare_agent/evaluation/mlflow_eval.py](../domains/healthcare/agent-service/src/healthcare_agent/evaluation/mlflow_eval.py)
-
-## Modern AI Stack Frameworks and Design Patterns Summary
-
-This section maps the current implementation to a modern AI application stack model and highlights what is already implemented versus what remains on the roadmap.
-
-### Framework Layer Summary
-
-| Modern AI Stack Layer | Typical Frameworks / Technologies | This Repository Mapping | Status |
-| --- | --- | --- | --- |
-| Data ingestion and event backbone | Kafka, Schema Registry, stream processors | Kafka + Schema Registry + native PyFlink pipeline | Implemented |
-| Retrieval stores | Vector DB + Graph DB + optional OLAP | Qdrant + Neo4j dual persistence | Implemented |
-| API and tool protocol layer | FastAPI, MCP, tool contracts | FastAPI + embedded FastMCP + MCP tool contracts | Implemented |
-| Agent / orchestration layer | Planner, skill registry, multi-step controller | Deterministic planner + skills layer + role-aware tool policies | Implemented (baseline) |
-| LangGraph multi-agent orchestration | StateGraph with conditional routing and specialist agents | LangGraph StateGraph with triage, retrieval, specialist, and synthesis agents | Implemented |
-| Model provider abstraction | Adapter for local and managed providers | Ollama + OpenAI + Anthropic + FallbackProvider | Implemented |
-| Evaluation and quality gates | Contract tests, route tests, retrieval scorecards | Contract tests + planner evaluation + planner edge suites + MLflow evaluation harness + automated quality gates | Implemented |
-| Observability and operations | Metrics, dashboards, probes, runbooks | Prometheus + Grafana + blackbox probes + MLflow tracing + runbook | Implemented |
-| Production governance and safety | Privacy policy, rollout gates, SLO controls | Deployment bundle and policy foundations present | In progress |
-
-### Design Pattern Summary
-
-| Pattern | Modern AI Relevance | Repository Usage | Status |
-| --- | --- | --- | --- |
-| Event-driven architecture | Supports near-real-time AI context refresh and replay | Producer -> Kafka -> PyFlink -> dual sinks | Implemented |
-| Polyglot persistence | Combines semantic similarity with relationship reasoning | Qdrant for vectors + Neo4j for graph context | Implemented |
-| Shared-core multi-surface API | Prevents drift between REST, SSE, and tool protocol behavior | `QueryService` shared by HTTP and MCP tool endpoints | Implemented |
-| Planner-first retrieval orchestration | Improves determinism before LLM synthesis | Request classification + retrieval planning + ranking | Implemented |
-| LangGraph multi-agent orchestration | Enables specialized domain reasoning with graph-based agent routing | StateGraph with triage, retrieval, specialist, confidence, and synthesis nodes | Implemented |
-| MLflow tracing and evaluation | Enables query pipeline inspection and experiment tracking | Nested span tracing + healthcare scorers + evaluation harness | Implemented |
-| Policy enforcement point | Centralizes authorization and output controls | Role/tool checks + evidence shaping + byte budgets | Implemented |
-| Adapter pattern for model providers | Decouples retrieval from generation vendor | Provider adapters with automatic failover | Implemented |
-| Contract-first evolution | Keeps external API/tool behavior stable as internals evolve | Contract test suite and MCP schema discipline | Implemented |
-| Evaluation-driven promotion | Uses objective quality gates for release progression | Evaluation gates module with configurable thresholds; CI step added | Implemented |
-| Progressive delivery controls | Reduces risk in production AI changes | Documented production deployment patterns; staged gates pending | In progress |
-
-### Gap Summary for Full Modern-Stack Alignment
-
-- Retrieval benchmark and grounded-answer scorecard automation are not fully enforced as release gates.
-- Policy and privacy controls are present at foundation level but not yet complete for non-demo production governance depth.
-- LangGraph is the required healthcare query path; MLflow tracing remains opt-in and both need further production hardening for non-demo use.
-- Structured output generation enables JSON-mode extraction for downstream programmatic consumption.
-- Session-scoped conversation memory provides multi-turn context carryover.
-- Classifier-based guardrails detect prompt injection, off-topic queries, and harmful output.
-- No dynamic model routing based on task complexity, latency, or cost.
-- SSE streaming (`POST /query/stream`) covers LangGraph agent progress only; answer tokens are not streamed yet.
-- Evaluation quality gates enforce minimum routing, evidence, and answer scores before release (`evaluation/gates.py`).
-- No per-user identity propagation or data-classification-aware access control.
-
-### Promotion Direction
-
-To promote from baseline-modern to production-modern AI stack maturity:
-
-1. Expand provider adapters and add failover behavior tests.
-2. Tighten evaluation gate thresholds and promote from soft gate to hard gate.
-3. Strengthen policy/privacy controls and rollout guardrails with explicit SLO criteria.
-
-### Maturity Scorecard (1-5)
-
-Scoring guide:
-
-- 1 = not started
-- 2 = foundational design in place
-- 3 = baseline implementation working
-- 4 = production hardening in progress
-- 5 = production-grade with automated gates
-
-| Layer | Current Score | Target Next Sprint | Evidence Anchor | Primary Lift To Increase Score |
-| --- | --- | --- | --- | --- |
-| Data ingestion and event backbone | 4 | 4 | Kafka + Schema Registry + PyFlink runtime | Add stronger replay/recovery regression checks |
-| Retrieval stores (vector + graph) | 4 | 4 | Qdrant + Neo4j dual persistence in active flow | Add retrieval quality benchmark baselines |
-| API and MCP tool protocol | 4 | 4 | FastAPI + embedded MCP + contract tests | Expand protocol-level regression coverage |
-| Planner and skills orchestration | 3 | 4 | Deterministic planner + skills layer | Add route quality scorecards in CI |
-| LangGraph multi-agent orchestration | 3 | 4 | LangGraph StateGraph with specialist agents | Add broader agent integration tests and production tuning |
-| Model provider abstraction | 4 | 4 | Ollama + OpenAI + Anthropic + FallbackProvider | Add provider failover contract tests |
-| Evaluation and quality gates | 4 | 4 | Contract + planner + MLflow + automated quality gates in CI | Tighten thresholds as baseline stabilizes |
-| Observability and operations | 4 | 4 | Prometheus, Grafana, probes, MLflow tracing, runbook | Add alert quality tuning and SLO dashboards |
-| Production governance and safety | 2 | 3 | Policy/deploy foundations under production bundle | Implement policy/privacy/SLO rollout controls |
-| Structured outputs and extraction | 3 | 3 | JSON-mode structured generation with Pydantic schema validation | Add schema-constrained decoding for complex multi-entity extraction |
-| Agent memory and context | 3 | 3 | Session-scoped conversation memory with TTL expiration | Add persistent cross-session memory for longitudinal monitoring |
-| Model routing and optimization | 2 | 3 | Single Ollama provider | Add dynamic routing by task complexity and cost |
-| Input guardrails and safety | 3 | 3 | Classifier-based injection detection + output safety + grounding check | Add dedicated ML classifier model (Llama Guard) |
-| Streaming UX | 2 | 3 | SSE agent-step streaming in provider web UI with `/query` fallback ([ADR-0010](adrs/0010-layered-agentic-architecture.md)) | Stream synthesis tokens; durable resume (P2) |
-
-Sprint tracking note:
-
-- Update only `Current Score`, `Target Next Sprint`, and `Primary Lift To Increase Score` during planning/review.
-- Keep `Evidence Anchor` stable unless architecture implementation materially changes.
-
-## Architecture At A Glance
-
-```text
-Shared Infrastructure (docker-compose.infra.yml)
-  Kafka cluster (3 brokers) + Schema Registry
-  Flink cluster (JobManager + TaskManager) — shared across domains
-  Ollama (LLM inference)
-  Prometheus + Grafana + Blackbox Exporter
-  MLflow Tracing
-  Conduktor Console
-
-Data Platform (domains/<d>/data-pipelines/ + packages/knowledge-core)
-  Per-domain: Producer -> Kafka -> Flink job submission -> Qdrant + Neo4j
-
-Domain AI Agents (domains/)
-  Per-domain: FastAPI agents service
-    -> input guardrails classifier (safety/guardrails.py)
-    -> session memory context loading (orchestration/memory.py)
-    -> request classification + retrieval planning (orchestration/planner.py)
-    -> vector + graph retrieval (retrieval/search.py)
-    -> evidence ranking + harness guards (retrieval/ranking.py, safety/harness.py)
-    -> LangGraph multi-agent routing (orchestration/graph.py + agents/nodes.py)
-    -> LLM synthesis via provider abstraction (generation/synthesis.py)
-    -> structured output parsing (generation/structured_output.py) [optional]
-    -> output guardrails + grounding check
-    -> session memory turn storage
-    -> embedded MCP endpoint (/mcp)
-
-Operational Plane
-  Flink UI, Conduktor, Prometheus, Grafana, MLflow UI
-  Neo4j Browser, Provider Web UI
-```
-
-## Overall Architecture Diagram
+## 1. System context
 
 ```mermaid
 flowchart LR
-  subgraph Infra[Shared Infrastructure]
-    K[Kafka]
-    SR[Schema Registry]
-    L[LLM runtime - Ollama]
-    PR[Prometheus]
-    GF[Grafana]
-    MLF[MLflow]
-    CDK[Conduktor]
-  end
-
-  subgraph DP[data-pipelines/]
-    subgraph DPHC[healthcare]
-      HP[Producer] --> K
-      SR -. schemas .-> HP
-      K --> HF[PyFlink job]
-      HF --> HQ[Qdrant]
-      HF --> HN[Neo4j]
-    end
-    subgraph DPSC[supply-chain]
-      SP[Producer] --> K
-      SR -. schemas .-> SP
-      K --> SF[PyFlink job]
-      SF --> SQ[Qdrant]
-      SF --> SN[Neo4j]
-    end
-  end
-
-  subgraph Domains[domains/ - AI Agents]
-    subgraph HCA[healthcare/agent-service]
-      HAPI[FastAPI + embedded FastMCP]
-      HDOM[healthcare_agent modules - planner, retrieval, policy]
-      HMODES[LangGraph StateGraph]
-      HAPI --> HDOM --> HMODES
-    end
-    subgraph SCA[supply-chain/agent-service]
-      SAPI[FastAPI + embedded FastMCP]
-      SDOM[supply_chain_agent modules - planner, retrieval, safety]
-      SMODES[LangGraph StateGraph]
-      SAPI --> SDOM --> SMODES
-    end
-  end
-
-  subgraph UI[Application Layer]
-    HWeb[HC Web] --> HCA
-    SWeb[SC Web] --> SCA
-    MCPClient[MCP Client] --> HCA
-    MCPClient --> SCA
-  end
-
-  HMODES --> HQ
-  HMODES --> HN
-  SMODES --> SQ
-  SMODES --> SN
-  HMODES --> L
-  SMODES --> L
-
-  K -. inspect .-> CDK
-  HAPI -. metrics .-> PR
-  SAPI -. metrics .-> PR
-  HMODES -. traces .-> MLF
-  SMODES -. traces .-> MLF
-  PR --> GF
+    user[Clinician / analyst] --> web[Webapp]
+    mcpClient[MCP client<br/>IDE, other agents] --> mcp
+    web --> api[agent-service<br/>FastAPI]
+    api --- mcp[MCP server<br/>/mcp]
+    api --> graph[LangGraph<br/>workflow]
+    graph --> qdrant[(Qdrant<br/>vectors)]
+    graph --> neo4j[(Neo4j<br/>graph)]
+    graph --> llm[LLM provider<br/>Ollama / Databricks / Bedrock / ...]
+    producer[Event producer] --> kafka[(Kafka)]
+    kafka --> flink[Flink job]
+    flink --> qdrant
+    flink --> neo4j
+    graph -. traces .-> mlflow[MLflow]
+    api -. metrics .-> prom[Prometheus]
 ```
 
-## Component Interaction Diagram
+The platform has two planes:
+
+| Plane | Responsibility | Components |
+| --- | --- | --- |
+| **Data plane** | Turn raw events into searchable, linked knowledge | Producer, Kafka, Schema Registry, Flink, Neo4j, Qdrant |
+| **Agent plane** | Answer questions with governed, grounded evidence | Webapp, agent-service, LangGraph, MCP, LLM providers |
+
+Both planes share the **knowledge layer**: the ontology, rule packs, graph seeds and
+skills, plus a single embedding configuration (see [§5](#5-cross-cutting-design)).
+
+## 2. Layered agent architecture
+
+```mermaid
+flowchart TB
+    ui[UI layer<br/>React webapp, static HTML] --> bff[API / BFF layer<br/>FastAPI routes, SSE, auth, validation]
+    bff --> orch[Orchestration layer<br/>LangGraph state graph]
+    orch --> tools[Tool layer<br/>MCP tools via agent-core]
+    tools --> data[Data layer<br/>Qdrant, Neo4j, LLM]
+```
+
+| Layer | Owns | Must not |
+| --- | --- | --- |
+| UI | Rendering, streaming display, trace view | Call data stores or LLMs directly |
+| API / BFF | Request validation (Pydantic, extra fields forbidden), caller role, CORS, SSE framing | Contain retrieval or prompting logic |
+| Orchestration | Triage, retrieval, specialists, confidence, synthesis, guardrails, human review | Bypass tool policy |
+| Tools | Authorised, audited, size-bounded operations | Make policy decisions in prompts |
+| Data | Storage and model inference | Know about callers |
+
+LangGraph is the **only** query path. The REST endpoints and the MCP
+`graphrag_answer_generate` tool both invoke the same compiled graph. See
+[ADR-0010](adrs/0010-layered-agentic-architecture.md) and
+[ADR-0012](adrs/0012-capability-oriented-layout.md).
+
+## 3. Code organisation
+
+```text
+packages/
+  agent-core/        # domain-neutral runtime: settings, policy, audit, guardrails,
+                     # MCP server builder, metrics, streaming, ports
+  knowledge-core/    # domain-neutral knowledge: embedding, ontology loader,
+                     # rules engine, storage, pipeline runner
+domains/
+  healthcare/
+    agent-service/   # healthcare_agent package + tests (unit, integration, evals)
+    data-pipelines/  # flink-job, producer, Avro schemas
+    knowledge/       # ontology, graph-seeds, skills
+    scripts/         # validation, seed generation, smoke tests
+    webapp/          # React + TypeScript + Vite
+  supply-chain/      # same shape; static webapp, smaller agent
+infra/               # compose, Helm, environments, images, observability, nginx
+```
+
+The repository is a Python 3.11 **uv workspace**: shared packages are built as wheels
+and installed into each image ([ADR-0011](adrs/0011-uv-workspace-packaging.md)).
+
+### 3.1 Shared packages
+
+| Package | Module | Purpose |
+| --- | --- | --- |
+| `agent-core` | `settings` | `AgentServiceSettings` (Pydantic settings) |
+| | `policy` | Role → allowed-tools policy, loaded from YAML |
+| | `governance` | Authorise, audit, time and size-bound every tool call |
+| | `audit` | `AuditEvent`, `JsonlAuditSink` |
+| | `guardrails` | Input and output checks, redaction |
+| | `mcp_server` | FastMCP builder: `ToolSpec`, annotations, transport security |
+| | `metrics` | Prometheus collectors |
+| | `streaming` | SSE event framing and allowlist |
+| | `runtime`, `ports` | Thread offload helpers and provider-neutral interfaces |
+| `knowledge-core` | `embedding` | Embedding provider factory (local / Databricks) |
+| | `ontology`, `ontology_loader` | Typed ontology models and YAML loader |
+| | `rules_engine` | Drug-safety, lab-signal and claims-outcome rules |
+| | `storage`, `runner` | Neo4j / Qdrant writers and pipeline runner |
+
+## 4. Runtime flows
+
+### 4.1 Ingestion
 
 ```mermaid
 sequenceDiagram
-  participant UI as Domain Web App
-  participant MCP as MCP Client
-  participant API as FastAPI agents service
-  participant MCPAPI as Embedded FastMCP endpoint
-  participant Core as QueryService orchestration core
-  participant Policy as Guardrails, memory, and policy
-  participant Planner as Planner and skills layer
-  participant Qdrant
-  participant Neo4j
-  participant Model as Provider adapter / model router
-  participant LLM as Ollama or managed provider
-
-  UI->>API: POST /query
-  API->>Core: QueryService.run_query()
-  Core->>Policy: validate input and load session context
-  Policy-->>Core: authorized request
-  Core->>Planner: classify, plan, and build skills plan
-  Planner-->>Core: retrieval plan and skill actions
-  Core->>Qdrant: vector retrieval
-  Core->>Neo4j: graph retrieval
-  Core->>Policy: rank, sanitize, and ground evidence
-  Policy-->>Core: bounded evidence
-  Core->>Model: grounded synthesis request
-  Model->>LLM: generate with selected provider/model
-  LLM-->>Core: answer text
-  Core->>Policy: validate output and store session turn
-  Core-->>API: evidence, answer, and metadata
-  API-->>UI: JSON response
-
-  MCP->>MCPAPI: initialize session
-  MCPAPI-->>MCP: handshake and tool list
-  MCP->>MCPAPI: call MCP tool
-  MCPAPI->>Core: invoke shared query/tool handler
-  Core-->>MCPAPI: tool result
-  MCPAPI-->>MCP: MCP tool response
+    participant P as Producer
+    participant K as Kafka
+    participant F as Flink job
+    participant E as Embedding provider
+    participant N as Neo4j
+    participant Q as Qdrant
+    P->>K: Avro event (topic per source)
+    K->>F: consume (checkpointed)
+    F->>F: normalise, apply ontology rules
+    F->>N: MERGE nodes and edges (idempotent)
+    F->>E: embed event text
+    F->>Q: upsert point (vector + payload)
+    F-->>K: failed records to DLQ
 ```
 
-## Event Flow Diagram
+### 4.2 Query
 
 ```mermaid
-flowchart TD
-  A[Domain producer] --> B[Kafka topic]
-  B --> C[Native PyFlink DataStream job]
-  C --> D{Reference topic?}
-  D -->|Yes| E[Update shared reference state]
-  D -->|No| F[Load transactional payload]
-  E --> G[Ontology loader, normalization, and rules]
-  F --> G
-  G --> H[Canonical event and provenance tags]
-  H --> I[Build semantic text and embedding]
-  I --> J[Upsert semantic evidence to Qdrant]
-  H --> K[Merge ontology-aligned entities and edges in Neo4j]
-  J --> L[Query service vector retrieval]
-  K --> M[Query service graph retrieval]
-  L --> N[Planner-selected ranking and policy shaping]
-  M --> N
-  N --> O[REST JSON or MCP tool response]
+sequenceDiagram
+    participant U as Webapp
+    participant A as agent-service
+    participant G as LangGraph
+    participant Q as Qdrant
+    participant N as Neo4j
+    participant L as LLM
+    U->>A: POST /query/stream (X-Caller-Role)
+    A->>A: validate, authorise
+    A->>G: invoke(thread_id)
+    G->>G: input guardrail, triage
+    G->>Q: vector search (query embedding)
+    G->>N: graph traversal
+    G->>G: specialists, confidence
+    G->>L: synthesise from evidence
+    G->>G: output guardrail
+    alt needs human review
+        G-->>A: interrupt (status=pending_approval)
+        U->>A: POST /query/resume (approve / reject)
+        A->>G: resume(thread_id)
+    end
+    A-->>U: SSE step events, then result
 ```
 
-## AI App Process Flow Diagram
-
-```mermaid
-flowchart TD
-  E1[Receive Request] --> E2{API Surface}
-  E2 -->|RAG REST| E3[RAG Query Endpoint]
-  E2 -->|FastMCP| E4[MCP Session and Tool Endpoint]
-  E3 --> C1[Normalize input, authorize, load memory]
-  E4 --> C1
-  C1 --> C2[Classify request type]
-  C2 --> C3[Select retrieval plan]
-  C3 --> C7[LangGraph StateGraph]
-  C7 --> C8[Vector + graph retrieval]
-  C8 --> C9[Rank, sanitize, and ground evidence]
-  C9 --> C10[Structured prompt or grounded prompt]
-  C10 --> C11[Provider adapter and model router]
-  C11 --> C12{Configured provider}
-  C12 -->|Local default| C13[Ollama]
-  C12 -->|Configured| C14[OpenAI / Anthropic / fallback]
-  C13 --> C15[Output guardrails and response budget]
-  C14 --> C15
-  C15 --> C16[Store session turn and emit metrics/traces]
-  C16 --> O1[REST JSON response]
-  C16 --> O2[MCP tool response]
-```
-
-## LLM Selection Strategy (Local and Production)
-
-### Local Development
-
-Current implementation uses Ollama in domains/healthcare/agent-service/src/healthcare_agent/main.py.
-
-- Local endpoint via OLLAMA_URL.
-- Model choice via LLM_MODEL.
-- Automatic fallback to available local model tags when possible.
-- No per-token API fee for local Ollama inference; cost is primarily local infrastructure (hardware and power).
-- Runtime controls currently wired from env: LLM_TIMEOUT_SECONDS and LLM_MAX_TOKENS.
-- Generation temperature is currently fixed in code (`0.2`).
-
-MCP delivery in the current implementation:
-
-- MCP is embedded in the same agent-service process.
-- MCP protocol endpoint: `POST /mcp` (streamable HTTP).
-- Human diagnostic endpoint: `GET /mcp/health`.
-
-### LLM Provider Routing (Implemented)
-
-The repository runtime includes a provider adapter in `domains/healthcare/agent-service/src/healthcare_agent/generation/providers.py` with four implemented generation providers:
-
-- **OllamaProvider** — local inference (default for dev)
-- **BedrockProvider** — AWS Bedrock Runtime (production primary)
-- **OpenAIProvider** — OpenAI Chat Completions API
-- **AnthropicProvider** — Anthropic Messages API (production fallback option)
-- **FallbackProvider** — wraps primary + fallback; auto-retries on error
-
-Routing is environment-driven:
-
-| Environment | Primary | Fallback |
-|-------------|---------|----------|
-| Dev / Local | Ollama (`llama3.1`) | none |
-| Production | Bedrock (`anthropic.claude-3-5-haiku-20241022-v1:0`) | Anthropic (`claude-sonnet-4-20250514`) |
-
-Configuration keys:
-
-- `LLM_PROVIDER`: `ollama`, `databricks`, `openai`, `anthropic`, or `bedrock`
-- `LLM_MODEL`: provider-specific model name
-- `LLM_FALLBACK_PROVIDER`: optional fallback provider name
-- `LLM_FALLBACK_MODEL`: fallback model name
-- `LLM_TIMEOUT_SECONDS`, `LLM_MAX_TOKENS`
-- `OLLAMA_URL` (for ollama mode)
-- `OPENAI_API_KEY` (for openai mode)
-- `ANTHROPIC_API_KEY` (for anthropic mode)
-
-Secrets should be sourced from a secret manager or runtime environment injection, never committed to repository files.
-
-Current agent-service observability metrics for query latency and throughput:
-
-- agent_service_http_request_duration_seconds
-- agent_service_tool_execution_duration_seconds
-- agent_service_tool_execution_total
-
-Use a secret manager for API keys. Do not store credentials in files or compose manifests.
-
-## Services And Responsibilities
-
-### Producer
-
-domains/healthcare/data-pipelines/producer/produce_events.py emits two event families:
-
-- Transactional events:
-  - clinical notes
-  - lab results
-  - device telemetry
-  - medication orders
-  - claims events
-- Reference events:
-  - patients
-  - providers
-  - devices
-  - medications
-  - payers
-
-The producer registers a shared Avro envelope in Schema Registry and publishes Confluent Avro-serialized values to Kafka.
-
-### Kafka + Schema Registry
-
-Kafka is the transport and replay backbone. Topic creation is controlled by kafka-init in infra/compose/docker-compose.healthcare.yml with fixed partitions per domain topic.
-
-Schema Registry stores the MedicalEvent envelope under topic-value subjects for transactional and reference topics, and the schema ID is embedded in Kafka value payloads.
-
-### Flink Runtime
-
-Each domain runs its own Flink cluster (JobManager + TaskManager) defined in its compose overlay: `healthcare-flink-jobmanager` / `healthcare-flink-taskmanager` in infra/compose/docker-compose.healthcare.yml and `supplychain-flink-jobmanager` / `supplychain-flink-taskmanager` in infra/compose/docker-compose.supply-chain.yml, each built from the domain's `data-pipelines/flink-job/Dockerfile`.
-
-Domain-specific job submitters are defined in each domain's compose overlay:
-
-- Healthcare: `healthcare-flink-app` submits `healthcare_graph_rag_pyflink_job.py`
-- Supply-chain: `supplychain-sc-flink-app` submits `supplychain_graph_rag_job.py`
-
-Each job submitter uses `flink run -m flink-jobmanager:8081` to submit to the shared cluster.
-
-### Native PyFlink Job
-
-domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py is the active stream job:
-
-- Builds one KafkaSource per topic in ALL_TOPICS.
-- Tags each record with its topic and unions all streams.
-- Applies GraphRagSideEffectMap to route by topic type.
-- Reuses HealthcareGraphRagProcessor from healthcare_graph_rag_job.py for business logic and sink writes.
-
-Execution details:
-
-- Checkpointing enabled via FLINK_CHECKPOINT_INTERVAL_MS.
-- Parallelism controlled by FLINK_JOB_PARALLELISM.
-- Starts from earliest offsets using KafkaOffsetsInitializer.earliest().
-- Uses per-topic group IDs built from FLINK_KAFKA_GROUP_ID.
-
-### Processor Logic Reuse
-
-domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py provides:
-
-- domain-routed embedding (clinical / claims / device) via `packages/knowledge-core/src/knowledge_core/embedding.py`,
-- clinical_text rendering with optional reference-data expansion,
-- in-memory reference store updates,
-- event enrichment,
-- Qdrant upserts,
-- Neo4j merges by event type.
-
-This file also retains a direct Kafka consumer main() path for fallback troubleshooting, but the active runtime path is the native PyFlink job.
-
-### Qdrant
-
-Qdrant stores semantic vectors in healthcare_events with payload fields such as:
-
-- event_id
-- event_ts
-- event_type
-- patient_id
-- source metadata
-- enriched/reference_hit_count
-- rendered text
-- normalized payload
-
-### Neo4j
-
-Neo4j stores patient-centric graph entities and lineage, including:
-
-- base event lineage (ClinicalEvent, SourceSystem, Encounter),
-- clinical entities (Condition, Symptom, Observation),
-- medication/device/claim entities,
-- reference-context links (Provider, Device, Medication, Payer).
-
-See [04_data_platform.md](04_data_platform.md) for the full model.
-
-### Agent API
-
-domains/healthcare/agent-service/src/healthcare_agent/main.py exposes:
-
-- GET /health
-- GET /metrics
-- GET /mcp/health
-- POST /query
-- POST /mcp (MCP streamable HTTP protocol endpoint)
-
-Embedded MCP tools (10 total):
-
-- patient_context_get
-- vector_evidence_search
-- graphrag_answer_generate
-- risk_summary_generate
-- evidence_bundle_export
-- timeline_explain
-- medication_risk_assess
-- coding_gap_detect
-- cohort_risk_summary
-- skills_plan_get
-
-Query flow:
-
-1. **Input guardrails** — classify input for injection, off-topic, length (`safety/guardrails.py`).
-2. **Session memory** — load conversation context from session store (`orchestration/memory.py`).
-3. Classify request type and select retrieval plan (`orchestration/planner.py`).
-4. Embed user question (`retrieval/search.py`) and search Qdrant for nearest evidence.
-5. Collect patient IDs from vector hits and optional request scope.
-6. Query Neo4j patient graph (`retrieval/search.py`).
-7. Rank evidence deterministically (`retrieval/ranking.py`).
-8. Execute LangGraph multi-agent orchestration (`orchestration/graph.py`) through `QueryService.run_query` / `stream`.
-9. Build synthesis prompt and call LLM provider (`generation/synthesis.py`); optionally use structured output mode (`generation/structured_output.py`).
-10. **Output guardrails** — classify output for harmful content and grounding (`safety/guardrails.py`).
-11. **Session memory** — store turn for multi-turn context.
-12. Apply response policy (`safety/response_policy.py`) and return answer with evidence.
-
-#### LLM Provider Interface (Implemented)
-
-The provider adapter in `domains/healthcare/agent-service/src/healthcare_agent/generation/providers.py` implements the following contract:
-
-```python
-class LLMProvider(Protocol):
-    def generate(self, *, prompt: str, timeout_seconds: int, max_tokens: int, temperature: float) -> str: ...
-```
-
-Providers: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `FallbackProvider`.
-
-Factory: `build_llm_provider(...)` in `generation/factory.py`
-
-Wiring in `main.py`:
-
-```python
-llm_provider = build_llm_provider(service_settings)
-```
-
-Environment-driven routing variables:
-
-- LLM_PROVIDER: ollama, databricks, openai, anthropic, or bedrock
-- LLM_FALLBACK_PROVIDER: optional fallback
-- LLM_FALLBACK_MODEL: fallback model name
-- LLM_MODEL: provider-specific model name
-- LLM_TIMEOUT_SECONDS: request timeout
-- LLM_MAX_TOKENS: response token budget
-- OLLAMA_URL: required for local ollama mode
-- ANTHROPIC_API_KEY: required for anthropic mode
-- OPENAI_API_KEY: required for openai mode
-
-Secrets should be sourced from a secret manager or runtime environment injection, never committed to repository files.
-
-### Provider Web
-
-The provider web UI (`domains/healthcare/webapp`) is a React + TypeScript single-page app built with Vite and served by Nginx. It calls the Agent API (`POST /query`) and the MCP streamable-HTTP endpoint (`POST /mcp`) directly from the browser and renders:
-
-- structured clinical summaries (risks, interactions, lab signals, confidence) and guardrail blocks,
-- ranked, filterable vector evidence with redaction notices,
-- an interactive knowledge-graph view of `graph_context` (conditions, medications, labs, interactions, contraindications, adverse events),
-- retrieval plan, guardrail, model-routing and LangGraph traces,
-- Markdown/JSON export per result.
-
-Conversation content is held in memory only; the browser persists just the API base URL, mode and theme. See `domains/healthcare/webapp/README.md`.
-
-### Observability
-
-monitoring config provides:
-
-- Prometheus scrape and alerting,
-- Blackbox probes for Kafka/Flink/Neo4j availability,
-- Grafana provisioning for dashboards,
-- MLflow tracing for agent pipeline spans, evaluation experiments, and cross-mode comparison,
-- Flink dashboard for job-level visibility,
-- Conduktor for Kafka topic/cluster/schema browsing.
-
-## Data Flow Details
-
-### Transactional Event Path
-
-```text
-Producer transactional topic write
-  -> Kafka topic
-  -> PyFlink KafkaSource
-  -> GraphRagSideEffectMap
-  -> HealthcareGraphRagProcessor.process_event
-  -> enrichment with in-memory reference cache
-  -> Qdrant upsert + Neo4j merge
-  -> Agent API retrieval surface
-```
-
-### Reference Event Path
-
-```text
-Producer master topic write
-  -> Kafka topic
-  -> PyFlink KafkaSource
-  -> GraphRagSideEffectMap
-  -> HealthcareGraphRagProcessor.process_reference_event
-  -> in-memory reference cache mutation
-  -> affects subsequent transactional enrichment
-```
-
-## Reliability And Operational Notes
-
-- Flink starts from earliest offsets, so local restarts can replay historical topic data.
-- Processor writes are designed around stable identifiers to keep upserts deterministic.
-- Reference store is process memory; recovery of reference context relies on replay.
-- healthcare.dlq.events currently exists for hardening but is not populated by the active processor.
-
-## Security And Scope
-
-This stack is for local synthetic-demo use. It is not production-hardened. Notable simplifications:
-
-- open CORS policy in API,
-- demo credentials in compose,
-- no auth between most internal services,
-- Confluent Avro-on-wire with schema ID framing and subject-based enforcement.
-
-## Evolution Paths
-
-Recommended next improvements:
-
-- Move reference data to managed Flink keyed state.
-- Add explicit dead-letter publish and replay tooling.
-- Migrate wire format to Avro or Protobuf with compatibility enforcement.
-- Add API auth, role-based access control, and tighter CORS.
-- Add end-to-end test suites for stream processing and retrieval quality.
-- Harden LangGraph multi-agent routing with broader specialist-agent tests and production tuning.
-- Expand MLflow evaluation harness with retrieval benchmarks and grounding scorecards as CI gates.
+## 5. Cross-cutting design
+
+| Concern | Design | Reference |
+| --- | --- | --- |
+| **Dual persistence** | Neo4j holds explicit relationships; Qdrant holds semantic vectors; both are written from the same event | [ADR-0001](adrs/0001-dual-persistence-qdrant-neo4j.md) |
+| **Embedding parity** | Ingest and query use the same `knowledge_core.embedding` provider and model; a dimension mismatch fails fast | [ADR-0002](adrs/0002-qdrant-streaming-vector-store.md) |
+| **Ontology governance** | YAML ontology is the source of truth for seeds, rules and validation | [ADR-0003](adrs/0003-ontology-governance-and-seed-generation.md) |
+| **Model routing** | Provider factory with fallback, complexity tiers and a cost budget | [ADR-0004](adrs/0004-local-first-llm-provider-routing.md) |
+| **Tool governance** | Policy and authorisation before execution; audit after | [ADR-0005](adrs/0005-embed-fastmcp-in-rag-api.md) |
+| **Skills** | Generated, validated skill manifests drive planning | [ADR-0006](adrs/0006-skills-layer-standardization-and-validation.md) |
+| **Orchestration** | LangGraph multi-agent graph with HITL and memory | [ADR-0007](adrs/0007-langgraph-multi-agent-orchestration.md) |
+| **Observability** | MLflow traces and evaluations; Prometheus metrics | [ADR-0008](adrs/0008-mlflow-tracing-and-evaluation.md) |
+
+### 5.1 Security model
+
+- **Caller role** comes from the `X-Caller-Role` header (`read_only`, `generation`,
+  `export`). In production `AGENT_ALLOW_ROLE_HEADER=false` and the role must be supplied
+  by a trusted gateway.
+- **Authorisation runs before execution**, including before an SSE stream opens, so a
+  denied request returns HTTP 401 instead of a partial stream.
+- **Redaction** removes raw payloads for every role except `export`.
+- **Bounded output** — answer, evidence and response-byte limits are enforced by
+  guardrails, not by prompts.
+- **MCP transport security** — optional DNS-rebinding protection with allowed hosts and
+  origins.
+- **Secrets** come from environment variables or an external secret manager, never from
+  source.
+
+### 5.2 Failure handling
+
+| Failure | Behaviour |
+| --- | --- |
+| Primary LLM returns an error | `FallbackProvider` retries on the fallback provider |
+| Embedding model missing | Startup fails unless `EMBEDDING_REQUIRE_MODEL=false` (then a deterministic hash fallback is used) |
+| Vector dimension mismatch | Fails fast; recreate the collection and re-ingest |
+| Bad event | Sent to the DLQ (healthcare); the job continues |
+| Neo4j / Qdrant unavailable | Retrieval nodes return structured errors; confidence drops |
+
+## 6. Domains
+
+| Aspect | Healthcare | Supply chain |
+| --- | --- | --- |
+| Agent package | `healthcare_agent` | `supply_chain_agent` |
+| Streaming (SSE) | Yes | No |
+| Multi-turn memory | Yes | No |
+| Human-in-the-loop | Yes | No |
+| Confidence re-retrieval loop | Yes (threshold 0.75) | Yes (threshold 0.75) |
+| Specialist delegation router | Yes | No |
+| Webapp | React + Vite | Static HTML / JS |
+| Detail | [05](05_ai_agents.md) | [09](09_supply_chain_domain.md) |

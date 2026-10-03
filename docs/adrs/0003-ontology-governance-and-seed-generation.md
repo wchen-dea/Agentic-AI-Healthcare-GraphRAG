@@ -1,4 +1,4 @@
-# ADR-0003: Ontology Governance and Seed Generation
+# ADR-0003: Adopt ontology governance and seed generation
 
 - Status: accepted
 - Date: 2026-06-12
@@ -8,70 +8,40 @@
 
 ## Context
 
-The repository now uses explicit ontology artifacts to drive ingestion semantics, graph seed generation, and validation:
-
-- Ontology configuration under `platform/healthcare/ontology/`
-- Generated seed artifact `platform/healthcare/neo4j/generated_ontology_seeds.cypher`
-- Bootstrap runner `platform/healthcare/neo4j/bootstrap.sh`
-- Validation checks in `domains/healthcare/scripts/validate_ontology.py`
-
-Without a formal governance decision, the stack can drift in several ways:
-
-1. Ontology config changes can diverge from generated Neo4j seed Cypher.
-2. Runtime rule behavior can drift from declared ontology relationships.
-3. CI can miss semantic contract regressions when only code-level tests pass.
-
-The project needs an explicit decision for source-of-truth ownership, regeneration policy, and CI enforcement.
+The graph must stay interpretable and consistent across healthcare and supply-chain domains. Without explicit governance, edges drift, labels become ambiguous and seed data becomes inconsistent with production queries.
 
 ## Decision
 
-Adopt ontology-first governance with generated seed artifacts and conformance validation.
-
-1. `platform/healthcare/ontology/` is the canonical source of truth for ontology and rule semantics.
-2. `platform/healthcare/neo4j/generated_ontology_seeds.cypher` is a generated artifact and must be regenerated from ontology config when ontology changes.
-3. `platform/healthcare/neo4j/init.cypher` remains focused on constraints and bootstrap orchestration, not hand-maintained semantic seed content.
-4. Seed generation is performed by `domains/healthcare/scripts/generate_ontology_seed_cypher.py`.
-5. Conformance validation is enforced by `domains/healthcare/scripts/validate_ontology.py`, including:
-   - generated seed freshness checks,
-   - bootstrap verification,
-   - focused ontology/runtime unit test suites.
-6. CI must run ontology conformance checks for relevant changes before merge.
+Define a small, governed ontology for core entities and relationships. Seed data includes reference nodes and deterministic edges such as medication interactions, contraindications and lab signals. The ontology and seed material are treated as versioned assets that are validated in CI.
 
 ## Consequences
 
 Positive:
 
-- Ontology semantics are declared once and propagated consistently.
-- Seed artifacts are reproducible and reviewable.
-- Semantic drift is detected early in CI.
-- Runtime behavior and graph bootstrap remain aligned.
+- Graph semantics stay explicit and auditable.
+- New domains can reuse the same entity and relationship patterns.
+- Seed data reduces the need for ad hoc graph creation at runtime.
 
 Trade-offs:
 
-- Contributors must regenerate artifacts when ontology config changes.
-- CI gains additional runtime and dependency requirements.
-- Generated artifact diffs must be reviewed carefully to catch unintended semantic changes.
+- The ontology requires governance and version control.
+- New entities must be added deliberately rather than as free-form graph growth.
+- Over-standardization can slow the addition of niche domain concepts.
 
 ## Alternatives Considered
 
-- Keep ontology definitions only in hand-written Cypher:
-  - rejected due to high drift risk and weak testability.
-- Runtime-only ontology with no generated seed artifact:
-  - rejected because bootstrap reproducibility and reviewability degrade.
-- Optional validation only (no CI gate):
-  - rejected because semantic regressions can bypass review under fast iteration.
+- Free-form graph creation: easier at first but low consistency and poor query quality.
+- Pure document-only retrieval: simpler but loses causal and lineage-aware reasoning.
 
 ## Rollout and Verification
 
-1. Modify ontology and rule configs under `platform/healthcare/ontology/`.
-2. Regenerate seed artifact with `python domains/healthcare/scripts/generate_ontology_seed_cypher.py`.
-3. Run conformance checks with `python domains/healthcare/scripts/validate_ontology.py`.
-4. Confirm bootstrap behavior using `python domains/healthcare/scripts/test_neo4j_bootstrap.py` when ontology-affecting changes are made.
-5. Enforce CI conformance gate in `.github/workflows/ontology-conformance.yml`.
+- Validate ontology definitions and graph constraints as part of stack validation.
+- Seed the relationship tables and reference nodes during bootstrap.
+- Check for broken labels or missing reference data before release.
+- Review domain-specific additions in pull requests.
 
 ## Related
 
-- [ADR-0001: Use dual persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
-- [ADR-0006: Skills layer standardization and validation](./0006-skills-layer-standardization-and-validation.md)
-- [Platform Blueprint](../03_platform_blueprint.md)
-- [Runbook](../08_operation_runbook.md)
+- [04_data_platform.md](../04_data_platform.md)
+- [05_ai_agents.md](../05_ai_agents.md)
+- [ADR-0001](0001-dual-persistence-qdrant-neo4j.md)

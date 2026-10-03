@@ -1,704 +1,283 @@
-# MCP Layer Design (Minimal)
-
-## Purpose
-
-This document defines a minimal Model Context Protocol (MCP) layer so AI clients can call a stable healthcare toolset without coupling to internal service details.
-
-Goals:
-
-- Reuse existing FastAPI, Qdrant, Neo4j, and Kafka capabilities.
-- Expose a small, auditable, provider-agnostic tool surface.
-- Start local-first and evolve to production controls with minimal rework.
-
-## ADR References
-
-- [ADR-0005: Embed FastMCP in rag-api](adrs/0005-embed-fastmcp-in-rag-api.md)
-- [ADR-0004: Local-first LLM with provider routing](adrs/0004-local-first-llm-provider-routing.md)
-
-Skill composition roadmap strategy and actionable backlog sequencing are described in [03_platform_blueprint.md](03_platform_blueprint.md).
-
-## Architecture Placement
-
-```text
-AI Client (Copilot, Claude Desktop, custom agent)
-  -> Embedded MCP endpoint at /mcp (domains/healthcare/agent-service/src/healthcare_agent/main.py)
-  -> healthcare_agent modules:
-     - orchestration/query_service.py (shared REST, SSE, and MCP query path)
-     - orchestration/graph.py, state.py, runtime.py, planner.py, memory.py
-     - agents/nodes.py and agents/registry.py (specialist agent nodes and cards)
-     - retrieval/search.py and retrieval/ranking.py (Qdrant + Neo4j context)
-     - generation/synthesis.py, model_router.py, factory.py, providers.py
-     - safety/guardrails.py, harness.py, response_policy.py
-     - api/responses.py (response shaping); tool policy/audit in agent_core.governance
-     - tools/mcp_server.py, skills.py
-     - evaluation/ and observability/ modules
-  -> External stores:
-     - Neo4j (domains/healthcare/knowledge/graph-seeds)
-     - Qdrant (populated by domains/healthcare/data-pipelines/flink-job)
-     - Ollama (infra)
-```
-
-MCP is embedded in the healthcare agents service (ADR-0005). The standalone mcp-server scaffold has been removed.
-
-## 1) Tool Inventory
-
-Use a minimal toolset while covering high-value workflows.
-
-| Tool Name | Purpose | Backing Service |
-| --- | --- | --- |
-| `skills_plan_get` | Resolve Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools plan | agent-service skills layer |
-| `patient_context_get` | Retrieve patient-centric graph context summary | Neo4j via agent-service or direct adapter |
-| `vector_evidence_search` | Retrieve top-k vector evidence for question/patient | Qdrant via agent-service or direct adapter |
-| `graphrag_answer_generate` | Generate grounded answer from vector + graph evidence | agent-service |
-| `risk_summary_generate` | Generate concise risk summary for one patient | agent-service + prompt policy |
-| `timeline_explain` | Explain patient progression over a bounded time window | agent-service |
-| `medication_risk_assess` | Assess contraindications, interactions, and adverse reaction risks | agent-service + Neo4j context |
-| `coding_gap_detect` | Surface coding and claims consistency gaps | agent-service + Neo4j/Qdrant evidence |
-| `cohort_risk_summary` | Summarize cross-patient risk signals for cohort triage | agent-service + Qdrant/Neo4j |
-| `evidence_bundle_export` | Return traceable evidence bundle for audit/review | agent-service aggregation |
-
-Notes:
-
-- Keep tool names stable; evolve behavior via versioned schemas.
-- Add async tools optionally when needed (`ai_task_submit`, `ai_task_status_get`).
-- Skill-composed tool expansion roadmap is documented in [03_platform_blueprint.md](03_platform_blueprint.md).
-
-## 2) Request/Response Schemas
-
-Minimal JSON Schema contracts for v1.
-
-### `patient_context_get`
-
-Request schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["patient_id"],
-  "properties": {
-    "patient_id": { "type": "string", "minLength": 1 },
-    "include_claims": { "type": "boolean", "default": true },
-    "include_interactions": { "type": "boolean", "default": true }
-  },
-  "additionalProperties": false
-}
-```
-
-Response schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["patient_id", "graph_context", "retrieved_at"],
-  "properties": {
-    "patient_id": { "type": "string" },
-    "graph_context": { "type": "array", "items": { "type": "object" } },
-    "retrieved_at": { "type": "string", "format": "date-time" },
-    "trace_id": { "type": "string" }
-  },
-  "additionalProperties": false
-}
-```
-
-### `vector_evidence_search`
-
-Request schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["question"],
-  "properties": {
-    "question": { "type": "string", "minLength": 3 },
-    "patient_id": { "type": ["string", "null"] },
-    "top_k": { "type": "integer", "minimum": 1, "maximum": 20, "default": 5 }
-  },
-  "additionalProperties": false
-}
-```
-
-Response schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["question", "vector_context", "retrieved_at"],
-  "properties": {
-    "question": { "type": "string" },
-    "vector_context": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["event_id", "score"],
-        "properties": {
-          "event_id": { "type": "string" },
-          "patient_id": { "type": ["string", "null"] },
-          "event_type": { "type": ["string", "null"] },
-          "score": { "type": "number" },
-          "text": { "type": ["string", "null"] }
-        },
-        "additionalProperties": true
-      }
-    },
-    "retrieved_at": { "type": "string", "format": "date-time" },
-    "trace_id": { "type": "string" }
-  },
-  "additionalProperties": false
-}
-```
-
-### `graphrag_answer_generate`
-
-Request schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["question"],
-  "properties": {
-    "question": { "type": "string", "minLength": 3 },
-    "patient_id": { "type": ["string", "null"] },
-    "response_style": { "type": "string", "enum": ["concise", "clinical", "audit"] }
-  },
-  "additionalProperties": false
-}
-```
-
-Response schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["answer", "vector_context", "graph_context", "retrieved_at"],
-  "properties": {
-    "answer": { "type": "string" },
-    "patients": { "type": "array", "items": { "type": "string" } },
-    "vector_context": { "type": "array", "items": { "type": "object" } },
-    "graph_context": { "type": "array", "items": { "type": "object" } },
-    "retrieved_at": { "type": "string", "format": "date-time" },
-    "trace_id": { "type": "string" }
-  },
-  "additionalProperties": false
-}
-```
-
-### `risk_summary_generate`
-
-Request schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["patient_id"],
-  "properties": {
-    "patient_id": { "type": "string", "minLength": 1 },
-    "time_window_hours": { "type": "integer", "minimum": 1, "maximum": 720, "default": 72 }
-  },
-  "additionalProperties": false
-}
-```
-
-Response schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["patient_id", "summary", "risk_signals", "retrieved_at"],
-  "properties": {
-    "patient_id": { "type": "string" },
-    "summary": { "type": "string" },
-    "risk_signals": { "type": "array", "items": { "type": "string" } },
-    "retrieved_at": { "type": "string", "format": "date-time" },
-    "trace_id": { "type": "string" }
-  },
-  "additionalProperties": false
-}
-```
-
-### `evidence_bundle_export`
-
-Request schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["question"],
-  "properties": {
-    "question": { "type": "string", "minLength": 3 },
-    "patient_id": { "type": ["string", "null"] },
-    "include_raw_payload": { "type": "boolean", "default": false }
-  },
-  "additionalProperties": false
-}
-```
-
-### `skills_plan_get`
-
-Request schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["business_goal"],
-  "properties": {
-    "business_goal": { "type": "string", "minLength": 3 },
-    "agent": { "type": ["string", "null"] }
-  },
-  "additionalProperties": false
-}
-```
-
-Response schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": [
-    "flow",
-    "business_goal",
-    "agent",
-    "skills",
-    "context_requirements",
-    "ontology_dependencies",
-    "mcp_tools",
-    "runtime_tools",
-    "retrieved_at"
-  ],
-  "properties": {
-    "flow": { "type": "array", "items": { "type": "string" } },
-    "business_goal": { "type": "string" },
-    "goal_description": { "type": "string" },
-    "agent": { "type": "string" },
-    "skills": { "type": "array", "items": { "type": "object" } },
-    "context_requirements": { "type": "array", "items": { "type": "string" } },
-    "ontology_dependencies": { "type": "array", "items": { "type": "string" } },
-    "mcp_tools": { "type": "array", "items": { "type": "string" } },
-    "runtime_tools": { "type": "array", "items": { "type": "string" } },
-    "retrieved_at": { "type": "string", "format": "date-time" },
-    "trace_id": { "type": "string" }
-  },
-  "additionalProperties": false
-}
-```
-
-Response schema:
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "required": ["question", "vector_context", "graph_context", "answer", "retrieved_at"],
-  "properties": {
-    "question": { "type": "string" },
-    "patients": { "type": "array", "items": { "type": "string" } },
-    "vector_context": { "type": "array", "items": { "type": "object" } },
-    "graph_context": { "type": "array", "items": { "type": "object" } },
-    "answer": { "type": "string" },
-    "retrieved_at": { "type": "string", "format": "date-time" },
-    "trace_id": { "type": "string" },
-    "guardrails": {
-      "type": "object",
-      "properties": {
-        "evidence_text_redacted": { "type": "boolean" },
-        "evidence_access_level": { "type": "string", "enum": ["none", "bounded"] },
-        "graph_access_level": { "type": "string", "enum": ["standard", "broader"] },
-        "raw_payload_requested": { "type": "boolean" },
-        "raw_payload_returned": { "type": "boolean" },
-        "response_truncated": { "type": "boolean" }
-      }
-    }
-  },
-  "additionalProperties": false
-}
-```
-
-## 3) Auth and Audit Model
-
-Minimal model that runs locally and scales to production.
-
-### AuthN/AuthZ
-
-Local demo (embedded mode):
-
-- Run without bearer-token enforcement by default for local simplicity.
-- Enforce role-based authorization through a tool policy in embedded agent-service for both `/query` and MCP tool entrypoints.
-
-Optional standalone mode:
-
-- Static API token in MCP server config.
-- Optional allowlist of tool names per token.
-
-Production:
-
-- Service-to-service auth with OAuth2 client credentials or workload identity.
-- Tool-level authorization policy:
-  - `read_only`: patient_context_get, vector_evidence_search
-  - `generation`: query, graphrag_answer_generate, risk_summary_generate
-  - `export`: evidence_bundle_export
-- Environment-scoped policies (`dev`, `stage`, `prod`).
-
-### Audit
-
-Log one structured audit event per tool call:
-
-- `timestamp`
-- `trace_id`
-- `tool_name`
-- `caller_id` (service principal or token id)
-- `input_hash` (SHA-256 of normalized request)
-- `patient_scope` (explicit IDs or `cohort`)
-- `outcome` (`success` or `error`)
-- `latency_ms`
-- `response_size_bytes`
-
-Do not log raw PHI payloads. Prefer hashes, IDs, and minimal metadata.
-
-### Data Protection Controls
-
-- Redact or tokenize sensitive fields before returning tool output when policy requires.
-- Return guardrails metadata that records evidence-access mode and response truncation state.
-- Enforce max response sizes and timeouts per tool.
-- Add per-tool rate and burst limits.
-
-## 4) Rollout Stages: Local Demo to Production
-
-### Stage 0: Local Design and Contract Freeze
-
-1. Finalize tool contracts and JSON schemas in this document.
-2. MCP tool surface is implemented in the agents service over the shared query orchestration.
-3. Contract tests with static fixtures and CI validation are in place.
-
-Exit criteria:
-
-- All tool schemas validated.
-- Basic happy-path tests pass locally.
-
-Current status:
-
-- Completed in current implementation (embedded MCP in the agents service with 10 tools).
-
-### Stage 1: Local Demo Integration
-
-1. Validate initialize handshake against `http://localhost:8000/mcp`.
-2. Keep non-protocol diagnostics available at `/mcp/health`.
-3. Validate from at least one MCP client.
-
-Exit criteria:
-
-- End-to-end calls from MCP client succeed.
-- Trace IDs link MCP calls to API logs.
-
-Current status:
-
-- Completed for local stack (`/mcp` and `/mcp/health` active, smoke test script present).
-
-### Stage 2: Staging Hardening
-
-1. Add centralized auth (service identity).
-2. Add policy gates per tool and environment.
-3. Add SLO dashboards (latency, error rate, tool call volume).
-4. Add resilience controls (timeouts, retries, circuit breaker).
-
-Exit criteria:
-
-- Security review passed.
-- SLO monitoring and alerts active.
-
-### Stage 3: Production Launch
-
-1. Enable production identity and secret management.
-2. Enable audited tool access with retention policy.
-3. Roll out in canary mode to selected clients.
-4. Expand tool set only after stability is proven.
-
-Exit criteria:
-
-- Stable error budget.
-- Audit completeness verified.
-- Operational runbook published.
-
-## Current Implementation Note
-
-The embedded MCP layer is wired from `domains/healthcare/agent-service/src/healthcare_agent/main.py`, while the ten healthcare MCP tools live in `tools/mcp_server.py`. They share `QueryService.run_query` and `QueryService.stream` with `POST /query` and `POST /query/stream`.
-
-ADR-0012 removed the former ReAct and single-pass query paths. LangGraph is now the only healthcare orchestrator for REST, SSE, and MCP calls, with specialist agents for medication safety, lab interpretation, and coding review.
-
-`POST /query/stream` always runs the LangGraph orchestrator and returns Server-Sent Events: `meta` (trace ID), `step` per graph node (allowlisted scalar fields only, no evidence or answer text), then `result` (same payload as `/query`) or `error` (generic message and trace ID). Authorization is checked before the stream opens, and each stream writes one audit entry. See [ADR-0010](adrs/0010-layered-agentic-architecture.md) for the layered target architecture and phased roadmap.
-
-The server is built by the shared `agent_core.mcp_server` factory (see [ADR-0005](adrs/0005-embed-fastmcp-in-rag-api.md#shared-mcp-server-framework)). Every tool has a title, a description, and MCP annotations (read-only, idempotent, open-world hints) taken from `TOOL_SPECS`. Blocking tool bodies run in worker threads. The skills layer is also exposed as the resources `skills://catalog` and `skills://{skill_id}` and as the `clinical_review` prompt (the supply-chain service exposes `supply_risk_review`). Transport and Host/Origin validation come from the `MCP_*` settings.
-
-When MLflow tracing is enabled (`MLFLOW_TRACKING_URI`), every MCP tool execution is traced as a nested span hierarchy visible in the MLflow Tracing UI. Trace IDs from the audit log can be correlated with MLflow spans for end-to-end observability.
-
-# Skills Layer
-
-## Purpose
-
-This project now includes an explicit Skills layer that operationalizes the flow:
-
-Business Goals -> Agent -> Skills -> Context -> Ontology -> MCP -> Tools
-
-The standardization and CI validation policy for this layer is formalized in [ADR-0006](adrs/0006-skills-layer-standardization-and-validation.md).
-
-The layer is runtime-backed (not documentation-only):
-
-- Skill catalog and goal mappings are defined in [agent-service/src/healthcare_agent/config/skills_layer.json](../domains/healthcare/agent-service/src/healthcare_agent/config/skills_layer.json).
-- Resolution logic is implemented in [agent-service/src/healthcare_agent/tools/skills.py](../domains/healthcare/agent-service/src/healthcare_agent/tools/skills.py).
-- LangGraph multi-agent orchestration maps skills to specialized agent nodes in [agent-service/src/healthcare_agent/agents/nodes.py](../domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py).
-- Runtime access is exposed through:
-  - REST: POST /skills/plan
-  - MCP tool: skills_plan_get
-
-## Layer Model
-
-### 1) Business Goals
-
-Business goals are top-level outcomes (for example, clinical triage, medication safety review, claims denial prevention).
-
-Each goal defines:
-
-- description
-- default_agent
-- ordered list of skill IDs
-
-### 2) Agent
-
-Agent identity is a planner/runtime persona that orchestrates the skill sequence for a goal.
-
-- Default agent comes from goal configuration.
-- Caller can override via optional agent field in skills_plan_get.
-- In LangGraph mode, the triage agent classifies requests and routes to specialist agents (`medication_safety_agent`, `lab_interpretation_agent`, `coding_review_agent`) based on request type.
-
-### 3) Skills
-
-Each skill describes a reusable unit of capability:
-
-- context_requirements
-- ontology_dependencies
-- mcp_tools
-- runtime_tools
-
-### 4) Context and Ontology
-
-The resolver aggregates:
-
-- union of required context fields
-- union of ontology dependencies
-
-This makes prerequisites explicit before tool execution.
-
-### 5) MCP and Tools
-
-The resolver emits:
-
-- mcp_tools: MCP tools expected to be called
-- runtime_tools: underlying system tools/services (neo4j, qdrant, agent_service, ollama)
-
-## API Contract
-
-### REST
-
-POST /skills/plan
-
-Request:
-
-```json
-{
-  "business_goal": "medication_safety_review",
-  "agent": "medication_safety_agent"
-}
-```
-
-Response includes:
-
-- flow
-- business_goal
-- agent
-- skills
-- context_requirements
-- ontology_dependencies
-- mcp_tools
-- runtime_tools
-- retrieved_at
-- trace_id
-
-### MCP
-
-Tool: skills_plan_get
-
-Arguments:
-
-- business_goal (required)
-- agent (optional)
-
-## Role and Policy
-
-skills_plan_get is authorized in read_only role via [agent-service/src/healthcare_agent/config/tool_policies.json](../domains/healthcare/agent-service/src/healthcare_agent/config/tool_policies.json).
-
-## Validation
-
-Contracts are tested in [agent-service/tests/integration/test_contracts.py](../domains/healthcare/agent-service/tests/integration/test_contracts.py), including:
-
-- successful plan generation for known business goal
-- deterministic flow shape and tool outputs
-- proper error handling for unknown goals
-
-Agent Skills package compliance is enforced with:
-
-- generator: [domains/healthcare/scripts/generate_agent_skills.py](../domains/healthcare/scripts/generate_agent_skills.py)
-- validator: [domains/healthcare/scripts/validate_agent_skills.py](../domains/healthcare/scripts/validate_agent_skills.py)
-- shared library: [scripts/lib/skill_generator.py](../scripts/lib/skill_generator.py), [scripts/lib/skill_validator.py](../scripts/lib/skill_validator.py)
-
-CI also includes an optional upstream validation pass using `skills-ref validate`.
-The workflow behavior is:
-
-- use `skills-ref` directly when already present on the runner
-- otherwise attempt a best-effort on-the-fly install (`python -m pip install --user skills-ref`)
-- if install still fails, log a skip message and continue without failing the workflow
-
-Run locally:
-
-```bash
-python domains/healthcare/scripts/generate_agent_skills.py
-python domains/healthcare/scripts/generate_agent_skills.py --check
-python domains/healthcare/scripts/validate_agent_skills.py
-```
-
-For supply-chain:
-
-```bash
-python domains/supply-chain/scripts/generate_agent_skills.py
-python domains/supply-chain/scripts/generate_agent_skills.py --check
-python domains/supply-chain/scripts/validate_agent_skills.py
-```
-
-Generated skill packages are stored under [healthcare/skills](../domains/healthcare/knowledge/skills) and [supply-chain/skills](../domains/supply-chain/knowledge/skills) and include one `SKILL.md` per skill folder plus supporting references.
-
-# LangGraph Multi-Agent Query Path
-
-## Purpose
-
-This section documents the current healthcare agent runtime after ADR-0012. The former ReAct controller and single-pass `/query` path were removed; LangGraph is the only query path for `POST /query`, `POST /query/stream`, and MCP tools. There is no rollback environment flag, and `/query` responses do not include a `react` block.
-
-## Runtime File Mapping
-
-Primary implementation and integration touchpoints:
-
-- `domains/healthcare/agent-service/src/healthcare_agent/main.py` — slim composition root that wires `HealthcareAgentSettings`, Qdrant/Neo4j adapters (`vector_context`, `graph_context`), LLM gateway, LangGraph runtime ports, FastAPI, and MCP.
-- `domains/healthcare/agent-service/src/healthcare_agent/config/settings.py` — `HealthcareAgentSettings`, a `pydantic-settings` class extending `agent_core.settings.AgentServiceSettings`; environment variable names intentionally retain the `AGENT_*`, `LLM_*`, `QDRANT_URL`, and `NEO4J_*` prefixes.
-- `domains/healthcare/agent-service/src/healthcare_agent/api/routes.py` — HTTP routes including `/query` and `/query/stream`.
-- `packages/agent-core/src/agent_core/governance.py` — shared `ToolGovernance` role policy, audit logging, and tool metrics (used by the healthcare agent service).
-- `domains/healthcare/agent-service/src/healthcare_agent/api/responses.py` — `ResponseShaper` response shaping.
-- `domains/healthcare/agent-service/src/healthcare_agent/orchestration/query_service.py` — `QueryService.run_query` and `QueryService.stream`, the shared query service used by HTTP and MCP.
-- `domains/healthcare/agent-service/src/healthcare_agent/orchestration/graph.py` — LangGraph `StateGraph` builder.
-- `domains/healthcare/agent-service/src/healthcare_agent/orchestration/runtime.py` — runtime ports for graph execution.
-- `domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py` — specialist agent node functions.
-- `domains/healthcare/agent-service/src/healthcare_agent/agents/registry.py` — agent cards and capability registry.
-- `domains/healthcare/agent-service/src/healthcare_agent/tools/mcp_server.py` — `HealthcareMcpTools` with the ten healthcare MCP tools.
-- `domains/healthcare/agent-service/src/healthcare_agent/tools/skills.py` — skills-plan resolution.
-- `domains/healthcare/agent-service/src/healthcare_agent/retrieval/search.py` and `retrieval/ranking.py` — Qdrant/Neo4j retrieval and deterministic ranking.
-- `domains/healthcare/agent-service/src/healthcare_agent/generation/factory.py` — `build_llm_provider`.
-- `domains/healthcare/agent-service/src/healthcare_agent/safety/` — guardrails, harness, and response policy.
-- `domains/healthcare/agent-service/src/healthcare_agent/evaluation/` — gates, agent evaluation datasets (`agent_eval.py`), MLflow evaluation, retrieval benchmarks, and grounding scorecards.
-- `packages/agent-core/src/agent_core/metrics.py` — shared Prometheus `agent_service_*` collectors.
-- `domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py` — MLflow tracing helpers.
-
-## LangGraph Flow
+# 05 — AI Agents
+
+This document describes the agent services that answer questions over the knowledge platform built in [04 — Data Platform](04_data_platform.md). Most of it covers the healthcare agent. The supply-chain agent uses the same building blocks with a smaller feature set; see [09 — Supply Chain Domain](09_supply_chain_domain.md). How the agents are tested and gated is in [06 — Quality Assurance](06_quality_assurance.md).
+
+## 1. Service layout
+
+Each domain ships one FastAPI service. The service hosts the REST API, the LangGraph orchestrator and an embedded MCP server, all in one process.
+
+| Concern | Healthcare module (`domains/healthcare/agent-service/src/healthcare_agent/`) |
+| --- | --- |
+| HTTP API, schemas, response shaping | `api/routes.py`, `api/schemas.py`, `api/responses.py` |
+| Agent definitions and node functions | `agents/registry.py`, `agents/nodes.py` |
+| Graph, planner, memory, HITL, query service | `orchestration/` |
+| Vector and graph retrieval, ranking | `retrieval/search.py`, `retrieval/ranking.py` |
+| LLM providers, routing, synthesis, structured output | `generation/` |
+| Guardrails, harness, response policy | `safety/` |
+| MCP server and skills | `tools/mcp_server.py`, `tools/skills.py` |
+| Tracing | `observability/tracing.py` |
+| Offline evaluation | `evaluation/` |
+| Settings and policy files | `config/settings.py`, `config/tool_policies.json`, `config/skills_layer.json` |
+
+Code shared by both domains lives in `packages/agent-core` (`agent_core`):
+
+| Module | Provides |
+| --- | --- |
+| `ports` | `VectorStore`, `GraphStore`, `LLMProvider`, `SessionStore`, and `Tracer` protocols, plus `NoopTracer` |
+| `runtime` | `AgentRuntime`, which holds the wired dependencies |
+| `settings` | `AgentServiceSettings`, the base Pydantic settings class |
+| `policy` | `ToolPolicy` and `AuthorizationError` for role-based tool access |
+| `governance` | `ToolGovernance`, which checks policy and writes audit events around each tool call |
+| `audit` | `AuditEvent`, `JsonlAuditSink` and `hash_payload` |
+| `guardrails` | `detect_prompt_injection` and `check_length` |
+| `mcp_server` | `build_mcp_server`, `register_tools`, `register_skills_surface`, `ToolSpec`, tool annotations and transport security |
+| `streaming` | `format_sse` |
+| `metrics` | `ServiceMetrics` for Prometheus |
+
+Embeddings and store clients come from `packages/knowledge-core`; see [04 — Data Platform](04_data_platform.md#embeddings). The decision to split these layers is recorded in [ADR 0010](adrs/0010-layered-agentic-architecture.md).
+
+## 2. Graph flow
+
+`orchestration/graph.py` builds a LangGraph `StateGraph` over the `HealthcareAgentState` `TypedDict`.
 
 ```mermaid
-graph TD
-    S[input_guardrail] -->|allowed| A[triage]
-    S -->|blocked| I[END]
-    A --> B[vector_retrieval]
-    B --> C[graph_retrieval]
-    C -->|medication_safety| D[medication_safety]
-    C -->|lab_interpretation| E[lab_interpretation]
-    C -->|coding_review| F[coding_review]
-    C -->|patient_summary/cohort_triage| G[confidence_evaluator]
-    D --> J{Pending delegation?}
-    E --> J
-    F --> J
-    J -->|yes| K[delegation_router]
-    J -->|no| G
-    K --> G
-    G -->|confidence >= threshold or max_iter| H[synthesis]
-    G -->|low confidence| B
-    H --> O[output_guardrail]
-    O --> I
+flowchart TD
+  IG[input_guardrail] --> T[triage]
+  T --> VR[vector_retrieval]
+  VR --> GR[graph_retrieval]
+  GR --> DR{delegation_router}
+  DR --> MS[medication_safety]
+  DR --> LI[lab_interpretation]
+  DR --> CR[coding_review]
+  MS --> CE[confidence_evaluator]
+  LI --> CE
+  CR --> CE
+  CE -- "confidence < 0.75 and iterations left" --> VR
+  CE --> HR[human_review]
+  HR --> S[synthesis]
+  S --> OG[output_guardrail]
 ```
 
-Eleven LangGraph nodes share typed state (two guardrails, three retrieval nodes, three specialist nodes, two control nodes, and synthesis). Node names are registered in `orchestration/graph.py`; the implementing functions live in `agents/nodes.py`:
+1. `input_guardrail` rejects prompt-injection attempts and over-length questions.
+2. `triage` classifies the request type and builds a `RetrievalPlan` (`name`, `query_text`, `top_k`, `reason`).
+3. `vector_retrieval` and `graph_retrieval` collect evidence.
+4. One or more specialists run. When a request needs several, `delegation_router` sends it to each of them.
+5. `confidence_evaluator` scores the evidence. Below 0.75 it loops back to retrieval, up to `LANGGRAPH_MAX_ITERATIONS` times (default 3, capped at 6).
+6. `human_review` runs only when HITL is enabled; see [Memory and human review](#7-memory-and-human-review).
+7. `synthesis` writes the answer and `output_guardrail` checks it before it is returned.
 
-| Node | Function | Responsibility |
-|------|----------|----------------|
-| `input_guardrail` | `input_guardrail` | Block unsafe or out-of-scope requests before any retrieval |
-| `triage` | `triage_agent` | Classify question and select retrieval plan |
-| `vector_retrieval` | `vector_retrieval_agent` | Qdrant similarity search and evidence ranking |
-| `graph_retrieval` | `graph_retrieval_agent` | Neo4j patient graph traversal and evidence ranking |
-| `medication_safety` | `medication_safety_agent` | Interaction, contraindication, and adverse event analysis |
-| `lab_interpretation` | `lab_interpretation_agent` | Lab signal and abnormal observation extraction |
-| `coding_review` | `coding_review_agent` | Claims gap detection and ICD-10 mapping analysis |
-| `delegation_router` | `delegation_router` | Resolve specialist-to-specialist capability requests |
-| `confidence_evaluator` | `confidence_evaluator` | Evidence completeness scoring and loop control |
-| `synthesis` | `synthesis_agent` | Grounded answer generation through the configured provider |
-| `output_guardrail` | `output_guardrail` | Validate and shape the final answer before it is returned |
+## 3. Agents
 
-## Human-in-the-Loop Review and Graph Caching
+The agents are registered in `agents/registry.py`. `GET /agents` lists them as cards with `name`, `description`, `capabilities` and `accepted_inputs`.
 
-Compiled LangGraph graphs are cached per process. Healthcare caches one graph per
-(tracing, HITL) combination; supply chain caches one per tracing setting. Tests reset
-the cache with `clear_graph_cache()`.
+| Agent | Role |
+| --- | --- |
+| `triage` | Classifies the request and plans retrieval |
+| `vector_retrieval` | Semantic search in Qdrant |
+| `graph_retrieval` | Patient, medication and claim context from Neo4j |
+| `medication_safety` | Interactions and contraindications |
+| `lab_interpretation` | Abnormal lab signals and trends |
+| `coding_review` | Diagnosis and claim coding gaps |
+| `synthesis` | Writes the grounded answer |
 
-When `HITL_ENABLED=true`, the healthcare graph is compiled with a LangGraph checkpointer
-and a `human_review` node (`orchestration/hitl.py`). Medication-safety requests and answers
-below `HITL_CONFIDENCE_THRESHOLD` pause at a LangGraph interrupt. The `/query` response then
-returns `status: "pending_approval"`, a `thread_id`, and a `human_review` summary without
-evidence. At most `HITL_MAX_PENDING` reviews are held; the oldest is evicted first.
+## Request types
 
-A reviewer resumes the run with `POST /query/resume`:
+The triage planner (`orchestration/planner.py`) maps each question to one request type. The type sets the retrieval plan and which specialist runs.
 
-```json
-{"thread_id": "<id>", "decision": "approve", "note": "optional", "session_id": "optional"}
-```
+| Request type | Typical question | Specialist |
+| --- | --- | --- |
+| `patient_summary` | "Summarize patient P123" | none (synthesis only) |
+| `medication_safety` | "Any interaction risks for this patient's drugs?" | `medication_safety` |
+| `lab_interpretation` | "Explain the recent abnormal labs" | `lab_interpretation` |
+| `coding_review` | "Are there coding gaps on recent claims?" | `coding_review` |
+| `cohort_triage` | "Which patients need follow-up first?" | delegated as needed |
 
-`decision` is `approve` or `reject`. The route authorizes the caller first, returns 404 for
-unknown or expired threads, and applies the same governance and audit path as `/query`.
-Only the final, reviewed answer is written to the multi-turn session memory, so pending
-answers never leak into later conversation context.
+## 4. Retrieval and ranking
 
-Limitation: the in-memory checkpointer and pending-review registry are process-local.
-Multi-replica deployments need a shared checkpointer (for example Postgres or Redis) and
-sticky routing or a shared registry.
+- **Vector search** (`retrieval/search.py`) embeds the query with the same model that was used at ingest (`stable_embedding` from `knowledge_core`). It searches each domain in the `healthcare_events` collection separately, then merges the results by score.
+- **Graph search** runs parameterized Cypher for patient context: encounters, medications, interactions, contraindications and claims.
+- **Ranking** (`retrieval/ranking.py`) combines semantic relevance, recency and graph signal. Ties are broken by event ID, so the order is stable.
+- Patient context reads are cached, so repeated turns in a session don't hit Neo4j again.
 
-## Observability and Configuration
+## LLM routing
 
-| Environment Variable | Default | Purpose |
-|---------------------|---------|---------|
-| `LANGGRAPH_MAX_ITERATIONS` | `3` | Max confidence re-retrieval loops |
-| `HITL_ENABLED` | `false` | Pause low-confidence or blocked answers for human review |
-| `HITL_CONFIDENCE_THRESHOLD` | `0.75` | Confidence below which an answer goes to human review |
-| `HITL_MAX_PENDING` | `1000` | Maximum paused review threads kept in process |
-| `MLFLOW_TRACKING_URI` | (none) | Enable MLflow tracing (for example `http://mlflow:5000`) |
-| `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | MLflow experiment name |
+`generation/factory.py` builds the LLM gateway from settings:
 
-Operational names were aligned in ADR-0012 Phase 3b: the environment prefix is `AGENT_*` (legacy `RAG_API_*` names were removed in Phase 4 and are ignored), Prometheus collectors are `agent_service_*`, the Helm chart and Kubernetes service are `agent-service`, the Compose service is `agent-service` (container `healthcare-agent-service`), and the CI workflow is `agent-service-contracts.yml`.
+1. **Primary provider** comes from `LLM_PROVIDER` and `LLM_MODEL` (default `ollama` and `llama3.1`). The supported providers are Ollama, OpenAI, Anthropic, Bedrock and Databricks (`generation/providers.py`).
+2. **Fallback**: if `LLM_FALLBACK_PROVIDER` is set, the primary is wrapped in `FallbackProvider`. When the primary returns a result that starts with `LLM error:`, the fallback is called.
+3. **Tier routing**: if any of `LLM_MODEL_SIMPLE`, `LLM_MODEL_MODERATE` or `LLM_MODEL_COMPLEX` differs from `LLM_MODEL`, a `ModelRouter` is added.
+   - Each tier takes a `provider:model` spec.
+   - `classify_complexity` scores the question and sorts it into a tier.
+   - The router drops to a cheaper tier when the tier's rolling latency exceeds `LLM_LATENCY_TARGET_MS`, or when the estimated hourly spend exceeds `LLM_COST_BUDGET_HOURLY_USD`. A value of 0 turns that check off.
 
-## Test Notes
+In dev, every tier uses the same local model, so routing is a no-op. The `model_routing` field of a response reports the provider, model and tier that served it. The design is in [ADR 0004](adrs/0004-local-first-llm-provider-routing.md).
 
-Planner-only local checks run through the renamed script:
+## 5. Synthesis and structured output
 
-```bash
-./domains/healthcare/scripts/test_planner.sh
-```
+`generation/synthesis.py` builds the prompt from the ranked evidence, the specialist findings and the session summary. It calls the gateway with `LLM_TIMEOUT_SECONDS` (default 120) and `LLM_MAX_TOKENS` (default 1200), and retries when it fails.
 
-Tests patch module-level adapters on `healthcare_agent.main` (`vector_context`, `graph_context`, `ask_ollama`, and `queries.run_query`) and call MCP tools as `main.mcp_tools.<tool>(...)`.
+When the request sets `structured: true`, `generation/structured_output.py` validates the answer into a Pydantic model with these fields:
+
+- `summary`
+- `key_findings`
+- `risks`, each with `category`, `severity`, `description` and evidence source
+- `interactions`
+- `lab_signals`
+- `confidence`
+
+The validated model is returned as `structured_response`.
+
+## 6. Streaming
+
+`POST /query/stream` returns Server-Sent Events, formatted with `agent_core.streaming.format_sse`:
+
+| Event | Payload |
+| --- | --- |
+| `meta` | `trace_id`, `orchestrator: "langgraph"` |
+| `step` | One per completed node, with allowlisted scalar fields only. Evidence is never streamed. |
+| `result` | The same body as `POST /query` |
+| `error` | A structured error message |
+
+Authorization runs before the stream opens, so a denied caller gets a plain `401` rather than an `error` event. The web client falls back to `POST /query` when the stream endpoint returns `404` or `405`.
+
+## 7. Memory and human review
+
+**Session memory** (`orchestration/memory.py`):
+
+- Each `session_id` keeps its last 20 turns for `SESSION_TTL_SECONDS` (default 3600).
+- The store is in-process by default. Set `SESSION_STORE_BACKEND=redis` and `REDIS_URL` to share sessions across replicas.
+- `QueryService` loads a short summary of recent turns into the graph state and records each new turn.
+
+**Human-in-the-loop** (`orchestration/hitl.py`):
+
+- Enable it with `HITL_ENABLED=true`.
+- When confidence is below `HITL_CONFIDENCE_THRESHOLD` (default 0.75), `human_review` calls LangGraph `interrupt`. The response then has `status: "pending_review"`, a `thread_id`, and a `human_review` payload. The payload holds counts and routing metadata only, never raw evidence.
+- A reviewer calls `POST /query/resume` with the `thread_id`, a `decision` (`approve` or `reject`) and an optional `note`. An unknown thread returns `404`.
+- `HITL_MAX_PENDING` (default 1000) caps the number of open reviews.
+- The checkpointer is LangGraph's `InMemorySaver`, so pending reviews only exist in the process that created them. Multi-replica deployments need a shared checkpointer or sticky routing.
+
+## 8. HTTP API
+
+Healthcare agent, port 8000. The caller role comes from the `X-Caller-Role` header when `AGENT_ALLOW_ROLE_HEADER` is true; otherwise `AGENT_DEFAULT_CALLER_ROLE` is used.
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /health` | Liveness and dependency status |
+| `GET /metrics` | Prometheus metrics |
+| `GET /mcp/health` | MCP transport (`streamable-http`), mount path (`/mcp`) and skills status |
+| `GET /agents` | Agent cards |
+| `POST /skills/plan` | Skill plan for a `business_goal` (3–128 chars) and `agent` |
+| `POST /query` | Run the graph |
+| `POST /query/stream` | Run the graph and stream progress (SSE) |
+| `POST /query/resume` | Approve or reject a paused run |
+| `GET /` | Redirects to `/docs` (OpenAPI UI) |
+
+`POST /query` request fields:
+
+| Field | Notes |
+| --- | --- |
+| `question` | Required. Up to `AGENT_MAX_QUESTION_CHARS` (1000). |
+| `patient_id` | Optional, up to 128 chars |
+| `structured` | Optional; returns `structured_response` |
+| `session_id` | Optional, up to 64 chars; turns on multi-turn memory |
+| `top_k` | Optional, default 5 |
+
+The response contains:
+
+- `question`, `request_type`, `retrieval_plan`, `patients`
+- `vector_context`, `graph_context`, `answer`
+- `retrieved_at`, `trace_id`, `guardrails`
+- when applicable: `structured_response`, `model_routing`, `langgraph`, `status`, `thread_id`, `human_review`
+
+Errors: `401` for an unauthorized role, `400` for invalid input, `503` when a backing store is unavailable.
+
+## 9. MCP tools and skills
+
+The MCP server is built with `agent_core.mcp_server.build_mcp_server` and mounted at `/mcp` using Streamable HTTP. Its name comes from `MCP_SERVER_NAME` (default `HealthcareGraphRAG MCP`). Every tool call goes through `ToolGovernance`, which checks the role policy, writes an audit event with hashed arguments, and runs blocking work off the event loop. The design is in [ADR 0005](adrs/0005-embed-fastmcp-in-rag-api.md).
+
+| Tool | Role needed |
+| --- | --- |
+| `patient_context_get` | `read_only` |
+| `vector_evidence_search` | `read_only` |
+| `skills_plan_get` | `read_only` |
+| `graphrag_answer_generate` | `generation` |
+| `risk_summary_generate` | `generation` |
+| `timeline_explain` | `generation` |
+| `medication_risk_assess` | `generation` |
+| `coding_gap_detect` | `generation` |
+| `cohort_risk_summary` | `generation` |
+| `evidence_bundle_export` | `export` |
+
+Role-to-tool rules are in `config/tool_policies.json`. Override the file with `AGENT_TOOL_POLICY_PATH`.
+
+**Skills** are reusable, multi-tool workflows. They are declared in `config/skills_layer.json`, which must have `business_goals` and `skills` keys; override it with `AGENT_SKILLS_LAYER_PATH`. The healthcare skills are:
+
+- `patient-snapshot`
+- `grounded-answer`
+- `medication-safety-graph-review`
+- `risk-signal-detection`
+- `claim-outcome-risk-review`
+- `evidence-bundle-export`
+
+The skills are exposed through `POST /skills/plan`, the `skills_plan_get` tool, and MCP resources and prompts. `make generate-skills` and `make validate-skills` keep the generated skill files in sync; see [ADR 0006](adrs/0006-skills-layer-standardization-and-validation.md).
+
+MCP transport options: `MCP_STATELESS_HTTP`, `MCP_JSON_RESPONSE`, `MCP_DNS_REBINDING_PROTECTION`, `MCP_ALLOWED_HOSTS` and `MCP_ALLOWED_ORIGINS`.
+
+## 10. Guardrails and response policy
+
+| Layer | Module | Checks |
+| --- | --- | --- |
+| Input | `safety/guardrails.py` | Prompt injection, length |
+| Output | `safety/guardrails.py` | Clinical directives must carry an "advisory" or "clinical review" caveat |
+| Grounding | `safety/harness.py` | The answer must cite retrieved evidence |
+| Response policy | `safety/response_policy.py` | Role-based redaction, truncation, byte limits |
+
+The response policy limits are:
+
+- `AGENT_MAX_CONTEXT_ITEMS` (5)
+- `AGENT_MAX_EVIDENCE_CHARS` (240)
+- `AGENT_MAX_ANSWER_CHARS` (2000)
+- `AGENT_MAX_RESPONSE_BYTES` (50000)
+
+The `guardrails` block in each response reports the redaction level, access level, limits, any truncation, and any flags raised. Answers are decision support, not clinical advice.
+
+## Observability
+
+- **Tracing**: when `MLFLOW_TRACKING_URI` is set, `observability/tracing.py` enables MLflow tracing for the LangGraph run and the LLM calls. Otherwise a no-op tracer is used. Every response carries a `trace_id`. See [ADR 0008](adrs/0008-mlflow-tracing-and-evaluation.md).
+- **Metrics**: `GET /metrics` exposes Prometheus counters and histograms for HTTP method, path, status and duration.
+- **Audit**: tool calls are appended as JSON lines to `AGENT_AUDIT_LOG_PATH` (default `logs/agent_audit.log`). Arguments are hashed, not stored.
+
+## 11. Configuration reference
+
+The service settings are Pydantic `BaseSettings` classes (`config/settings.py`, which extends `agent_core.settings.AgentServiceSettings`). Variables prefixed `AGENT_` are governance settings shared by both domains.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `QDRANT_URL`, `QDRANT_COLLECTION` | `http://qdrant:6333`, `healthcare_events` | Vector store |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | `bolt://neo4j:7687`, `neo4j`, (secret) | Graph store |
+| `LLM_PROVIDER`, `LLM_MODEL` | `ollama`, `llama3.1` | Primary LLM |
+| `LLM_FALLBACK_PROVIDER`, `LLM_FALLBACK_MODEL` | empty | Fallback LLM |
+| `LLM_MODEL_SIMPLE`, `LLM_MODEL_MODERATE`, `LLM_MODEL_COMPLEX` | empty (use `LLM_MODEL`) | Tier models (`provider:model`) |
+| `LLM_LATENCY_TARGET_MS`, `LLM_COST_BUDGET_HOURLY_USD` | `0` (off) | Router downgrade triggers |
+| `LLM_TIMEOUT_SECONDS`, `LLM_MAX_TOKENS` | `120`, `1200` | Generation limits |
+| `OLLAMA_URL` | `http://ollama:11434` | Ollama endpoint |
+| `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, … | see [04](04_data_platform.md#embeddings) | Must match the ingest pipeline |
+| `LANGGRAPH_MAX_ITERATIONS` | `3` (max 6) | Retrieval retry loop |
+| `HITL_ENABLED`, `HITL_CONFIDENCE_THRESHOLD`, `HITL_MAX_PENDING` | off, `0.75`, `1000` | Human review |
+| `SESSION_STORE_BACKEND`, `REDIS_URL`, `SESSION_TTL_SECONDS` | `memory`, —, `3600` | Session memory |
+| `MCP_SERVER_NAME` and `MCP_*` transport options | see [section 9](#9-mcp-tools-and-skills) | MCP server |
+| `MLFLOW_TRACKING_URI` | empty | Tracing |
+| `AGENT_DEFAULT_CALLER_ROLE`, `AGENT_ALLOW_ROLE_HEADER` | `generation`, `true` | Caller role |
+| `AGENT_TOOL_POLICY_PATH`, `AGENT_SKILLS_LAYER_PATH` | bundled files | Policy and skills overrides |
+| `AGENT_ALLOW_ORIGINS` | `*` | CORS |
+
+Set `AGENT_ALLOW_ROLE_HEADER=false` and a narrow `AGENT_ALLOW_ORIGINS` in production. Supply secrets from the platform's secret store; see [07 — CI/CD Automation](07_cicd_automation.md).
+
+## 12. Related
+
+- [ADR 0004 — Local-first LLM provider routing](adrs/0004-local-first-llm-provider-routing.md)
+- [ADR 0005 — Embed FastMCP in the RAG API](adrs/0005-embed-fastmcp-in-rag-api.md)
+- [ADR 0006 — Skills layer standardization](adrs/0006-skills-layer-standardization-and-validation.md)
+- [ADR 0007 — LangGraph multi-agent orchestration](adrs/0007-langgraph-multi-agent-orchestration.md)
+- [ADR 0008 — MLflow tracing and evaluation](adrs/0008-mlflow-tracing-and-evaluation.md)
+- [ADR 0010 — Layered agentic architecture](adrs/0010-layered-agentic-architecture.md)

@@ -1,4 +1,4 @@
-# ADR-0002: Qdrant as the Streaming Vector Store for Real-Time RAG
+# ADR-0002: Use Qdrant as the streaming vector store
 
 - Status: accepted
 - Date: 2026-06-12
@@ -8,121 +8,42 @@
 
 ## Context
 
-Healthcare events flow continuously through Kafka into the Flink enrichment pipeline, which produces clinical embeddings that must be searchable with minimal lag. Embedding freshness is critical: a RAG query about a patient encounter should retrieve context from events that arrived minutes ago, not from a nightly batch job.
-
-The Conduktor glossary on [vector embeddings in streaming](https://www.conduktor.io/glossary/vector-embeddings-in-streaming) frames the core challenge clearly—batch embedding generation creates stale AI context, while streaming pipelines require a vector store that can accept continuous upserts at high throughput without degrading query latency. The same source identifies key selection criteria for vector databases in streaming contexts: per-event indexing, rich payload filtering, scalable ANN search, and strong operational ergonomics.
-
-Specific requirements for this system:
-
-1. **Sub-second write latency** — Flink emits embeddings at event time; the store must index them fast enough for the next RAG query to see them.
-2. **Payload filtering on metadata** — queries must be scoped by `patient_id`, `event_type`, `icd10_code`, and `source_system` without a separate metadata store.
-3. **Hybrid search** — dense vector similarity combined with sparse keyword matching for clinical terminology that embeddings may under-represent.
-4. **Embedding model versioning** — the system will evolve from `text-embedding-3-small` (1 536 dims) to domain-tuned models; the store must support multiple named collections and zero-downtime collection migration.
-5. **Lineage metadata per vector** — each vector payload must carry `embedding_model`, `model_version`, `source_event_id`, and `ingested_at` to support drift detection and reprocessing audits.
-6. **Open-source and self-hostable** — avoids managed-only lock-in; must run in Docker Compose locally and on Kubernetes in production.
+Healthcare events stream continuously through Kafka and Flink. The vector store must accept upserts quickly, support metadata filters and keep retrieval latency low enough for live GraphRAG queries.
 
 ## Decision
 
-Use **Qdrant** as the primary vector store for streaming healthcare embeddings.
-
-Qdrant is a Rust-based open-source vector database designed for high-throughput upserts and millisecond ANN queries. Its architecture aligns directly with the streaming embedding pipeline described in this system:
-
-- **Named collections per embedding model** — `medical_events_v1` (1 536 dims, cosine) and additional collections for upgraded models allow parallel serving during model transitions.
-- **Payload indexing** — `patient_id`, `event_type`, `icd10_code`, and `source_system` are indexed as payload fields, enabling filtered ANN without post-query pruning.
-- **Sparse + dense hybrid search** — Qdrant's native sparse vector support allows BM25-style term matching alongside dense similarity, addressing clinical terminology gaps in embeddings.
-- **Streaming upsert via gRPC** — Flink's Qdrant sink uses the gRPC `UpsertPoints` API; batched micro-upserts (default batch size 64) balance throughput against indexing latency.
-- **Vector payload for lineage** — every point stores `embedding_model`, `model_version`, `source_event_id`, and `ingested_at` as payload fields, satisfying governance requirements without a separate lineage store.
-- **Content-based deduplication** — Flink hashes event content before upsert; duplicate events detected by hash are skipped, reducing cost and preventing stale vector overwrites.
-
-### Collection schema (v1)
-
-```
-Collection: medical_events_v1
-  vectors:
-    dense:  size=1536, distance=Cosine
-    sparse: (BM25 tokenised clinical text)
-  payload_schema:
-    patient_id:      keyword  (indexed)
-    event_type:      keyword  (indexed)
-    icd10_code:      keyword  (indexed)
-    source_system:   keyword  (indexed)
-    embedding_model: keyword
-    model_version:   keyword
-    source_event_id: keyword
-    ingested_at:     datetime (indexed)
-    content_hash:    keyword
-```
-
-### Query pattern
-
-```python
-qdrant_client.search(
-    collection_name="medical_events_v1",
-    query_vector=("dense", question_embedding),
-    query_filter=Filter(
-        must=[
-            FieldCondition(key="patient_id", match=MatchValue(value=patient_id)),
-            FieldCondition(key="event_type", match=MatchAny(any=["diagnosis", "lab_result"])),
-        ]
-    ),
-    limit=10,
-    with_payload=True,
-)
-```
+Use Qdrant as the primary vector store for event embeddings. It supports collection-level metadata indexes, ANN search and fast insertion. The Flink pipeline writes embeddings to Qdrant with patient, event and domain metadata so agents can scope retrieval before generation.
 
 ## Consequences
 
 Positive:
 
-- Embeddings generated by Flink are queryable within seconds of event arrival, enabling true real-time RAG.
-- Payload-indexed filtering avoids full-collection scans; query latency remains stable as the collection grows.
-- Hybrid search improves recall for rare ICD-10 codes and drug names that dense embeddings may place imprecisely.
-- Lineage fields on every point allow detection of embedding drift and targeted reprocessing when models are upgraded.
-- Open-source with Docker and Helm chart support; no managed-service dependency.
+- Low-latency retrieval for fresh events.
+- Payload filtering keeps query scope precise.
+- The design is self-hostable and compatible with local Compose workflows.
 
 Trade-offs:
 
-- Qdrant is the second data store alongside Neo4j (ADR-0001), adding operational surface area.
-- Collection migration on model upgrade requires a dual-collection parallel-serve window and a backfill Flink job before cutting over.
-- Sparse vector indexing increases memory footprint; must be monitored for large clinical vocabularies.
-- gRPC batching introduces a small buffering delay (configurable); must be tuned against latency SLOs.
+- Collection management and migration are operational work.
+- Dense-only query mode is simpler than the original hybrid target.
+- Vector dimension changes require re-indexing and a provider switch plan.
 
 ## Alternatives Considered
 
-- **Pinecone**: managed service with strong streaming support but closed-source and external dependency; ruled out for self-hosted production requirement.
-- **pgvector**: simple PostgreSQL extension, but lacks native hybrid search, payload indexing, and the write throughput required for continuous Flink upserts at scale.
-- **Weaviate**: rich filtering and hybrid search comparable to Qdrant, but higher JVM-based resource consumption and more complex operator model.
-- **Milvus**: strong GPU-accelerated throughput but heavier deployment footprint (etcd, MinIO dependencies) inconsistent with lean Kubernetes baseline.
-- **Chroma**: excellent for local development but not production-grade for multi-node streaming workloads.
+- Pinecone: managed but externalized and less flexible for local-first development.
+- pgvector: simpler but weaker for streaming metadata filtering and large-scale ANN workloads.
+- Milvus or Weaviate: valid but heavier operational footprint.
 
 ## Rollout and Verification
 
-1. **Collection provisioning** — add `qdrant_init.py` script (called at stack startup) to create `medical_events_v1` with the schema above; idempotent on re-run.
-2. **Flink sink configuration** — configure `QdrantSink` with `batch_size=64`, `flush_interval_ms=200`, gRPC endpoint from `QDRANT_GRPC_HOST` env var.
-3. **Payload index creation** — apply `CreateFieldIndex` for `patient_id`, `event_type`, `icd10_code`, `ingested_at` after collection creation.
-4. **Embedding drift monitor** — Prometheus metric `qdrant_cosine_similarity_p50` scraped via Qdrant's `/metrics` endpoint; alert if p50 drops > 15 % week-over-week.
-5. **Latency SLO validation** — end-to-end test: produce a synthetic event → measure time until it is returned by a similarity query; target < 5 s at p95.
-6. **Model upgrade playbook** — create `medical_events_v2` collection → run backfill Flink job → run both collections in parallel for 48 h → switch RAG API query target → drop v1.
+- Provision the collection with the correct dimension and metadata fields.
+- Configure the Flink sink to write per-domain vectors and patient filters.
+- Validate latency and re-index procedures when moving between local MiniLM and Databricks embeddings.
+- Keep collection metadata aligned to the active embedding provider.
 
 ## Related
 
-- [ADR-0001: Dual Persistence (Qdrant + Neo4j)](./0001-dual-persistence-qdrant-neo4j.md)
-- [Architecture](../02_architecture.md)
-- [Kafka Schema](../04_data_platform.md)
-- [Conduktor — Vector Embeddings in Streaming](https://www.conduktor.io/glossary/vector-embeddings-in-streaming)
-
-## Implementation Note (2026-08-21)
-
-The current deployment uses a simplified Qdrant configuration compared to the target schema above:
-
-| Aspect | ADR Target | Current Implementation |
-| --- | --- | --- |
-| Collection name | `medical_events_v1` | `healthcare_events` |
-| Vector dimensions | 1,536 (text-embedding-3-small) | 384 (sentence-transformers/all-MiniLM-L6-v2) |
-| Vector config | Single unnamed vector | Named vectors per domain: `clinical`, `claims`, `device` |
-| Search mode | Dense + sparse hybrid | Dense only (per-domain) |
-| Client protocol | gRPC batched upserts | HTTP QdrantClient |
-| Payload indexes | Explicit `CreateFieldIndex` | Not explicitly created |
-| Lineage fields | `embedding_model`, `model_version`, `source_event_id`, `ingested_at` | `event_id`, `event_ts`, `event_type`, `patient_id`, `embedding_domain` |
-
-The accepted architectural direction remains valid. Domain-routed named vectors are now implemented with per-domain model configurability (`EMBEDDING_MODEL_CLINICAL`, `EMBEDDING_MODEL_CLAIMS`, `EMBEDDING_MODEL_DEVICE`). Migration to the full ADR-0002 schema (larger dimensions, sparse hybrid, gRPC batching) is planned alongside domain-tuned model deployment.
+- [ADR-0001](0001-dual-persistence-qdrant-neo4j.md)
+- [04_data_platform.md](../04_data_platform.md)
+- [08_operation_runbook.md](../08_operation_runbook.md)
+- [06_quality_assurance.md](../06_quality_assurance.md)

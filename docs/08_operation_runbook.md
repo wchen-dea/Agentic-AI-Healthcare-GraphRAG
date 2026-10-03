@@ -1,638 +1,248 @@
-# Healthcare GraphRAG Runbook
-
-## Purpose
-
-This runbook covers day-0 and day-2 operations for the local Docker Compose development stack, including startup, verification, recovery, and common failure handling.
-
-For production AI-only deployment boundaries and compose bundles, see [docs/07_cicd_automation.md](07_cicd_automation.md).
-
-Scope note:
-
-- The commands and defaults in this runbook are for local development and synthetic-demo operation.
-- Production-ready deployment configuration lives under `infra/` (Helm in `infra/helm/`, production Compose in `infra/environments/production/`) and should be operated with environment-specific security, secrets, networking, and platform controls.
-- For full deployment documentation including Helm charts, see [docs/07_cicd_automation.md](07_cicd_automation.md).
-
-## Prerequisites
-
-- Docker Compose
-- [uv](https://docs.astral.sh/uv/) (Python project manager)
-- curl
-- jq
-- make (for Makefile shortcuts)
-- Helm 3 (for Kubernetes deployments)
-- minikube (for local Kubernetes)
-
-Optional but useful:
-
-- cypher-shell access through the Neo4j container
-- Conduktor and Flink dashboards in browser
-
-## Makefile Quick Reference
-
-```bash
-make up          # Start infra + healthcare + supply-chain
-make up-hc       # Start infra + healthcare only
-make down-all    # Stop everything
-make ps          # Show running containers
-make neo4j-hc    # Healthcare cypher-shell
-make neo4j-sc    # Supply-chain cypher-shell
-make test-hc     # Run healthcare tests
-make topics      # List Kafka topics
-make clean       # Full cleanup with volume removal
-make validate-skills  # Validate agent skills for both domains
-make generate-skills  # Regenerate skill packages
-make validate-ontology # Validate ontology configs
-make helm-dev    # Deploy to minikube via Helm
-make helm-dev-down # Tear down minikube release
-make helm-ports  # Start all port-forwards
-make helm-ports-stop # Kill all port-forwards
-make helm-lint   # Lint Helm chart + template both envs
-make helm-prd    # Render production Helm templates (dry-run)
-make help        # Show all targets
-```
-
-## Core Commands
-
-Start or refresh services:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
-```
-
-Start supply-chain domain alongside healthcare:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml \
-  -f infra/compose/docker-compose.healthcare.yml \
-  -f infra/compose/docker-compose.supply-chain.yml \
-  up -d --build
-```
-
-Apply compose changes and remove deleted services:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
-```
-
-If you change `agent-service` source code, rebuild the image before recreating the service:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
-```
-
-### LangGraph Query Path
-
-ADR-0012 removed the former ReAct and single-pass rollback paths. LangGraph is now the only healthcare query path for `/query`, `/query/stream`, and MCP tools. To tune the bounded re-retrieval loop, set:
-
-```bash
-LANGGRAPH_MAX_ITERATIONS=3
-```
-
-Rebuild and recreate `agent-service` after source or configuration changes:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
-```
-
-Verify with a smoke query and ensure a `langgraph` object is present in the response:
-
-```bash
-curl -s -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Summarize hyperkalemia risk","patient_id":"patient-0001"}' | jq '.langgraph'
-```
-
-Expected: non-null object with `enabled`, `iterations`, `final_reason`, `confidence`, and `agent_trace`.
-
-### Optional: Enable MLflow Tracing
-
-Add or update these variables in `.env`:
-
-```bash
-MLFLOW_TRACKING_URI=http://mlflow:5000
-MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
-```
-
-Rebuild and recreate `agent-service`:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build agent-service
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate agent-service
-```
-
-Verify MLflow UI is reachable:
-
-```bash
-curl -s http://localhost:5000/health
-```
-
-After running queries, LangGraph traces appear in the MLflow Tracing UI at http://localhost:5000.
-
-Run planner test suites (CI-safe shortcut):
-
-```bash
-./domains/healthcare/scripts/test_planner.sh
-```
-
-Stop all services:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down
-```
-
-Stop and delete volumes (destructive):
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down -v
-```
-
-## Service Health Checklist
-
-### 1) Container Status
-
-```bash
-make ps  # or: docker compose -f infra/compose/docker-compose.infra.yml -p infra ps
-```
-
-Expected core services: kafka, kafka2, kafka3, schema-registry, flink-jobmanager, flink-taskmanager, flink-app, qdrant, neo4j, agent-service, producer, localstack.
-
-Note: MCP is embedded in the agents service in the current architecture; MCP is embedded in the agents process.
-
-Producer startup is intentionally blocked until `schema-registry` is healthy and `kafka-init` completes successfully.
-
-### 2) Flink Job Health
-
-```bash
-curl -s http://localhost:8082/jobs/overview | jq .
-```
-
-Expected steady-state:
-
-- HealthcareGraphRagPyFlinkJob in RUNNING state.
-- No demo auto-submit job by default.
-
-### 3) API Health
-
-```bash
-curl -s http://localhost:8000/health | jq .
-```
-
-Expected response:
-
-```json
-{"status":"ok"}
-```
-
-### 4) MCP Diagnostic Health
-
-```bash
-curl -s http://localhost:8000/mcp/health | jq .
-```
-
-Expected response includes:
-
-- status: ok
-- mcp.enabled: true
-- mcp.endpoint: /mcp
-
-### 5) MCP Handshake Smoke Test
-
-```bash
-python3 ./domains/healthcare/scripts/mcp_smoke_test.py
-```
-
-Expected output starts with:
-
-- MCP smoke test passed
-
-### 5a) Skills Layer Plan Endpoint Check
-
-```bash
-curl -s -X POST http://localhost:8000/skills/plan \
-  -H "Content-Type: application/json" \
-  -H "X-Caller-Role: read_only" \
-  -d '{"business_goal":"medication_safety_review"}' | jq .
-```
-
-Expected response includes:
-
-- `business_goal`
-- `agent`
-- `skills`
-- `mcp_tools`
-- `runtime_tools`
-
-### 6) Qdrant Collection
-
-```bash
-curl -s http://localhost:6333/collections | jq .
-```
-
-Expected collection includes healthcare_events.
-
-### 7) LocalStack Health
-
-```bash
-curl -s http://localhost:4566/_localstack/health | jq .
-```
-
-Expected response includes a LocalStack version plus a services object with available local AWS-compatible services.
-
-### 8) Neo4j Basic Check
-
-```bash
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (p:Patient) RETURN count(p) AS patients;'
-```
-
-Expected patients count increases over time as producer and stream processing continue.
-
-### 8a) Drug Safety Seeding Verification
-
-Verify `init.cypher` seeded the FAERS-aligned pharmacovigilance vocabulary:
-
-```bash
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (ao:AdverseOutcome) RETURN ao.code, ao.description ORDER BY ao.code;'
-```
-
-Expected: 6 rows — CA, DE, DS, HO, LT, OT.
-
-```bash
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (:Medication)-[r:HAS_KNOWN_REACTION]->(:Symptom) RETURN count(r) AS edges;'
-```
-
-Expected: 20 or more edges.
-
-```bash
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (m:Medication)-[r:CONTRAINDICATED_FOR]->(c:Condition) RETURN m.name, c.name, r.severity ORDER BY r.severity DESC LIMIT 8;'
-```
-
-Expected rows include: Metformin → Chronic Kidney Disease, Lisinopril → Hyperkalemia, Vancomycin → Chronic Kidney Disease.
-
-```bash
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (m:Medication)-[r:INTERACTS_WITH]->(m2:Medication) WHERE r.mechanism IS NOT NULL RETURN m.name, m2.name, r.mechanism LIMIT 5;'
-```
-
-Expected rows include Warfarin interactions with mechanism annotations.
-
-### 8b) Live Adverse Event and Lab Signal Check
-
-After the stack has been running for a few minutes:
-
-```bash
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (ae:AdverseEvent)-[:ASSOCIATED_WITH_MEDICATION]->(m:Medication) RETURN m.name, ae.symptom_name, ae.severity LIMIT 10;'
-```
-
-Expected: rows appear as clinical notes with matching symptoms are processed.
-
-```bash
-docker exec healthcare-neo4j cypher-shell -u neo4j -p healthcare123 \
-  'MATCH (o:Observation)-[mi:MAY_INDICATE]->(c:Condition) RETURN o.name, o.value, c.name, mi.reason LIMIT 10;'
-```
-
-Expected: rows appear as lab results cross clinical thresholds.
-
-### 9) Agent API Metrics Endpoint
-
-```bash
-curl -s http://localhost:8000/metrics | grep -E 'agent_service_(http_request_duration_seconds|tool_execution_duration_seconds|tool_execution_total)'
-```
-
-Expected result includes metric families:
-
-- agent_service_http_request_duration_seconds
-- agent_service_tool_execution_duration_seconds
-- agent_service_tool_execution_total
-
-### 10) Grafana Query Latency Panel
-
-In Grafana, open the Healthcare GraphRAG Monitoring Overview dashboard and verify the panel:
-
-- RAG Query Latency (p50/p95)
-
-The panel uses the query tool histogram and should display two series:
-
-- query p50
-- query p95
-
-### 11) MLflow Tracing Health (when enabled)
-
-```bash
-curl -s http://localhost:5000/health
-```
-
-Expected: HTTP 200. If the MLflow container is running, traces are viewable at http://localhost:5000.
-
-Verify traces are being recorded after a query:
-
-```bash
-curl -s -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Summarize hyperkalemia risk","patient_id":"patient-0001"}' > /dev/null
-# Then check MLflow UI for new trace spans
-```
-
-## Smoke Query
-
-```bash
-curl -s -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "Why might this patient have hyperkalemia risk and what evidence exists?",
-    "patient_id": "patient-0001"
-  }' | jq .
-```
-
-Expected top-level response fields:
-
-- `answer` — LLM-generated text grounded in both retrieval paths
-- `vector_context` — list of Qdrant ANN hits, each with `event_type`, `score`, `text_redacted`
-- `patients` — patient IDs resolved from vector hits plus the supplied `patient_id`
-- `trace_id`, `retrieved_at`, `guardrails`
-
-Each entry in `graph_context` contains:
-
-| Field | Content |
+# 08 — Operations Runbook
+
+How to run, check, observe and recover the platform, both on Docker Compose and on Kubernetes. Design background is in [02 — Architecture](02_architecture.md) and [03 — Platform Blueprint](03_platform_blueprint.md). Pipeline details are in [04 — Data Platform](04_data_platform.md), and agent behaviour is in [05 — AI Agents](05_ai_agents.md).
+
+All commands run from the repository root. Credentials come from the environment, for example `$NEO4J_PASSWORD`. Never paste them into tickets or logs.
+
+## 1. Prerequisites and service map
+
+Prerequisites:
+
+- Docker Desktop (or Docker Engine with Compose v2), with at least 16 GB RAM, 4 CPUs and about 10 GB of free disk
+- `uv` and Python 3.11 for tests and tooling
+- Node.js for the healthcare web UI dev server
+- For Kubernetes: `minikube`, `kubectl` and `helm`
+
+The stack is made of three Compose projects that share the external network `graphrag-net`:
+
+| Make variable | Project | Compose file | Container prefix |
+| --- | --- | --- | --- |
+| `DC_INFRA` | `infra` | `infra/compose/docker-compose.infra.yml` | `infra-` |
+| `DC_HC` | `healthcare` | `infra/compose/docker-compose.healthcare.yml` | `healthcare-` |
+| `DC_SC` | `supplychain` | `infra/compose/docker-compose.supply-chain.yml` | `supplychain-` |
+
+Host ports:
+
+| Service | Port(s) | Notes |
+| --- | --- | --- |
+| Healthcare agent API | 8000 | `/docs` for OpenAPI |
+| Supply-chain agent API | 8001 | |
+| Healthcare web UI | 8088 | |
+| Supply-chain web UI | 8089 | |
+| Qdrant (healthcare) | 6333, 6334 | REST and gRPC |
+| Qdrant (supply chain) | 6335, 6336 | REST and gRPC |
+| Neo4j (healthcare) | 7474, 7687 | Browser and Bolt |
+| Neo4j (supply chain) | 7475, 7688 | Browser and Bolt |
+| Flink UI (healthcare) | 8082 | |
+| Flink UI (supply chain) | 8083 | |
+| Kafka | 9092–9094 (host), 29092–29094 (in-network) | Three brokers |
+| ZooKeeper | 2181 | |
+| Schema Registry | 8081 | |
+| Conduktor Console | 8085 | 9080 when port-forwarded from Kubernetes |
+| Ollama | 11434 | |
+| MLflow | 5000 | |
+| Prometheus | 9090 | |
+| Blackbox exporter | 9115 | |
+| Grafana | 3000 | |
+| LocalStack | 4566 | |
+
+## 2. Lifecycle
+
+Run `make help` for the full target list.
+
+| Task | Command |
 | --- | --- |
-| `conditions` | Diagnosed conditions with onset timestamps |
-| `symptoms` | Symptoms extracted from clinical notes |
-| `observations` | Lab results with `lab_panel` and `specimen_type` |
-| `medications` | Orders with `drug_class`, `route`, `order_type` |
-| `interactions` | Drug-drug pairs with `risk`, `severity`, `mechanism` |
-| `vitals` | Device readings with `temp_c`, `rr`, `alert` |
-| `claims` | Claims with `Procedure` description and `Payer` name |
-| `lab_signals` | `MAY_INDICATE` edges: observation → indicated condition |
-| `icd10_codes` | `CODED_AS` edges: condition → ICD-10 code |
-| `adverse_events` | `REPORTED_ADVERSE_REACTION` with medication, MedDRA term, severity |
-| `contraindications` | `CONTRAINDICATED_FOR` edges active for current medication orders |
+| Start infra and both domains | `make up` |
+| Start infra and one domain | `make up-hc` or `make up-sc` |
+| Pull the local LLM | `make pull-model` (`llama3.1` into `infra-ollama`) |
+| Build images | `make build` (healthcare), `make build-sc`, `make build-all` |
+| Restart one domain | `make restart` (healthcare) or `make restart-sc` |
+| Stop everything | `make down` (uses `--remove-orphans`) |
+| Wipe volumes and prune | `make clean` |
+| Rebuild from scratch | `make fresh` (`clean`, `up`, `pull-model`) |
+| Container status | `make ps` |
+| Follow logs | `make logs` (healthcare) or `make logs-sc` |
+| List Kafka topics | `make topics` |
 
-## Flink Operations
+Resets:
 
-### List Running Jobs
+- **Soft reset** keeps data: `make down && make up`.
+- **Hard reset** deletes Neo4j, Qdrant, Kafka and MLflow volumes: `make clean && make up && make pull-model`. The `neo4j-init` containers re-seed the ontology and the producers repopulate the stores.
 
-```bash
-curl -s http://localhost:8082/jobs/overview | jq '.jobs[] | {jid, name, state}'
-```
+## 3. Health checklist
 
-### Cancel A Job
+Run these after every start or deployment. `make validate` runs the scripted equivalent (`scripts/validate_all_stacks.sh`).
 
-```bash
-curl -s -X PATCH http://localhost:8082/jobs/<job_id>
-```
+| Check | Command | Expect |
+| --- | --- | --- |
+| Agent APIs | `make api-hc`, `make api-sc` | `status` is `ok` |
+| MCP endpoint | `curl -s localhost:8000/mcp/health` | `mcp.enabled` is true and the endpoint is `/mcp` |
+| MCP tools end to end | `python3 domains/healthcare/scripts/mcp_smoke_test.py` | All tools listed and callable |
+| Skill planner | see below | A plan for `medication_safety_review` |
+| Flink jobs | `make flink-hc`, `make flink-sc` | One `RUNNING` job per domain |
+| Qdrant collections | `make qdrant-hc`, `make qdrant-sc` | `points_count` grows; vector size matches the embedding provider (384 for MiniLM, 1024 for Databricks GTE) |
+| Neo4j | `make neo4j-hc`, `make neo4j-sc` | Cypher shell opens |
+| MLflow | `make mlflow` | `OK` |
+| LocalStack | `curl -s localhost:4566/_localstack/health` | Services listed |
 
-### View Job Exceptions
-
-```bash
-curl -s http://localhost:8082/jobs/<job_id>/exceptions | jq .
-```
-
-### Inspect Submitter Logs
-
-```bash
-docker logs --tail=200 healthcare-flink-app
-```
-
-Expected line after successful submission:
-
-- Job has been submitted with JobID ...
-
-## Skills Package Operations
-
-Generate Agent Skills package files from the runtime skills layer config:
+Skill planner check:
 
 ```bash
-python domains/healthcare/scripts/generate_agent_skills.py
-python domains/supply-chain/scripts/generate_agent_skills.py
+curl -s -X POST localhost:8000/skills/plan \
+  -H 'Content-Type: application/json' \
+  -H 'X-Caller-Role: read_only' \
+  -d '{"business_goal":"medication_safety_review"}'
 ```
 
-Check for drift without modifying files:
+Healthcare Neo4j seed checks:
 
 ```bash
-python domains/healthcare/scripts/generate_agent_skills.py --check
-python domains/supply-chain/scripts/generate_agent_skills.py --check
+docker exec healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
+  "MATCH (o:AdverseOutcome) RETURN o.code ORDER BY o.code"
+# expect CA, DE, DS, HO, LT, OT
+
+docker exec healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
+  "MATCH ()-[r:HAS_KNOWN_REACTION]->() RETURN count(r)"
+# expect at least 20
+
+docker exec healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
+  "MATCH (m:Medication)-[:CONTRAINDICATED_FOR]->(c) RETURN m.name, c.name"
+# includes Metformin→CKD, Lisinopril→Hyperkalemia, Vancomycin→CKD
 ```
 
-Validate generated skill folders and SKILL.md frontmatter:
+Live-data checks, once the producer has run for a minute:
 
 ```bash
-python domains/healthcare/scripts/validate_agent_skills.py
-python domains/supply-chain/scripts/validate_agent_skills.py
+docker exec healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
+  "MATCH (:AdverseEvent)-[r:ASSOCIATED_WITH_MEDICATION]->() RETURN count(r)"
+docker exec healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
+  "MATCH ()-[r:MAY_INDICATE]->() RETURN count(r)"
 ```
 
-## Common Failure Modes And Fixes
+`neo4j-init` verifies edge counts after seeding. If it logs `Could not read ... edge count (got: ''); skipping verification`, the count query returned no output. The seed itself is fine; run the queries above by hand to confirm.
 
-### 1) Orphan Container From Removed Service
-
-Symptom:
-
-- docker compose warns about orphan containers from older compose revisions.
-
-Fix:
+## 4. Smoke queries
 
 ```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
+curl -s -X POST localhost:8000/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Summarize recent adverse events for this patient","patient_id":"patient-0001"}'
 ```
 
-### 2) Unexpected Non-Healthcare Flink Job Running
+The response holds `answer`, `vector_context`, `graph_context`, `patients`, `trace_id`, `retrieved_at`, `guardrails` and `langgraph` (`enabled`, `iterations`, `final_reason`, `confidence`, `agent_trace`). The full field list is in [05 — AI Agents](05_ai_agents.md#8-http-api).
 
-Symptom:
+More examples: `make query-hc` and `make query-sc`, which run `domains/*/scripts/query_examples.sh`.
 
-- jobs/overview includes old demo job IDs from a previous run.
+## 5. Observability
 
-Fix:
+| Tool | Where | What to look at |
+| --- | --- | --- |
+| Prometheus | `localhost:9090` | Scrapes every 15 s. Jobs: `qdrant`, `agent_service`, `neo4j_probe`, `kafka_probe`, `flink_probe` |
+| Blackbox exporter | `localhost:9115` | `http_2xx` and `tcp_connect` probes, 5 s timeout |
+| Grafana | `localhost:3000` | `healthcare-monitoring-overview` and `kafka-flink-service-health` dashboards |
+| MLflow | `localhost:5000` | Agent traces and evaluation runs |
+| Conduktor | `localhost:8085` | Topics, consumer lag, messages |
 
-1. Cancel old job:
+Agent metrics:
+
+- `agent_service_http_request_duration_seconds` — request latency; the Grafana panel "RAG Query Latency (p50/p95)" uses it
+- `agent_service_tool_execution_duration_seconds` and `agent_service_tool_execution_total` — MCP tool latency and outcomes
+
+Alerts in `infra/observability/prometheus-alerts.yml`:
+
+| Alert | Meaning | First step |
+| --- | --- | --- |
+| `Neo4jProbeDown` | Neo4j HTTP is unreachable | `docker logs healthcare-neo4j` |
+| `Neo4jProbeLatencyHigh` | Neo4j responds slowly | Check heap and long-running queries |
+| `QdrantTargetDown` | Qdrant metrics scrape fails | `docker logs healthcare-qdrant` |
+| `KafkaProbeDown` | Broker TCP probe fails | `docker logs infra-kafka` |
+| `FlinkJobManagerProbeDown` | Flink JobManager is unreachable | `docker logs healthcare-flink-jobmanager` |
+
+MLflow tracing is on when `MLFLOW_TRACKING_URI` is set; `MLFLOW_EXPERIMENT_NAME` selects the experiment. Use `trace_id` from a response to find the run.
+
+The DLQ topic `healthcare.dlq.events` is provisioned but nothing writes to it yet.
+
+## 6. Flink operations
 
 ```bash
-curl -s -X PATCH http://localhost:8082/jobs/<demo_job_id>
+curl -s localhost:8082/jobs/overview                     # list jobs
+curl -s localhost:8082/jobs/<job-id>/exceptions          # last failure
+curl -s -X PATCH "localhost:8082/jobs/<job-id>?mode=cancel"
+docker logs healthcare-flink-app --tail=200
 ```
 
-2. Ensure no old submitter container exists:
+The healthcare job is `HealthcareGraphRagPyFlinkJob`. Use port 8083 and the `supplychain-` containers for supply chain. To redeploy a job, cancel it and run `docker compose -p healthcare -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate flink-app` (or `sc-flink-app` in the supply-chain project).
 
-```bash
-make ps  # or: docker compose -f infra/compose/docker-compose.infra.yml -p infra ps
-```
+## 7. Embedding provider switch and re-index
 
-3. Re-run with orphan cleanup:
+Ingest (Flink) and query (agent) must use the same embedding model and dimension. See [04 — Data Platform](04_data_platform.md#embeddings).
 
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --remove-orphans
-```
+| Setting | Dev | Production |
+| --- | --- | --- |
+| `EMBEDDING_PROVIDER` | `local` (`all-MiniLM-L6-v2`) | `databricks` |
+| `DATABRICKS_EMBEDDING_ENDPOINT` | — | `databricks-gte-large-en` |
+| `EMBEDDING_DIM` | 384 | 1024 |
+| `EMBEDDING_REQUIRE_MODEL` | `true` (compose default) | `true`, so startup fails instead of falling back to hashed vectors |
 
-### 3) PyFlink Python Worker Not Found
+After any change to these settings, re-index:
 
-Symptom:
+1. Delete both collections:
 
-- TaskManager errors about Cannot run program python.
+   ```bash
+   curl -s -X DELETE localhost:6333/collections/healthcare_events
+   curl -s -X DELETE localhost:6335/collections/supplychain_events
+   ```
 
-Checks:
+2. Force-recreate `flink-app` and `agent-service` in the healthcare project, and `sc-flink-app` and `sc-agent-service` in the supply-chain project.
+3. Let the producers replay events, or restart them.
+4. On Kubernetes, set identical `EMBEDDING_*` values in the agent chart `secrets` and the Flink chart `secretEnv`.
 
-```bash
-docker exec healthcare-flink-taskmanager which python
-docker exec healthcare-flink-taskmanager which python3
-```
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Qdrant `wrong vector dimension` | Collection was created with the other provider | Re-index |
+| Relevant evidence missing | Ingest and query use different models | Align `EMBEDDING_*` and re-index |
+| Startup fails with `EMBEDDING_REQUIRE_MODEL` | Model could not load | Check the image includes the model, or the Databricks endpoint and token |
+| Databricks `401`/`403` | Token missing or lacks endpoint access | Fix the secret and the serving-endpoint permissions |
 
-Expected:
+## 8. Sessions and human review
 
-- /usr/bin/python exists as symlink to python3.
-- FLINK_PROPERTIES include python.executable and submission uses -Dpython.executable.
+- Multi-turn memory is keyed by `session_id`. The default store is in-process (`SESSION_STORE_BACKEND=memory`), so sessions are lost on restart and are not shared between replicas. Use `SESSION_STORE_BACKEND=redis` with `REDIS_URL` for shared sessions. `SESSION_TTL_SECONDS` defaults to 3600 and at most 20 turns are kept.
+- Human review is off unless `HITL_ENABLED=true`. Paused runs return `status: "pending_review"` and a `thread_id`. Resume them with:
 
-Recovery:
+  ```bash
+  curl -s -X POST localhost:8000/query/resume \
+    -H 'Content-Type: application/json' \
+    -d '{"thread_id":"<thread-id>","decision":"approve","note":"checked"}'
+  ```
 
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build --force-recreate flink-jobmanager flink-taskmanager flink-app
-```
+- Pending reviews live in LangGraph's in-memory checkpointer and are lost on restart. Run one agent replica, or use sticky routing, while HITL is enabled. `HITL_MAX_PENDING` (default 1000) caps open reviews.
 
-### 4) Kafka Connector Class Errors In Flink
+## 9. Kubernetes and Helm
 
-Symptom:
+The umbrella chart is `infra/helm` with sub-charts under `infra/helm/charts`. Dev uses namespace `healthcare-ai-dev` (release `healthcare-dev`); production uses `healthcare-ai` (release `healthcare`). See [03 — Platform Blueprint](03_platform_blueprint.md#3-kubernetes-with-helm).
 
-- ClassNotFound or NoClassDefFound errors for Kafka connector/runtime classes.
+| Task | Command |
+| --- | --- |
+| Deploy to minikube | `make helm-dev` (runs `infra/environments/dev/setup-minikube.sh`) |
+| Port-forward services | `make helm-ports`; stop with `make helm-ports-stop` |
+| Tear down dev | `make helm-dev-down` |
+| Lint and render | `make helm-lint`, `make helm-prd` (dry-run only) |
+| Pull the model in-cluster | `kubectl -n healthcare-ai-dev exec deploy/ollama -- ollama pull llama3.1` |
 
-Checks:
-
-```bash
-docker exec healthcare-flink-jobmanager ls -1 /opt/flink/lib | grep -E 'flink-connector-kafka|kafka-clients'
-```
-
-Recovery:
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml build --no-cache flink-jobmanager flink-taskmanager flink-app
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --force-recreate flink-jobmanager flink-taskmanager flink-app
-```
-
-### 5) Ollama Model Not Available
-
-Symptom:
-
-- API answer reports no model installed or model not found.
-- In dev/local environments using Ollama as `LLM_PROVIDER`.
-
-Fix (Docker Compose):
-
-```bash
-docker exec -it infra-ollama ollama pull llama3.1
-```
-
-Fix (Minikube/Helm):
-
-```bash
-kubectl -n healthcare-ai-dev exec deploy/ollama -- ollama pull llama3.1
-```
-
-Note: Production uses AWS Bedrock (primary) with optional Anthropic fallback — Ollama is not deployed. If cloud generation fails, check the pod IAM role, Bedrock model access in the configured region, and `ANTHROPIC_API_KEY` when fallback is enabled.
-
-### 6) Conduktor Message Cannot Be Displayed (Bytes Deserializer)
-
-Symptom:
-
-- `Message cannot be displayed`
-- `The data masking rules cannot be applied with bytes deserializer`
-
-Cause:
-
-- Topic value deserializer is set to `Bytes` while payloads are Confluent Avro on wire.
-
-Fix in Conduktor:
-
-1. Set key deserializer to `String`.
-1. Set value deserializer to `Avro (Schema Registry)`.
-1. Ensure Schema Registry endpoint is `http://schema-registry:8081`.
-1. Refresh the topic messages view.
-
-Note:
-
-- `payload_json` is a string field in the current envelope schema.
-- Field masking applies to envelope fields, but not nested JSON keys inside `payload_json`.
-
-## Data Reset Procedures
-
-### Soft Restart (keep volumes)
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
-```
-
-### Hard Reset (delete all local data)
-
-Warning: this removes Kafka, Qdrant, Neo4j, and Grafana/Prometheus local state.
-
-```bash
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml down -v
-docker compose -f infra/compose/docker-compose.infra.yml -f infra/compose/docker-compose.healthcare.yml up -d --build
-```
-
-## Post-Change Validation
-
-After changing compose, streaming code, or docs:
-
-```bash
-./scripts/validate_docs.sh
-./scripts/validate_all_stacks.sh
-make validate-skills
-make validate-ontology
-curl -s http://localhost:8082/jobs/overview | jq .
-```
-
-For Helm deployments:
-
-```bash
-helm template dev infra/helm -f infra/helm/values-dev.yaml > /dev/null && echo OK
-helm template prd infra/helm -f infra/helm/values-production.yaml > /dev/null && echo OK
-```
-
-Confirm:
-
-- docs lint passes,
-- stack checks pass,
-- only HealthcareGraphRagPyFlinkJob is actively running unless intentionally launching additional jobs.
-
-## Kubernetes / Helm Operations
-
-### Deploy dev (minikube)
-
-```bash
-infra/environments/dev/setup-minikube.sh
-# Or manually:
-minikube start --cpus=4 --memory=8192
-helm install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace
-```
-
-### Deploy production
+Production install. Supply secrets from your secret store; never commit them:
 
 ```bash
 helm install healthcare infra/helm \
   -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
-  --set agent-service.secrets.NEO4J_PASSWORD=<value> \
-  --set agent-service.secrets.OPENAI_API_KEY=<value> \
-  --set agent-service.secrets.ANTHROPIC_API_KEY=<value>
-```
+  --set agent-service.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
+  --set agent-service.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
 
-`OPENAI_API_KEY` is optional; set it only when using the OpenAI provider or fallback.
-
-### Upgrade
-
-```bash
 helm upgrade healthcare infra/helm -f infra/helm/values-production.yaml -n healthcare-ai
+helm rollback healthcare <revision> -n healthcare-ai
 ```
 
-### Rollback
-
-```bash
-helm rollback healthcare 1 -n healthcare-ai
-```
-
-### Check pod health
+Checks:
 
 ```bash
 kubectl -n healthcare-ai-dev get pods
@@ -640,71 +250,71 @@ kubectl -n healthcare-ai-dev logs deploy/agent-service --tail=50
 kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000/health
 ```
 
-### Tear down dev
+## 10. Troubleshooting
 
-```bash
-make helm-dev-down
-minikube delete
-```
-
-### Port-forwards (macOS Docker driver)
-
-On macOS with Docker driver, NodePorts are not directly accessible. Use port-forwards:
-
-```bash
-make helm-ports       # start all port-forwards
-make helm-ports-stop  # kill all port-forwards
-```
-
-Services:
-
-- Agent API: `http://localhost:8000`
-- Web UI: `http://localhost:8088`
-- Neo4j: `http://localhost:7474`
-- Qdrant: `http://localhost:6333/dashboard`
-- Conduktor: `http://localhost:9080`
-
-### Minikube Troubleshooting
+### Compose stack
 
 | Symptom | Cause | Fix |
-|---------|-------|-----|
-| `K8S_APISERVER_MISSING` on start | Stale cluster state | `minikube delete && make helm-dev` |
-| Confluent pods crash: "PORT is deprecated" | Kubernetes service-linked env vars | `enableServiceLinks: false` on pod spec (already set in charts) |
-| Neo4j crash: "Unrecognized setting PORT" | Same service-link env var injection | Same fix |
-| Ollama OOM killed | Not enough memory for model | Default is 16GB; use `MINIKUBE_MEMORY=20480 make helm-dev` for llama3.1 |
-| `ImagePullBackOff` | Image not built in minikube's Docker | `eval $(minikube docker-env) && docker build ...` (setup-minikube.sh does this automatically) |
-| Flink blob transfer timeout | Missing port 6124 on jobmanager service | Already fixed in chart |
-| Query takes 2-3 minutes | CPU-only LLM inference | Expected for qwen2.5:1.5b; use Docker Compose for GPU/Metal acceleration |
-| Port-forward dies mid-request | kubectl limitation with long connections | Re-run `make helm-ports` |
+| --- | --- | --- |
+| "Found orphan containers" | Old services from earlier layouts | `make down` (uses `--remove-orphans`) |
+| Agent `503` | Neo4j or Qdrant not ready | Wait for health checks; check `make ps` |
+| LLM calls fail on first start | Ollama model not pulled | `make pull-model` |
+| Network `graphrag-net` not found | Domain started without infra | `make up` or `make up-hc` |
 
-### Minimum Requirements (Minikube)
+### Flink
 
-- Docker Desktop: allocate at least 16GB RAM to Docker engine
-- `minikube start --cpus=4 --memory=16384`
-- Disk: ~10GB for images + model weights
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Old demo job still running | Stale job from an earlier deploy | Cancel it (section 6) and recreate `flink-app` |
+| `python: not found` in the task manager | PyFlink cannot find Python | The image symlinks `/usr/bin/python`; check `python.executable` in the Flink config |
+| `ClassNotFoundException` for the Kafka connector | Connector jars missing from `/opt/flink/lib` | Rebuild the Flink image with `--no-cache` |
+| Job restarts in a loop | Sink or deserialisation error | Read `/jobs/<id>/exceptions` |
 
-## LLM Provider Troubleshooting
+### LLM providers
 
-Provider selection is controlled by `LLM_PROVIDER`, `LLM_MODEL`, `LLM_MAX_TOKENS`, and `LLM_TIMEOUT_SECONDS` (see `.env.example`).
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Databricks `404` | Wrong serving endpoint name | Fix `LLM_MODEL` / the endpoint name |
+| Databricks `400` on `temperature` | Model rejects the parameter | Retried automatically without it |
+| Answers cut off | Token limit too low | Raise `LLM_MAX_TOKENS` (compose sets 4096) and `LLM_TIMEOUT_SECONDS` |
+| Bedrock `AccessDenied` | IAM role lacks `bedrock:InvokeModel` | Fix the role or region |
+| `ANTHROPIC_API_KEY not set` | Secret not injected | `kubectl -n healthcare-ai get secret agent-service-secrets` |
+| Slow answers on CPU | Local inference | Expected; use a smaller model or a hosted provider |
 
-| Env | Provider | Symptom | Check |
-|-----|----------|---------|-------|
-| Local / Dev | Databricks | HTTP 404 from serving endpoint | `LLM_MODEL` must be the serving **endpoint** name (e.g. `databricks-gpt-5-6-luna`), not a Unity Catalog model name; verify `DATABRICKS_HOST` / `DATABRICKS_TOKEN` |
-| Local / Dev | Databricks | HTTP 400 mentioning `temperature` | Handled automatically — the provider retries without `temperature`; no action needed |
-| Local / Dev | Databricks | Truncated or empty answers, timeouts | Raise `LLM_MAX_TOKENS` (compose default `4096`) and `LLM_TIMEOUT_SECONDS` (default `120`); calls can take ~50s |
-| Local / Dev | Ollama (alternative) | "no models installed" | `ollama pull llama3.1` in the ollama pod/container, with `LLM_PROVIDER=ollama` |
-| Prod | Bedrock | Access denied / model not found | Verify IAM role / `AWS_REGION` and model access for `LLM_MODEL` |
-| Prod | Anthropic (fallback) | "ANTHROPIC_API_KEY not set" | Verify secret injection via `kubectl get secret agent-service-secrets -o yaml` |
-| Prod | Both fail | "LLM error" in answer | Check network egress to Bedrock and `api.anthropic.com` |
+### Minikube
 
-## Escalation Notes
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `K8S_APISERVER_MISSING` | Stale cluster state | `minikube delete && make helm-dev` |
+| Pods crash on env var collisions | Kubernetes service links | Charts set `enableServiceLinks: false`; keep it |
+| Ollama `OOMKilled` | Not enough memory | `MINIKUBE_MEMORY=20480 make helm-dev` |
+| `ImagePullBackOff` | Image built outside minikube's Docker | `eval $(minikube docker-env)` and rebuild; the setup script does this |
+| Flink task manager cannot register | RPC port blocked | Check port 6124 in the network policy |
+| Port-forward drops | `kubectl` limit on long connections | Re-run `make helm-ports` |
 
-For persistent stream failures, capture and share:
+### Conduktor
 
-- docker compose ps
-- docker logs --tail=400 healthcare-flink-app
-- docker logs --tail=400 healthcare-flink-taskmanager
-- `curl -s http://localhost:8082/jobs/overview | jq .`
-- `curl -s http://localhost:8082/jobs/JOB_ID/exceptions | jq .`
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Messages show as bytes | Default deserializer | Choose Avro (Schema Registry) with `http://schema-registry:8081` |
+| Payload looks escaped | `payload_json` is a JSON string inside Avro | Expected; parse it client-side |
 
-These artifacts are typically sufficient to identify whether the issue is submission, dependency, connector, or runtime-state related.
+## 11. Escalation
+
+Collect before escalating:
+
+- `make ps` output and the failing container's logs (`docker logs <container> --tail=500`)
+- `/health` and `/mcp/health` responses
+- the `trace_id` of the failing request, and the MLflow trace for it
+- Flink `/jobs/<id>/exceptions` for pipeline issues
+- the active `LLM_*` and `EMBEDDING_*` settings, without secrets
+
+Raise `LANGGRAPH_MAX_ITERATIONS` (default 3) only to diagnose low-confidence loops, and revert afterwards.
+
+## Related
+
+- [03 — Platform Blueprint](03_platform_blueprint.md) — deployment topology and configuration
+- [04 — Data Platform](04_data_platform.md) — topics, Flink jobs, stores
+- [05 — AI Agents](05_ai_agents.md) — API and configuration reference
+- [06 — Quality Assurance](06_quality_assurance.md) — tests and evaluation gates
+- [07 — CI/CD Automation](07_cicd_automation.md) — pipelines and local equivalents
