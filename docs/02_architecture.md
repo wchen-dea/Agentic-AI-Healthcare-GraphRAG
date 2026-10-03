@@ -14,10 +14,10 @@ flowchart LR
     mcpClient[MCP client<br/>IDE, other agents] --> mcp
     web --> api[agent-service<br/>FastAPI]
     api --- mcp[MCP server<br/>/mcp]
-    api --> graph[LangGraph<br/>workflow]
-    graph --> qdrant[(Qdrant<br/>vectors)]
-    graph --> neo4j[(Neo4j<br/>graph)]
-    graph --> llm[LLM provider<br/>Ollama / Databricks / Bedrock / ...]
+    api --> lg[LangGraph<br/>workflow]
+    lg --> qdrant[(Qdrant<br/>vectors)]
+    lg --> neo4j[(Neo4j<br/>graph)]
+    lg --> llm[LLM provider<br/>Ollama / Databricks / Bedrock / ...]
     producer[Event producer] --> kafka[(Kafka)]
     kafka --> flink[Flink job]
     flink --> qdrant
