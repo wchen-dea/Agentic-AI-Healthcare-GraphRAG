@@ -128,6 +128,27 @@ class AgentServiceContractTests(unittest.TestCase):
         self.assertEqual(audit_event["patient_scope"], ["patient-1"])
         self.assertEqual(audit_event["caller_id"], "role:generation")
 
+    def test_query_resume_unknown_thread_returns_404(self) -> None:
+        rag_app = self.load_module(
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "resume-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+        client = TestClient(rag_app.app)
+
+        response = client.post(
+            "/query/resume",
+            json={"thread_id": "unknown-thread", "decision": "approve"},
+            headers={"X-Caller-Role": "generation"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+        denied = client.post(
+            "/query/resume",
+            json={"thread_id": "unknown-thread", "decision": "approve"},
+            headers={"X-Caller-Role": "read_only"},
+        )
+        self.assertEqual(denied.status_code, 401)
+
     def test_query_enforces_role_policy(self) -> None:
         rag_app = self.load_module(
             AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "auth-audit.log"),
@@ -233,6 +254,44 @@ class AgentServiceContractTests(unittest.TestCase):
         self.assertTrue(response.headers.get("mcp-session-id"))
         self.assertIn("mcp-session-id", response.headers.get("access-control-expose-headers", "").lower())
         self.assertIn('"id":"init-1"', response.text)
+
+    def test_mcp_surface_exposes_tool_metadata_skills_resources_and_prompt(self) -> None:
+        import asyncio
+
+        from healthcare_agent.tools.mcp_server import TOOL_SPECS
+
+        rag_app = self.load_module(
+            AGENT_AUDIT_LOG_PATH=str(Path(self.tmpdir.name) / "mcp-surface-audit.log"),
+            AGENT_TOOL_POLICY_PATH=str(self.policy_path),
+        )
+        mcp = rag_app.mcp
+        tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+        for spec in TOOL_SPECS:
+            self.assertEqual(tools[spec.name].title, spec.title)
+            self.assertTrue(tools[spec.name].description)
+            self.assertTrue(tools[spec.name].annotations.readOnlyHint)
+        self.assertTrue(tools["patient_context_get"].annotations.idempotentHint)
+        self.assertTrue(tools["graphrag_answer_generate"].annotations.openWorldHint)
+        self.assertIn("patient_id", tools["patient_context_get"].inputSchema["properties"])
+        self.assertTrue(mcp.instructions)
+
+        resources = {str(r.uri) for r in asyncio.run(mcp.list_resources())}
+        self.assertIn("skills://catalog", resources)
+        catalog = json.loads(next(iter(asyncio.run(mcp.read_resource("skills://catalog")))).content)
+        self.assertIn("clinical_deterioration_triage", catalog["business_goals"])
+        skill_id = catalog["skills"][0]["id"]
+        skill = json.loads(next(iter(asyncio.run(mcp.read_resource(f"skills://{skill_id}")))).content)
+        self.assertEqual(skill["id"], skill_id)
+
+        prompt = asyncio.run(
+            mcp.get_prompt(
+                "clinical_review",
+                {"business_goal": "clinical_deterioration_triage", "subject_id": "patient-1"},
+            )
+        )
+        text = prompt.messages[0].content.text
+        self.assertIn("Patient: patient-1", text)
+        self.assertIn("clinical_triage_agent", text)
 
     def test_mcp_export_defaults_to_bounded_text_and_denies_raw_payload(self) -> None:
         rag_app = self.load_module(

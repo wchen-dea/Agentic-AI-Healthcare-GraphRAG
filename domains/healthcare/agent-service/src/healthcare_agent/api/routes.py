@@ -17,7 +17,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from healthcare_agent.agents.registry import AGENT_REGISTRY
 from healthcare_agent.api.responses import ResponseShaper
-from healthcare_agent.api.schemas import QueryRequest, SkillsPlanRequest
+from healthcare_agent.api.schemas import QueryRequest, ResumeRequest, SkillsPlanRequest
 from healthcare_agent.config.settings import HealthcareAgentSettings
 from healthcare_agent.orchestration.query_service import QueryService
 from healthcare_agent.tools.skills import SkillsLayerError, build_skill_plan
@@ -130,6 +130,55 @@ def build_router(
                     trace_id,
                     caller_role=caller_role,
                 ),
+            )
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @router.post("/query/resume")
+    def query_resume(req: ResumeRequest, x_caller_role: str | None = CALLER_ROLE_HEADER) -> dict[str, Any]:
+        """Approve or reject a run paused for human review (``status="pending_approval"``).
+
+        Authorization is scoped to the paused run's patient, so a caller cannot
+        resume a thread for a patient outside its scope.
+        """
+        caller_role = governance.resolve_caller_role(x_caller_role)
+        request_payload = req.model_dump(exclude_none=True)
+        # Role check first so unauthorized callers cannot probe which threads exist.
+        try:
+            governance.authorize_or_audit_denial(
+                tool_name="query",
+                caller_role=caller_role,
+                request_payload=request_payload,
+                scope=scope_for(None),
+                started_at=time.time(),
+                trace_id=str(uuid.uuid4()),
+            )
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        pending = queries.pending_review(req.thread_id)
+        if pending is None:
+            raise HTTPException(status_code=404, detail="No pending review for this thread_id.")
+
+        def run(trace_id: str) -> dict[str, Any]:
+            try:
+                result = queries.resume(
+                    req.thread_id, req.decision, note=req.note, session_id=req.session_id
+                )
+            except KeyError as exc:
+                raise HTTPException(
+                    status_code=404, detail="No pending review for this thread_id."
+                ) from exc
+            return responses.query_response(result, trace_id, caller_role=caller_role)
+
+        try:
+            return governance.execute(
+                tool_name="query",
+                caller_role=caller_role,
+                request_payload=request_payload,
+                scope=scope_for(pending.get("patient_id")),
+                fn=run,
             )
         except AuthorizationError as exc:
             raise HTTPException(status_code=401, detail=str(exc)) from exc

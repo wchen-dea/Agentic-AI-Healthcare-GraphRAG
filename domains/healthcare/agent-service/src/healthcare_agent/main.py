@@ -15,10 +15,10 @@ from functools import lru_cache
 from typing import Any
 
 from agent_core.governance import ToolGovernance
+from agent_core.mcp_server import build_mcp_server
 from agent_core.metrics import ServiceMetrics
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from mcp.server.fastmcp import FastMCP
 from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
 
@@ -128,13 +128,19 @@ queries = QueryService(
     max_context_items=settings.max_context_items,
     orchestrator=orchestrator,
 )
+MCP_INSTRUCTIONS = (
+    "Healthcare GraphRAG tools over a patient knowledge graph and clinical evidence. Patient-scoped tools"
+    " require a patient_id; read skills://catalog or call skills_plan_get to choose tools for a business "
+    "goal. Outputs are decision support, not clinical advice."
+)
+
 mcp_tools = HealthcareMcpTools(
     settings=settings, governance=governance, responses=responses, queries=queries, load_skills=load_skills
 )
 
 # ── Transports: MCP (streamable HTTP at /mcp) and the FastAPI app ───────────
 
-mcp = FastMCP(settings.mcp_server_name)
+mcp = build_mcp_server(settings, name=settings.mcp_server_name, instructions=MCP_INSTRUCTIONS)
 mcp_tools.register(mcp)
 mcp_http_app = mcp.streamable_http_app()
 

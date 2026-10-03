@@ -329,8 +329,7 @@ Dev defaults to local Ollama for zero-cost iteration.
 Multi-agent orchestration is implemented via LangGraph with specialist agents for
 medication safety, lab interpretation, and coding review. ADR-0012 removed the former
 ReAct and single-pass query paths, so LangGraph is the only query path for REST, SSE, and
-MCP. Agent execution is traceable through MLflow spans and LangSmith traces when the
-respective tracking backends are configured.
+MCP. Agent execution is traceable through MLflow spans when an MLflow tracking backend is configured.
 
 ### Guardrails enforced at the API layer
 

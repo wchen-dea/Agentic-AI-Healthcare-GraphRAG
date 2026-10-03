@@ -113,7 +113,7 @@ This architecture intentionally combines several patterns so streaming ingestion
 | Dual Materialized Views | Qdrant (semantic view) + Neo4j (relationship view) | Keeps retrieval optimized for both similarity search and graph reasoning | Implemented |
 | Shared-Core, Multi-Interface (Hexagonal-style boundary) | One query core reused by REST and embedded MCP tools | Avoids duplicated business logic across API surfaces | Implemented |
 | Policy Enforcement Point | Role/tool authorization and response guardrails in the agents service | Centralizes access control and output safety rules | Implemented |
-| Contract-First Tooling | MCP tool request/response schemas and contract tests | Keeps tool semantics stable while internals change | Implemented |
+| Contract-First Tooling | MCP tool request/response schemas, annotations, and contract tests via the shared `agent_core.mcp_server` factory | Keeps tool semantics stable while internals change | Implemented |
 | Bounded Context Window | Max question/context/evidence/answer and response-byte budgets | Prevents unbounded prompt/output growth and latency spikes | Implemented |
 | Observability by Design | Prometheus metrics + Grafana latency dashboards + health probes | Makes latency and failure modes visible during iteration | Implemented |
 | Adapter Pattern for LLM Providers | OllamaProvider, OpenAIProvider, AnthropicProvider, FallbackProvider in llm_provider.py | Enables provider routing and automatic failover without rewriting retrieval | Implemented |

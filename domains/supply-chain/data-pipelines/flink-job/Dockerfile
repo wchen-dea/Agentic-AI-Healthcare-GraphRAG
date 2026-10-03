@@ -17,7 +17,16 @@ RUN apt-get update && apt-get install -y python3 python3-pip python3-dev default
 	&& curl -fsSL -o /opt/flink/lib/kafka-clients-3.7.1.jar \
 	  https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.7.1/kafka-clients-3.7.1.jar \
 	&& rm -rf /var/lib/apt/lists/*
+# Ingest must embed with the same model the agent service uses for queries
+# (see docs: "Embedding parity"). EMBEDDING_REQUIRE_MODEL fails fast instead of
+# silently writing incompatible MD5 hash vectors to Qdrant.
+ARG EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} \
+	EMBEDDING_REQUIRE_MODEL=true \
+	HF_HOME=/opt/hf-cache \
+	SENTENCE_TRANSFORMERS_HOME=/opt/hf-cache
 WORKDIR /app
+RUN pip3 install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 COPY domains/supply-chain/data-pipelines/flink-job/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 COPY domains/supply-chain/data-pipelines/flink-job/app /app/app
@@ -25,4 +34,6 @@ COPY domains/supply-chain/data-pipelines/flink-job/supplychain_graph_rag_job.py 
 COPY domains/supply-chain/data-pipelines/flink-job/supplychain_graph_rag_pyflink_job.py /app/supplychain_graph_rag_pyflink_job.py
 COPY --from=knowledge-core-wheel /wheels /tmp/wheels
 RUN pip3 install --no-cache-dir /tmp/wheels/knowledge_core-*.whl && rm -rf /tmp/wheels
+RUN python3 -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['EMBEDDING_MODEL'])" \
+	&& chown -R flink:flink /opt/hf-cache
 USER flink

@@ -7,7 +7,7 @@ MCP tools, evaluation gates) call this service instead of the graph directly.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Literal
 
 from healthcare_agent.orchestration.memory import get_session_store
 from healthcare_agent.orchestration.orchestrator import LangGraphOrchestrator
@@ -37,6 +37,9 @@ class QueryService:
         session_id: str | None, question: str, result: dict[str, Any], patient_id: str | None
     ) -> None:
         if not session_id or (result.get("guardrails") or {}).get("input_blocked"):
+            return
+        if result.get("status") == "pending_approval":
+            # Only reviewed, final answers enter multi-turn memory.
             return
         store = get_session_store()
         session = store.get_or_create(session_id)
@@ -83,3 +86,28 @@ class QueryService:
             if kind == "result":
                 self.remember_turn(session_id, question, data, patient_id)
             yield kind, data
+
+    def pending_review(self, thread_id: str) -> dict[str, Any] | None:
+        """Interrupt payload (question, patient_id, reason, ...) for a paused thread."""
+        return self._orchestrator.pending(thread_id)
+
+    def resume(
+        self,
+        thread_id: str,
+        decision: Literal["approve", "reject"],
+        *,
+        note: str | None = None,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Apply a reviewer decision to a paused run; remembers the final turn.
+
+        Raises ``KeyError`` for unknown or already-resolved threads.
+        """
+        pending = self._orchestrator.pending(thread_id)
+        if pending is None:
+            raise KeyError(thread_id)
+        result = self._orchestrator.resume(thread_id, decision, note)
+        self.remember_turn(
+            session_id, str(pending.get("question") or ""), result, pending.get("patient_id")
+        )
+        return result

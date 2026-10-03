@@ -93,6 +93,13 @@ services:
     ports:
       - "8001:8000"
     environment:
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-}
+      DATABRICKS_EMBEDDING_ENDPOINT: ${DATABRICKS_EMBEDDING_ENDPOINT:-databricks-gte-large-en}
+      DATABRICKS_HOST: ${DATABRICKS_HOST:-}
+      DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-}
+      EMBEDDING_REQUIRE_MODEL: ${EMBEDDING_REQUIRE_MODEL:-true}
       QDRANT_URL: http://qdrant-sc:6333
       QDRANT_COLLECTION: supplychain_events
       NEO4J_URI: bolt://neo4j-sc:7687
@@ -109,6 +116,13 @@ services:
       - "8083:8081"
     command: jobmanager
     environment:
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-}
+      DATABRICKS_EMBEDDING_ENDPOINT: ${DATABRICKS_EMBEDDING_ENDPOINT:-databricks-gte-large-en}
+      DATABRICKS_HOST: ${DATABRICKS_HOST:-}
+      DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-}
+      EMBEDDING_REQUIRE_MODEL: ${EMBEDDING_REQUIRE_MODEL:-true}
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: sc-flink-jobmanager
         parallelism.default: 2
@@ -126,6 +140,13 @@ services:
       - sc-flink-jobmanager
     command: taskmanager
     environment:
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-}
+      DATABRICKS_EMBEDDING_ENDPOINT: ${DATABRICKS_EMBEDDING_ENDPOINT:-databricks-gte-large-en}
+      DATABRICKS_HOST: ${DATABRICKS_HOST:-}
+      DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-}
+      EMBEDDING_REQUIRE_MODEL: ${EMBEDDING_REQUIRE_MODEL:-true}
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: sc-flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
@@ -151,6 +172,13 @@ services:
       neo4j-sc-init:
         condition: service_completed_successfully
     environment:
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-}
+      DATABRICKS_EMBEDDING_ENDPOINT: ${DATABRICKS_EMBEDDING_ENDPOINT:-databricks-gte-large-en}
+      DATABRICKS_HOST: ${DATABRICKS_HOST:-}
+      DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-}
+      EMBEDDING_REQUIRE_MODEL: ${EMBEDDING_REQUIRE_MODEL:-true}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka2:29093,kafka3:29094
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       QDRANT_URL: http://qdrant-sc:6333

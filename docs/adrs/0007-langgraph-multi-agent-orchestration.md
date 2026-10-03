@@ -20,7 +20,7 @@ The project needed a multi-agent architecture that:
 - routes to domain-specialist agents based on request type,
 - shares state across agents without circular imports,
 - coexists with the single-pass and ReAct modes behind feature flags,
-- supports observability through MLflow and LangSmith without coupling,
+- supports observability through MLflow without coupling,
 - reuses existing retrieval, ranking, and synthesis logic.
 
 ## Decision
@@ -62,7 +62,7 @@ Positive:
 
 Trade-offs:
 
-- Adds `langgraph`, `langchain-core`, and `langsmith` dependencies.
+- Adds the `langgraph` dependency. The `langchain-core` tool wrappers and `langsmith` tracing were later removed as unused; MLflow is the single tracing backend.
 - Agent nodes use deferred imports from `app.py` for retrieval clients, creating a runtime dependency (not circular at import time).
 - Confidence estimation remains simple (binary: both channels = 1.0); richer confidence models are future work.
 - Specialist agents extract but do not independently reason — the LLM synthesis still produces the final answer.

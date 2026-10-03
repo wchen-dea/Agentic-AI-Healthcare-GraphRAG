@@ -79,6 +79,15 @@ class QueryRequest(_QuestionRequest):
     top_k: TopK
 
 
+class ResumeRequest(_Request):
+    """Reviewer decision for a run paused at the ``human_review`` checkpoint."""
+
+    thread_id: str = Field(min_length=1, max_length=64)
+    decision: Literal["approve", "reject"]
+    note: str | None = Field(default=None, max_length=500)
+    session_id: str | None = Field(default=None, max_length=64)
+
+
 class PatientContextGetRequest(_Request):
     patient_id: PatientId
     include_claims: bool = True

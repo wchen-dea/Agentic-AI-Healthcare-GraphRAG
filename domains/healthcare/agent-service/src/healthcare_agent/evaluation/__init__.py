@@ -1,1 +1,1 @@
-"""Offline evaluation: retrieval benchmarks, grounding scorecards, gates, LangSmith and MLflow evals."""
+"""Offline evaluation: retrieval benchmarks, grounding scorecards, gates, agent scorers, and MLflow evals."""

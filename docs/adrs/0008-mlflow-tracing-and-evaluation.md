@@ -21,6 +21,8 @@ Prometheus metrics capture aggregate latency and throughput. JSON audit logs cap
 
 LangSmith was already integrated for LangGraph-specific tracing, but it requires a SaaS API key and does not trace single-pass or ReAct modes.
 
+Update: the LangSmith integration and the `langsmith` dependency have since been removed. MLflow is the single tracing backend; the dataset helpers moved to `evaluation/agent_eval.py`.
+
 ## Decision
 
 Integrate MLflow as the tracing and evaluation backend for all three query modes. Activation is controlled by `MLFLOW_TRACKING_URI`; when unset, all tracing wrappers pass through with zero overhead.
@@ -52,14 +54,13 @@ Positive:
 - Every query mode is traceable with the same span schema.
 - Evaluation scorers can be run offline (without MLflow) or logged to MLflow experiments.
 - MLflow UI provides visual trace inspection, experiment comparison, and metric trending.
-- LangSmith and MLflow can run concurrently for LangGraph queries.
+- One tracing backend (MLflow) for every query path, with no SaaS API key.
 
 Trade-offs:
 
 - Adds `mlflow>=2.21.0` dependency (~50 MB installed).
 - SQLite backend in the local stack is not suitable for production; PostgreSQL is recommended.
 - Tracing adds per-request overhead when enabled (typically < 5 ms per span).
-- LangSmith and MLflow serve overlapping purposes for LangGraph; teams should choose one for production.
 
 ## Alternatives Considered
 

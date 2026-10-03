@@ -51,7 +51,7 @@ What is implemented today:
 - LangGraph multi-agent orchestration is the only healthcare `/query`, `/query/stream`, and MCP query path after ADR-0012,
 - inter-agent delegation protocol with typed AgentCards, capability discovery, and delegation router (`agent_cards.py`),
 - MLflow tracing with nested span hierarchy and healthcare-specific evaluation harness is implemented behind the `MLFLOW_TRACKING_URI` feature flag,
-- LangSmith integration for LangGraph pipeline tracing is available via `LANGSMITH_API_KEY`,
+- optional human-in-the-loop review (`HITL_ENABLED`) pauses low-confidence or guardrail-blocked LangGraph runs at a `human_review` interrupt; reviewers resume them through `POST /query/resume`,
 - terminology mappings cover all 6 producer vocabularies at 100% (LAB→LOINC, ICD-10, MED→RxNorm, CPT, Specialty→NUCC, Payer→NAIC),
 - ontology governance enforced via CODEOWNERS, drift detection CI gate (`validate_ontology_drift.py`), and terminology coverage CI gate (`validate_terminology_coverage.py`),
 - ontology conformance tests validate relationship cardinality, node type alignment, required properties, and direction correctness (`test_ontology_conformance.py`),
@@ -169,7 +169,7 @@ flowchart LR
     SG --> MET
     LLM --> MET
     MET --> GF[Grafana]
-    LLM -. traces .-> MLF[MLflow / LangSmith]
+    LLM -. traces .-> MLF[MLflow]
   end
 
   SR -. schema governance .-> K
@@ -368,8 +368,6 @@ Launched via `docker compose -f infra/compose/docker-compose.infra.yml -f infra/
 | email-validator | ≥2.2.0 | Pydantic email field support |
 | prometheus-client | 0.23.1 | Metrics exposition |
 | langgraph | ≥0.4.1,<1.0.0 | Multi-agent StateGraph orchestration |
-| langchain-core | ≥0.3.0,<1.0.0 | Tool abstractions for LangGraph agents |
-| langsmith | ≥0.3.0,<1.0.0 | LangSmith tracing integration |
 | mlflow | ≥2.21.0,<3.0.0 | Agent tracing spans and evaluation harness |
 | sentence-transformers | 3.0.1 | Embedding model (`shared.embedding`) |
 | torch | ≥2.2 (CPU wheel on Linux) | sentence-transformers backend, from the PyTorch CPU index |
@@ -517,10 +515,13 @@ Launched via `docker compose -f infra/compose/docker-compose.infra.yml -f infra/
 
 | Property | Value |
 |----------|-------|
-| Default model | `sentence-transformers/all-MiniLM-L6-v2` (env `EMBEDDING_MODEL`) |
-| Dimensions | 384 |
+| Provider | `EMBEDDING_PROVIDER=local` (default, dev) or `databricks` (production) |
+| Default model (local) | `sentence-transformers/all-MiniLM-L6-v2` (env `EMBEDDING_MODEL`), 384 dims, 256-token window, baked into the Flink and agent images |
+| Default endpoint (databricks) | `databricks-gte-large-en` (env `DATABRICKS_EMBEDDING_ENDPOINT`), 1024 dims, 8192-token window |
+| Dimensions | Provider default (384 local, 1024 databricks); override with `EMBEDDING_DIM` |
 | Normalisation | L2 (unit vector) |
-| Fallback | Deterministic MD5 bag-of-words when `sentence-transformers` is unavailable |
+| Fallback | Deterministic MD5 bag-of-words when `sentence-transformers` is unavailable (dev/tests only) |
+| Strict mode | `EMBEDDING_REQUIRE_MODEL=true` (default in images, compose, Helm) raises instead of falling back |
 | Domain routing | `clinical`, `claims`, `device` — each configurable via `EMBEDDING_MODEL_CLINICAL`, `EMBEDDING_MODEL_CLAIMS`, `EMBEDDING_MODEL_DEVICE` |
 
 | Event Type | Embedding Domain |
@@ -531,6 +532,32 @@ Launched via `docker compose -f infra/compose/docker-compose.infra.yml -f infra/
 
 All three domains default to the same model. Set domain-specific env vars to activate separate models for improved recall.
 
+#### Embedding providers (dev vs production)
+
+The embedding layer is a provider-neutral adapter in `knowledge_core.embedding`; callers only use `stable_embedding()` and `get_vector_size()`.
+
+| Setting | Dev (default) | Production |
+|---|---|---|
+| `EMBEDDING_PROVIDER` | `local` | `databricks` |
+| Model / endpoint | `EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2` | `DATABRICKS_EMBEDDING_ENDPOINT=databricks-gte-large-en` |
+| `EMBEDDING_DIM` | unset (384) | `1024` (or unset, the provider default) |
+| Credentials | none | `DATABRICKS_HOST` (config) and `DATABRICKS_TOKEN` (Kubernetes Secret) |
+
+- The Databricks provider calls `POST {DATABRICKS_HOST}/serving-endpoints/{endpoint}/invocations` with a Bearer token, L2-normalises the result, and caches repeated texts in-process.
+- The Databricks provider uses one endpoint for all domains; `EMBEDDING_MODEL_*` domain overrides only apply to the local provider.
+- `DATABRICKS_TOKEN` must come from a secret: `secrets` in the agent-service chart, `secretEnv` (a `secretKeyRef`) in the Flink chart. It is never logged or included in error messages.
+- With `EMBEDDING_REQUIRE_MODEL=true`, an endpoint error fails the job/request; otherwise it falls back to MD5 vectors (dev/tests only).
+- Switching provider or dimension changes the vector space: recreate the Qdrant collections with the new size and re-ingest, and set identical embedding settings on the Flink jobs and agent services.
+
+#### Ingest/query embedding parity
+
+Vectors written at ingest and vectors computed at query time must come from the same model, otherwise similarity scores are meaningless.
+
+- Both Flink jobs (healthcare and supply-chain) and both agent services embed with `knowledge_core.embedding` (or the supply-chain agent's mirror of it, which a unit test keeps in sync) using the same `EMBEDDING_MODEL`.
+- The model is pre-downloaded into the Flink and agent images at build time, so runtime never depends on Hugging Face Hub availability.
+- With `EMBEDDING_REQUIRE_MODEL=true`, a missing model fails the job/request loudly instead of silently mixing MD5 vectors with neural vectors.
+- Changing `EMBEDDING_MODEL` (or any `EMBEDDING_MODEL_*` override) requires recreating the Qdrant collections and re-ingesting; set the same value on the Flink and agent-service deployments.
+
 ---
 
 ## 6. Qdrant Collection Specification
@@ -538,7 +565,7 @@ All three domains default to the same model. Set domain-specific env vars to act
 | Property | Value |
 |----------|-------|
 | Collection name | `healthcare_events` (default; env `QDRANT_COLLECTION`) |
-| Vector config | Named vectors: `clinical`, `claims`, `device` (384-dim cosine each) |
+| Vector config | Named vectors: `clinical`, `claims`, `device` (cosine; 384-dim in dev, size from `get_vector_size()`) |
 | Distance metric | Cosine |
 | HTTP port | 6333 |
 | gRPC port | 6334 |
@@ -904,8 +931,9 @@ Variables read from `.env` (gitignored) or compose `environment` blocks. All hav
 | `LANGGRAPH_MAX_ITERATIONS` | `3` | agent-service | Max confidence re-retrieval loops in the required LangGraph path |
 | `MLFLOW_TRACKING_URI` | (unset) | agent-service | MLflow server URL; enables tracing when set |
 | `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | agent-service | MLflow experiment name for traces and evaluation runs |
-| `LANGSMITH_API_KEY` | (unset) | agent-service | LangSmith API key; enables LangSmith tracing when set |
-| `LANGSMITH_PROJECT` | `healthcare-graphrag` | agent-service | LangSmith project name |
+| `HITL_ENABLED` | `false` | agent-service | Compile the graph with a checkpointer and pause low-confidence or blocked answers for human review |
+| `HITL_CONFIDENCE_THRESHOLD` | `0.75` | agent-service | Confidence below which an answer is routed to human review |
+| `HITL_MAX_PENDING` | `1000` | agent-service | Maximum number of paused review threads kept in process |
 
 ADR-0012 removed the former healthcare ReAct/single-pass rollback flags; `LANGGRAPH_MAX_ITERATIONS` remains the only LangGraph loop tuning variable.
 
@@ -935,7 +963,7 @@ Completed or largely implemented:
 - LangGraph multi-agent orchestration with specialist nodes and conditional routing as the required healthcare query path,
 - MLflow tracing with nested span hierarchy across agent nodes, retrievers, and LLM calls,
 - MLflow evaluation harness with healthcare-specific scorers,
-- LangSmith integration for LangGraph pipeline tracing.
+- compiled LangGraph graphs cached per tracing/HITL configuration, with optional human-in-the-loop review via a LangGraph checkpointer.
 
 Terminology and governance:
 

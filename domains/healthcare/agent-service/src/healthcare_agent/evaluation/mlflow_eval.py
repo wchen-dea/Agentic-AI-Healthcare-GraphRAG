@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 import mlflow
 
-from healthcare_agent.evaluation.langsmith import (
+from healthcare_agent.evaluation.agent_eval import (
     EVALUATION_DATASET,
     evaluate_agent_coverage,
     evaluate_answer_quality,

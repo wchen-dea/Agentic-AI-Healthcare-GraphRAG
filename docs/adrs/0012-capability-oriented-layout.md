@@ -109,9 +109,9 @@ ADR-0010 set the runtime layers (React UI → BFF → LangGraph orchestration �
   | `orchestration/query_service.py` (`QueryService`) | `run_query` in `app.py` |
   | `observability/metrics.py`, `observability/tracing.py` | Prometheus collectors in `app.py`, `langgraph_agents/mlflow_tracing.py` |
   | `generation/factory.py` | provider and router construction in `app.py` |
-  | `orchestration/{graph,state,runtime}.py`, `agents/nodes.py`, `agents/registry.py`, `tools/langchain_tools.py` | `langgraph_agents/` |
+  | `orchestration/{graph,state,runtime}.py`, `agents/nodes.py`, `agents/registry.py` | `langgraph_agents/` |
   | `orchestration/{planner,memory,plan_types}.py`, `retrieval/{search,ranking}.py`, `generation/{model_router,synthesis,structured_output}.py`, `safety/{guardrails,harness,response_policy}.py`, `evaluation/{gates,grounding_scorecard,retrieval_benchmark}.py` | `domain/` |
-  | `generation/providers.py`, `tools/skills.py`, `evaluation/{langsmith,mlflow_eval}.py` | `llm_provider.py`, `skills_layer.py`, `langgraph_agents/{evaluation,mlflow_eval}.py` |
+  | `generation/providers.py`, `tools/skills.py`, `evaluation/{agent_eval,mlflow_eval}.py` | `llm_provider.py`, `skills_layer.py`, `langgraph_agents/{evaluation,mlflow_eval}.py` |
 
 - `HealthcareAgentSettings` extends `agent_core.settings.AgentServiceSettings` with store, model-gateway, MCP, skills, and MLflow fields. `neo4j_password` is a `SecretStr`. `tool_policy_path` and `skills_layer_path` default to the files packaged in `healthcare_agent/config/`, and relative paths resolve against the package. Environment variable names are unchanged.
 - Request-size limits that depend on settings (`max_question_chars`, `max_context_items`) are checked by field validators against `RequestLimits`, which the composition root sets. This keeps the schemas importable without settings. As a result, OpenAPI no longer shows `maxLength` for `question` or the maximum for `top_k`.
@@ -194,6 +194,6 @@ Supply-chain now has the same layout and governance as healthcare, the deprecati
 - Replace the dev-only role header with verified caller identity (OIDC/JWT claims mapped to roles) behind `ToolPolicy`.
 - Adapt `observability/tracing.py` to the `Tracer` port and the Qdrant/Neo4j clients to `VectorStore`/`GraphStore` (`retrieval/qdrant.py`, `retrieval/neo4j.py`).
 - Unify the duplicate injection rules in `safety/harness.py` with `agent_core.guardrails`.
-- Move the remaining library-level `os.getenv` reads into `HealthcareAgentSettings`. They are in `retrieval/search.py` (`EMBEDDING_MODEL`), `orchestration/memory.py`, `orchestration/graph.py` (`LANGGRAPH_MAX_ITERATIONS`, LangSmith), `generation/model_router.py` (`ModelTierConfig.from_env`), `generation/providers.py`, and `observability/tracing.py`.
+- Move the remaining library-level `os.getenv` reads into `HealthcareAgentSettings`. They are in `retrieval/search.py` (`EMBEDDING_MODEL`), `orchestration/memory.py`, `orchestration/graph.py` (`LANGGRAPH_MAX_ITERATIONS`), `generation/model_router.py` (`ModelTierConfig.from_env`), `generation/providers.py`, and `observability/tracing.py`.
 - Remove the drifted copies of `ontology_loader`, `rules_engine`, `runner`, and `storage` in the healthcare Flink app in favour of `knowledge_core`.
 - Remove the try/except import fallback in the supply-chain Flink job now that `knowledge_core` is always installed.

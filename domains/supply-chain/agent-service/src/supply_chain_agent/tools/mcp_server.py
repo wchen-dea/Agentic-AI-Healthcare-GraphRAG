@@ -11,6 +11,7 @@ from typing import Any
 
 from agent_core.audit import utc_timestamp
 from agent_core.governance import ToolGovernance, scope_for
+from agent_core.mcp_server import ToolSpec, register_skills_surface, register_tools
 from mcp.server.fastmcp import FastMCP
 
 from supply_chain_agent.api.responses import ResponseShaper
@@ -28,16 +29,18 @@ from supply_chain_agent.tools.skills import build_skill_plan
 
 PORTFOLIO_SCOPE = "portfolio"
 
-TOOL_NAMES = (
-    "supplier_context_get",
-    "vector_evidence_search",
-    "graphrag_answer_generate",
-    "risk_summary_generate",
-    "disruption_impact_assess",
-    "inventory_reorder_check",
-    "evidence_bundle_export",
-    "skills_plan_get",
+# Descriptions fall back to each tool method's docstring.
+TOOL_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec("supplier_context_get", "Supplier context", "read_only"),
+    ToolSpec("vector_evidence_search", "Vector evidence search", "read_only"),
+    ToolSpec("graphrag_answer_generate", "GraphRAG answer", "generation"),
+    ToolSpec("risk_summary_generate", "Supplier risk summary", "generation"),
+    ToolSpec("disruption_impact_assess", "Disruption impact", "generation"),
+    ToolSpec("inventory_reorder_check", "Inventory reorder check", "generation"),
+    ToolSpec("evidence_bundle_export", "Evidence bundle export", "export"),
+    ToolSpec("skills_plan_get", "Skills plan", "read_only"),
 )
+TOOL_NAMES = tuple(spec.name for spec in TOOL_SPECS)
 
 _STYLE_PREFIX = {
     "concise": "Answer concisely. ",
@@ -63,8 +66,14 @@ class SupplyChainMcpTools:
         self._load_skills = load_skills
 
     def register(self, mcp: FastMCP) -> None:
-        for name in TOOL_NAMES:
-            mcp.tool()(getattr(self, name))
+        register_tools(mcp, self, TOOL_SPECS)
+        register_skills_surface(
+            mcp,
+            lambda: self._load_skills(str(self._settings.skills_layer_path)),
+            prompt_name="supply_risk_review",
+            prompt_title="Supply risk review plan",
+            subject_label="Entity",
+        )
 
     def _generate(self, tool_name: str, prompt: str, entity_id: str | None, payload: dict[str, Any]) -> dict[str, Any]:
         return self._governance.execute(

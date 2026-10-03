@@ -124,7 +124,7 @@ def main() -> int:
             evaluation_results = json.load(f)
     else:
         # Run live evaluation (requires running stack)
-        from healthcare_agent.evaluation.langsmith import run_evaluation_suite
+        from healthcare_agent.evaluation.agent_eval import run_evaluation_suite
         from healthcare_agent.main import queries
         evaluation_results = run_evaluation_suite(queries.run_query, mode=args.mode)
 

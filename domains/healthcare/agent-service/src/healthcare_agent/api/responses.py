@@ -15,7 +15,14 @@ from healthcare_agent.safety.response_policy import (
 )
 
 # Result keys copied verbatim into the query response when the graph sets them.
-_PASSTHROUGH_KEYS = ("structured_response", "model_routing", "langgraph")
+_PASSTHROUGH_KEYS = (
+    "structured_response",
+    "model_routing",
+    "langgraph",
+    "status",
+    "thread_id",
+    "human_review",
+)
 _GUARDRAIL_FLAGS = ("input_blocked", "output_blocked", "category")
 
 

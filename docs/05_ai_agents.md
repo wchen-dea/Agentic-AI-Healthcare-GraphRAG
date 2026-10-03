@@ -30,7 +30,7 @@ AI Client (Copilot, Claude Desktop, custom agent)
      - generation/synthesis.py, model_router.py, factory.py, providers.py
      - safety/guardrails.py, harness.py, response_policy.py
      - api/responses.py (response shaping); tool policy/audit in agent_core.governance
-     - tools/mcp_server.py, langchain_tools.py, skills.py
+     - tools/mcp_server.py, skills.py
      - evaluation/ and observability/ modules
   -> External stores:
      - Neo4j (domains/healthcare/knowledge/graph-seeds)
@@ -436,6 +436,8 @@ ADR-0012 removed the former ReAct and single-pass query paths. LangGraph is now 
 
 `POST /query/stream` always runs the LangGraph orchestrator and returns Server-Sent Events: `meta` (trace ID), `step` per graph node (allowlisted scalar fields only, no evidence or answer text), then `result` (same payload as `/query`) or `error` (generic message and trace ID). Authorization is checked before the stream opens, and each stream writes one audit entry. See [ADR-0010](adrs/0010-layered-agentic-architecture.md) for the layered target architecture and phased roadmap.
 
+The server is built by the shared `agent_core.mcp_server` factory (see [ADR-0005](adrs/0005-embed-fastmcp-in-rag-api.md#shared-mcp-server-framework)). Every tool has a title, a description, and MCP annotations (read-only, idempotent, open-world hints) taken from `TOOL_SPECS`. Blocking tool bodies run in worker threads. The skills layer is also exposed as the resources `skills://catalog` and `skills://{skill_id}` and as the `clinical_review` prompt (the supply-chain service exposes `supply_risk_review`). Transport and Host/Origin validation come from the `MCP_*` settings.
+
 When MLflow tracing is enabled (`MLFLOW_TRACKING_URI`), every MCP tool execution is traced as a nested span hierarchy visible in the MLflow Tracing UI. Trace IDs from the audit log can be correlated with MLflow spans for end-to-end observability.
 
 # Skills Layer
@@ -603,12 +605,11 @@ Primary implementation and integration touchpoints:
 - `domains/healthcare/agent-service/src/healthcare_agent/agents/nodes.py` — specialist agent node functions.
 - `domains/healthcare/agent-service/src/healthcare_agent/agents/registry.py` — agent cards and capability registry.
 - `domains/healthcare/agent-service/src/healthcare_agent/tools/mcp_server.py` — `HealthcareMcpTools` with the ten healthcare MCP tools.
-- `domains/healthcare/agent-service/src/healthcare_agent/tools/langchain_tools.py` — LangChain tool wrappers.
 - `domains/healthcare/agent-service/src/healthcare_agent/tools/skills.py` — skills-plan resolution.
 - `domains/healthcare/agent-service/src/healthcare_agent/retrieval/search.py` and `retrieval/ranking.py` — Qdrant/Neo4j retrieval and deterministic ranking.
 - `domains/healthcare/agent-service/src/healthcare_agent/generation/factory.py` — `build_llm_provider`.
 - `domains/healthcare/agent-service/src/healthcare_agent/safety/` — guardrails, harness, and response policy.
-- `domains/healthcare/agent-service/src/healthcare_agent/evaluation/` — gates, LangSmith, MLflow evaluation, retrieval benchmarks, and grounding scorecards.
+- `domains/healthcare/agent-service/src/healthcare_agent/evaluation/` — gates, agent evaluation datasets (`agent_eval.py`), MLflow evaluation, retrieval benchmarks, and grounding scorecards.
 - `packages/agent-core/src/agent_core/metrics.py` — shared Prometheus `agent_service_*` collectors.
 - `domains/healthcare/agent-service/src/healthcare_agent/observability/tracing.py` — MLflow tracing helpers.
 
@@ -652,13 +653,41 @@ Eleven LangGraph nodes share typed state (two guardrails, three retrieval nodes,
 | `synthesis` | `synthesis_agent` | Grounded answer generation through the configured provider |
 | `output_guardrail` | `output_guardrail` | Validate and shape the final answer before it is returned |
 
+## Human-in-the-Loop Review and Graph Caching
+
+Compiled LangGraph graphs are cached per process. Healthcare caches one graph per
+(tracing, HITL) combination; supply chain caches one per tracing setting. Tests reset
+the cache with `clear_graph_cache()`.
+
+When `HITL_ENABLED=true`, the healthcare graph is compiled with a LangGraph checkpointer
+and a `human_review` node (`orchestration/hitl.py`). Medication-safety requests and answers
+below `HITL_CONFIDENCE_THRESHOLD` pause at a LangGraph interrupt. The `/query` response then
+returns `status: "pending_approval"`, a `thread_id`, and a `human_review` summary without
+evidence. At most `HITL_MAX_PENDING` reviews are held; the oldest is evicted first.
+
+A reviewer resumes the run with `POST /query/resume`:
+
+```json
+{"thread_id": "<id>", "decision": "approve", "note": "optional", "session_id": "optional"}
+```
+
+`decision` is `approve` or `reject`. The route authorizes the caller first, returns 404 for
+unknown or expired threads, and applies the same governance and audit path as `/query`.
+Only the final, reviewed answer is written to the multi-turn session memory, so pending
+answers never leak into later conversation context.
+
+Limitation: the in-memory checkpointer and pending-review registry are process-local.
+Multi-replica deployments need a shared checkpointer (for example Postgres or Redis) and
+sticky routing or a shared registry.
+
 ## Observability and Configuration
 
 | Environment Variable | Default | Purpose |
 |---------------------|---------|---------|
 | `LANGGRAPH_MAX_ITERATIONS` | `3` | Max confidence re-retrieval loops |
-| `LANGSMITH_API_KEY` | (none) | Enable LangSmith tracing |
-| `LANGSMITH_PROJECT` | `healthcare-graphrag` | LangSmith project name |
+| `HITL_ENABLED` | `false` | Pause low-confidence or blocked answers for human review |
+| `HITL_CONFIDENCE_THRESHOLD` | `0.75` | Confidence below which an answer goes to human review |
+| `HITL_MAX_PENDING` | `1000` | Maximum paused review threads kept in process |
 | `MLFLOW_TRACKING_URI` | (none) | Enable MLflow tracing (for example `http://mlflow:5000`) |
 | `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | MLflow experiment name |
 

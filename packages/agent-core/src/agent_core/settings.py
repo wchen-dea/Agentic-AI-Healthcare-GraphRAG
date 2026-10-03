@@ -51,12 +51,31 @@ class AgentServiceSettings(BaseSettings):
     max_answer_chars: int = Field(default=2000, ge=1, validation_alias=env_name("MAX_ANSWER_CHARS"))
     max_response_bytes: int = Field(default=50000, ge=1, validation_alias=env_name("MAX_RESPONSE_BYTES"))
 
+    # MCP server (used by agent_core.mcp_server; needs the ``mcp`` extra)
+    mcp_instructions: str = Field(default="", validation_alias="MCP_INSTRUCTIONS")
+    mcp_stateless_http: bool = Field(default=False, validation_alias="MCP_STATELESS_HTTP")
+    mcp_json_response: bool = Field(default=False, validation_alias="MCP_JSON_RESPONSE")
+    mcp_dns_rebinding_protection: bool = Field(default=False, validation_alias="MCP_DNS_REBINDING_PROTECTION")
+    mcp_allowed_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="MCP_ALLOWED_HOSTS"
+    )
+    mcp_allowed_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="MCP_ALLOWED_ORIGINS"
+    )
+
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
             items = [item.strip() for item in value.split(",") if item.strip()]
             return items or ["*"]
+        return value
+
+    @field_validator("mcp_allowed_hosts", "mcp_allowed_origins", mode="before")
+    @classmethod
+    def _split_optional_csv(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
     @field_validator("audit_log_path", mode="after")

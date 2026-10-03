@@ -82,3 +82,5 @@ class HealthcareAgentState(TypedDict, total=False):
     confidence: float
     iteration: int
     final_reason: str
+    review_required: bool
+    human_review: dict[str, Any]

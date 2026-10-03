@@ -49,7 +49,13 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     HF_HOME=/home/app/.cache/huggingface \
     AGENT_AUDIT_LOG_PATH=/var/log/agent-service/audit.log
-WORKDIR /app
+# Bake the embedding model in so queries use the same vectors as the Flink
+# ingest images without a runtime download (see EMBEDDING_REQUIRE_MODEL).
+ARG EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} \
+    SENTENCE_TRANSFORMERS_HOME=/home/app/.cache/huggingface
 USER 10001:10001
+RUN python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['EMBEDDING_MODEL'])"
+WORKDIR /app
 EXPOSE 8000
 CMD ["uvicorn", "supply_chain_agent.main:app", "--host", "0.0.0.0", "--port", "8000"]

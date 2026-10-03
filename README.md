@@ -39,7 +39,7 @@ The implementation currently reflects these technologies:
 
 - Python + uv workspace management
 - FastAPI + Uvicorn
-- LangGraph / LangChain / LangSmith
+- LangGraph (checkpointer-backed human-in-the-loop review)
 - Neo4j for graph memory and ontology data
 - Qdrant for vector retrieval
 - Kafka + Schema Registry + Flink for streaming ingestion and processing

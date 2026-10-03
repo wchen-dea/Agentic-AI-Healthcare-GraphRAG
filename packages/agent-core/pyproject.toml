@@ -13,6 +13,8 @@ dependencies = [
 [project.optional-dependencies]
 # Prometheus exporter for agent_core.metrics.
 metrics = ["prometheus-client==0.23.1"]
+# FastMCP server factory for agent_core.mcp_server.
+mcp = ["mcp==1.28.0"]
 
 [dependency-groups]
 dev = ["pytest>=8.0"]
