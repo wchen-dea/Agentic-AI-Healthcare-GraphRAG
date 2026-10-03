@@ -22,7 +22,7 @@ flowchart LR
     kafka --> flink[Flink job]
     flink --> qdrant
     flink --> neo4j
-    graph -. traces .-> mlflow[MLflow]
+    lg -. traces .-> mlflow[MLflow]
     api -. metrics .-> prom[Prometheus]
 ```
 
