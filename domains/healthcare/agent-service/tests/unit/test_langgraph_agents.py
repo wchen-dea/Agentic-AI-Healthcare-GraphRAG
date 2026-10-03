@@ -15,7 +15,7 @@ from healthcare_agent.agents.nodes import (
     medication_safety_agent,
     triage_agent,
 )
-from healthcare_agent.evaluation.langsmith import (
+from healthcare_agent.evaluation.agent_eval import (
     evaluate_agent_coverage,
     evaluate_answer_quality,
     evaluate_evidence_completeness,
@@ -379,7 +379,7 @@ class TestPolypharmacyScenario:
     def test_full_agent_trace_covers_medication_path(self, polypharmacy_state):
         """The medication safety path should activate triage, both retrievers,
         and the medication_safety specialist."""
-        from healthcare_agent.evaluation.langsmith import evaluate_agent_coverage
+        from healthcare_agent.evaluation.agent_eval import evaluate_agent_coverage
         trace = [
             {"agent": "triage"},
             {"agent": "vector_retrieval"},

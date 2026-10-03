@@ -1,90 +1,45 @@
-# ADR-0007: LangGraph Multi-Agent Query Orchestration
+# ADR-0007: Use LangGraph for multi-agent orchestration
 
 - Status: accepted
 - Date: 2026-06-12
 - Deciders: platform team
 - Supersedes: none
 - Superseded by: none
-- Amended by: [ADR-0010](0010-layered-agentic-architecture.md) (runtime port, graph-level guardrails, SSE streaming, phased roadmap)
-
-> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`.
 
 ## Context
 
-The healthcare rag-api originally used a single-pass pipeline: classify request, retrieve from vector and graph stores, rank evidence, synthesize answer. ADR-0005 embedded MCP tools in rag-api. A feature-flagged ReAct controller added iterative retrieval but repeated the same fixed action each iteration without specialist reasoning.
-
-Clinical queries vary significantly in what matters: medication safety questions need interaction and contraindication chain analysis, lab interpretation questions need abnormal-value extraction, and coding review questions need ICD-10 gap detection. A single pipeline treats all request types identically, leaving specialist reasoning to the LLM prompt alone.
-
-The project needed a multi-agent architecture that:
-
-- routes to domain-specialist agents based on request type,
-- shares state across agents without circular imports,
-- coexists with the single-pass and ReAct modes behind feature flags,
-- supports observability through MLflow and LangSmith without coupling,
-- reuses existing retrieval, ranking, and synthesis logic.
+A single-pass pipeline cannot handle varying clinical tasks such as medication safety, lab interpretation and coding review. The system needed a structured way to route requests to specialists, re-enter retrieval on low confidence and preserve state across turns.
 
 ## Decision
 
-Adopt LangGraph `StateGraph` as the multi-agent orchestration framework for the healthcare rag-api. The graph contains eight nodes connected by conditional edges:
-
-- `triage_agent` — classifies request type and selects retrieval plan
-- `vector_retrieval_agent` — Qdrant similarity search with evidence ranking
-- `graph_retrieval_agent` — Neo4j patient graph traversal with evidence ranking
-- `medication_safety_agent` — interaction, contraindication, and adverse event extraction
-- `lab_interpretation_agent` — lab signal and abnormal observation extraction
-- `coding_review_agent` — claims gap detection and ICD-10 mapping analysis
-- `confidence_evaluator` — evidence completeness scoring and loop control
-- `synthesis_agent` — grounded answer generation via the LLM provider
-
-After graph retrieval, conditional routing dispatches to the appropriate specialist based on `request_type`. Patient summary and cohort queries skip specialist agents and proceed to confidence evaluation. Low-confidence results loop back to vector retrieval (bounded by `LANGGRAPH_MAX_ITERATIONS`, default 3).
-
-Three query modes coexist:
-
-| Mode | Activation | Priority |
-| --- | --- | --- |
-| Single-pass | `RAG_API_LANGGRAPH_ENABLED=false` | Lowest |
-| ReAct | `RAG_API_LANGGRAPH_ENABLED=false` and `RAG_API_REACT_ENABLED=true` | Medium |
-| LangGraph | Default (amended by ADR-0010; originally opt-in) | Highest |
-
-All modes share the same domain modules: `domain/retrieval.py`, `domain/synthesis.py`, `domain/evidence.py`, `domain/planner.py`, `domain/response_policy.py`.
-
-Shared state is managed through `HealthcareAgentState`, a TypedDict with `Annotated` reducer fields using `operator.add` for append-only list merging across agent nodes.
+Adopt LangGraph as the shared orchestration engine. The graph keeps request state in typed structures, routes to specialist agents using conditional edges, and supports iterative retrieval and evaluation loops with bounded confidence checks.
 
 ## Consequences
 
 Positive:
 
-- Specialist agents extract structured risk data (interaction chains, contraindication-to-lab confirmation) that single-pass cannot.
-- Each agent is independently testable without live infrastructure.
-- Conditional routing avoids unnecessary specialist execution for simple queries.
-- Feature flag allows gradual rollout without disrupting existing single-pass users.
-- State reducers prevent data loss across retrieval iterations.
+- Routing logic is explicit and testable.
+- Specialist agents can be added or phased in with low risk.
+- The same graph structure can support both healthcare and supply-chain use cases.
 
 Trade-offs:
 
-- Adds `langgraph`, `langchain-core`, and `langsmith` dependencies.
-- Agent nodes use deferred imports from `app.py` for retrieval clients, creating a runtime dependency (not circular at import time).
-- Confidence estimation remains simple (binary: both channels = 1.0); richer confidence models are future work.
-- Specialist agents extract but do not independently reason — the LLM synthesis still produces the final answer.
+- The orchestration layer introduces more moving parts than a single pipeline.
+- Graph configuration and state evolution must be carefully designed.
+- A runtime loop can still mis-route or under-score confidence if the evaluator is weak.
 
 ## Alternatives Considered
 
-- Extend the ReAct controller with action selection: rejected because the current ReAct implementation repeats the same action every iteration and the spec doc's richer behavior was never implemented.
-- Use LangChain AgentExecutor: rejected because it requires LLM-based tool selection, adding latency and non-determinism to the routing decision.
-- Custom agent framework: rejected to avoid maintaining a bespoke orchestration layer when LangGraph provides typed state, conditional edges, and ecosystem compatibility.
+- LangChain AgentExecutor or custom orchestration: more latency, more magic and weaker control.
 
 ## Rollout and Verification
 
-- LangGraph is on by default since ADR-0010; set `RAG_API_LANGGRAPH_ENABLED=false` in `.env` to roll back.
-- Verify with: `curl -s -X POST http://localhost:8000/query -H "Content-Type: application/json" -d '{"question":"Review medication safety for this patient","patient_id":"patient-0001"}' | jq '.langgraph'`
-- Expected: non-null `langgraph` block with `agent_trace`, `iterations`, `confidence`.
-- Run tests: `python -m pytest domains/healthcare/rag-api/tests/test_langgraph_agents.py`
-- Polypharmacy scenario tests validate specialist agent activation and interaction chain extraction.
+- Enable the graph in default mode with edge-based routing.
+- Validate the routing and confidence loops in unit and integration tests.
+- Keep the single-pass path as a fallback while the graph matures.
 
 ## Related
 
-- [ADR-0005: Embed FastMCP in rag-api](./0005-embed-fastmcp-in-rag-api.md)
-- [ADR-0004: Local-first LLM with provider routing](./0004-local-first-llm-provider-routing.md)
-- [docs/05_ai_agents.md](../05_ai_agents.md)
-- [domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/](../../domains/healthcare/rag-api/src/healthcare_rag_api/langgraph_agents/)
-- [domains/healthcare/rag-api/src/healthcare_rag_api/domain/](../../domains/healthcare/rag-api/src/healthcare_rag_api/domain/)
+- [05_ai_agents.md](../05_ai_agents.md)
+- [06_quality_assurance.md](../06_quality_assurance.md)
+- [ADR-0010](0010-layered-agentic-architecture.md)

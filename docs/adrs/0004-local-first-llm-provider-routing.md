@@ -1,4 +1,4 @@
-# ADR-0004: Local-First LLM with Provider Routing
+# ADR-0004: Use local-first LLM routing with provider fallback
 
 - Status: accepted
 - Date: 2026-06-12
@@ -6,56 +6,41 @@
 - Supersedes: none
 - Superseded by: none
 
-> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`. LLM providers and routing are in `healthcare_agent/generation/providers.py` and `generation/model_router.py`. `deploy/dev/rag-api.env` was replaced by the root `.env` (canonical vars: `LLM_PROVIDER`, `LLM_MODEL`, `LLM_MAX_TOKENS`, `LLM_TIMEOUT_SECONDS`); Compose and Helm dev both default to Databricks, Helm production to Bedrock with Anthropic fallback.
-
 ## Context
 
-Local development should run without external dependencies, while production should support managed model providers.
+The platform must stay usable in local and cloud environments. It should default to a local model for development and allow production to switch to Databricks or cloud-hosted providers when scale and quality require it.
 
 ## Decision
 
-Adopt local-first generation with provider abstraction:
-
-- Default local provider: Databricks foundation model.
-- Production provider: AWS Bedrock, with optional Anthropic/OpenAI fallback.
-- Keep retrieval orchestration stable and swap provider client behind adapter.
-
-Implementation status:
-
-- Implemented: `OllamaProvider`, `OpenAIProvider`, `AnthropicProvider`, `BedrockProvider`, `DatabricksProvider`, `FallbackProvider` in `domains/healthcare/rag-api/src/healthcare_rag_api/llm_provider.py`.
-- Factory: `create_provider()` routes by `LLM_PROVIDER` env var.
-- Fallback: `FallbackProvider` wraps primary + fallback; triggered by `LLM_FALLBACK_PROVIDER` env var.
-- Dynamic model routing: `ModelRouter` in `domains/healthcare/rag-api/src/healthcare_rag_api/domain/model_router.py` classifies query complexity (simple/moderate/complex) and selects the appropriate model tier. Supports cross-provider routing via `provider:model` syntax (e.g. `bedrock:anthropic.claude-3-5-sonnet-20240620-v1:0` for complex queries).
-- Prompt construction and synthesis extracted into `domains/healthcare/rag-api/src/healthcare_rag_api/domain/synthesis.py`.
-- Docker Compose dev (`deploy/dev/rag-api.env`) uses a Databricks foundation model; Helm dev values still use Ollama (uniform model across tiers); production uses AWS Bedrock with optional per-tier model configuration and fallback.
+Use provider-neutral config and a router that chooses the active LLM provider based on latency target, budget constraint and model tier. The default dev configuration uses local Ollama or a local embedding runtime, while production can route to Databricks or cloud endpoints as configured.
 
 ## Consequences
 
 Positive:
 
-- Fast local onboarding and offline-friendly development.
-- Clear migration path to production model providers.
-- Provider abstraction decouples retrieval orchestration from generation backend.
+- Local-first development keeps the environment flexible and low-cost.
+- Fallback logic protects availability when one provider is degraded.
+- Model routing separates business rules from provider SDK details.
 
 Trade-offs:
 
-- Provider behavior differences require adapter and testing discipline.
-- Model/version drift can affect output consistency.
-- Fallback adds latency on primary failure.
+- Provider behavior is not fully identical across vendors.
+- Operational tuning is needed for latency and cost budgets.
+- Fallbacks increase complexity when troubleshooting requests.
 
 ## Alternatives Considered
 
-- Direct Ollama calls without abstraction: rejected because it couples retrieval logic to a specific provider, making future provider additions invasive.
-- LangChain LLM abstraction: rejected to avoid adding LangChain as a runtime dependency for generation when a lightweight adapter is sufficient.
+- Single provider only: simpler but poor resilience and poor local development ergonomics.
+- Hard-coded provider selection in each service: brittle and duplicative.
 
 ## Rollout and Verification
 
-- Set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` in `deploy/dev/rag-api.env` (or `.env` for the Docker Compose infra stack), and `LLM_MODEL` to the target serving endpoint.
-- Verify the AI Gateway endpoint is reachable: `curl -s -H "Authorization: Bearer $DATABRICKS_TOKEN" "$DATABRICKS_HOST/api/2.0/serving-endpoints"`
-- Test generation: `curl -s -X POST http://localhost:8000/query -H "Content-Type: application/json" -d '{"question":"test","patient_id":"patient-0001"}' | jq .answer`
+- Configure latency and cost budgets in settings.
+- Exercise fallback behavior in smoke tests and evals.
+- Keep provider-specific logic isolated behind a router interface.
 
 ## Related
 
-- [Architecture](../02_architecture.md)
-- [MCP Layer Design](../05_ai_agents.md)
-- [Skills Layer](../05_ai_agents.md)
+- [05_ai_agents.md](../05_ai_agents.md)
+- [06_quality_assurance.md](../06_quality_assurance.md)
+- [ADR-0008](0008-mlflow-tracing-and-evaluation.md)

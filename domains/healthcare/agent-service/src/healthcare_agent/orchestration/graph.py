@@ -4,15 +4,18 @@ Builds a ``StateGraph`` that wires triage → parallel retrieval → specialist
 agents → confidence evaluation → synthesis, with conditional routing based
 on ``request_type`` and a confidence-gated re-retrieval loop.
 
-LangSmith tracing is automatically enabled when ``LANGSMITH_API_KEY`` and
-``LANGSMITH_PROJECT`` environment variables are set.
-
 MLflow tracing is automatically enabled when ``MLFLOW_TRACKING_URI`` is set.
+
+When ``HITL_ENABLED`` is set, a ``human_review`` node pauses the run before
+synthesis for clinician approval (see ``orchestration.hitl``). Compiled graphs
+are cached per (tracing, HITL) configuration; call ``clear_graph_cache`` after
+changing those settings at runtime.
 """
 from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from functools import lru_cache
 from typing import Any
 
 from langgraph.graph import END, StateGraph
@@ -31,6 +34,13 @@ from healthcare_agent.agents.nodes import (
 )
 from healthcare_agent.agents.registry import resolve_delegation
 from healthcare_agent.observability.tracing import mlflow_enabled, trace_agent_node
+from healthcare_agent.orchestration.hitl import (
+    PENDING_ANSWER,
+    after_human_review,
+    get_checkpointer,
+    hitl_enabled,
+    human_review,
+)
 from healthcare_agent.orchestration.state import HealthcareAgentState
 
 DEFAULT_CONTEXT_LIMIT = 5
@@ -145,8 +155,12 @@ def _after_input_guardrail(state: HealthcareAgentState) -> str:
 
 # ── Graph builder ──────────────────────────────────────────────────────────
 
-def build_healthcare_graph() -> StateGraph:
+def build_healthcare_graph(*, with_hitl: bool | None = None) -> Any:
     """Construct and compile the multi-agent healthcare LangGraph.
+
+    ``with_hitl`` defaults to ``hitl_enabled()``. When true, a ``human_review``
+    node sits between the confidence gate and synthesis and the graph is
+    compiled with a checkpointer so interrupted runs can be resumed.
 
     Graph topology::
 
@@ -179,6 +193,8 @@ def build_healthcare_graph() -> StateGraph:
             ▼               ▼
         synthesize     re-retrieve
             │          (back to vector)
+       [human_review]  ← HITL only; reject ──► output_guardrail
+            │
         ┌───▼──────────────┐
         │ output_guardrail │
         └───┬──────────────┘
@@ -254,20 +270,51 @@ def build_healthcare_graph() -> StateGraph:
     # Delegation router feeds back to confidence after resolving
     graph.add_edge("delegation_router", "confidence_evaluator")
 
-    # Confidence gate: synthesize or loop back
+    if with_hitl is None:
+        with_hitl = hitl_enabled()
+
+    # Confidence gate: synthesize (optionally via human review) or loop back
     graph.add_conditional_edges(
         "confidence_evaluator",
         _should_continue,
         {
-            "synthesize": "synthesis",
+            "synthesize": "human_review" if with_hitl else "synthesis",
             "re_retrieve": "vector_retrieval",
         },
     )
 
+    if with_hitl:
+        graph.add_node("human_review", human_review)
+        graph.add_conditional_edges(
+            "human_review",
+            after_human_review,
+            {"approved": "synthesis", "rejected": "output_guardrail"},
+        )
+
     graph.add_edge("synthesis", "output_guardrail")
     graph.add_edge("output_guardrail", END)
 
+    if with_hitl:
+        return graph.compile(checkpointer=get_checkpointer())
     return graph.compile()
+
+
+@lru_cache(maxsize=4)
+def _cached_graph(tracing: bool, with_hitl: bool) -> Any:
+    return build_healthcare_graph(with_hitl=with_hitl)
+
+
+def get_compiled_graph() -> Any:
+    """Return the compiled graph for the current tracing/HITL configuration.
+
+    Compilation is done once per configuration; nodes resolve their runtime
+    dependencies at call time, so a cached graph is safe to share.
+    """
+    return _cached_graph(mlflow_enabled(), hitl_enabled())
+
+
+def clear_graph_cache() -> None:
+    _cached_graph.cache_clear()
 
 
 # ── Public runners ─────────────────────────────────────────────────────────
@@ -313,19 +360,17 @@ def _initial_state(
     }
 
 
-def _run_config(patient_id: str | None) -> dict[str, Any]:
+def _run_config(patient_id: str | None, *, thread_id: str | None = None) -> dict[str, Any]:
     config: dict[str, Any] = {"recursion_limit": _recursion_limit()}
-    if os.getenv("LANGSMITH_API_KEY"):
-        config["callbacks"] = []  # LangSmith auto-instruments via env
-        config["metadata"] = {
-            "project": os.getenv("LANGSMITH_PROJECT", "healthcare-graphrag"),
-            "patient_id": patient_id or "none",
-        }
+    if thread_id:
+        config["configurable"] = {"thread_id": thread_id}
     return config
 
 
 def public_step(node: str, update: dict[str, Any] | None) -> dict[str, Any]:
     """Project a node update to a small, evidence-free progress event."""
+    if node == "__interrupt__":
+        return {"node": "human_review", "messages": [{"agent": "human_review", "action": "pending"}]}
     messages = (update or {}).get("messages") or []
     return {
         "node": node,
@@ -341,8 +386,19 @@ def public_step(node: str, update: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def final_state_to_response(question: str, final_state: dict[str, Any]) -> dict[str, Any]:
-    """Map final graph state to the ``run_query`` response shape."""
+def final_state_to_response(
+    question: str,
+    final_state: dict[str, Any],
+    *,
+    thread_id: str | None = None,
+    pending_review: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Map final graph state to the ``run_query`` response shape.
+
+    ``pending_review`` is the interrupt payload of a run paused for clinician
+    review; the response then carries ``status="pending_approval"`` and the
+    ``thread_id`` needed to resume it.
+    """
     # Deduplicate patient_ids that may have been appended from multiple iterations
     patient_ids = sorted(set(final_state.get("patient_ids", [])))
     response: dict[str, Any] = {
@@ -356,17 +412,26 @@ def final_state_to_response(question: str, final_state: dict[str, Any]) -> dict[
         "patients": patient_ids,
         "vector_context": final_state.get("vector_context", []),
         "graph_context": final_state.get("graph_context", []),
-        "answer": final_state.get("answer", ""),
+        "answer": PENDING_ANSWER if pending_review else final_state.get("answer", ""),
         "guardrails": dict(final_state.get("guardrails") or {}),
+        "status": "pending_approval" if pending_review else "completed",
         "langgraph": {
             "enabled": True,
             "iterations": final_state.get("iteration", 0),
-            "final_reason": final_state.get("final_reason", "unknown"),
+            "final_reason": (
+                "pending_review" if pending_review else final_state.get("final_reason", "unknown")
+            ),
             "confidence": final_state.get("confidence", 0.0),
             "agent_trace": final_state.get("messages", []),
         },
     }
-    if final_state.get("structured_response"):
+    if thread_id:
+        response["thread_id"] = thread_id
+    if pending_review:
+        response["human_review"] = {"status": "pending", **pending_review}
+    elif final_state.get("human_review"):
+        response["human_review"] = dict(final_state["human_review"])
+    if final_state.get("structured_response") and not pending_review:
         response["structured_response"] = final_state["structured_response"]
     return response
 
@@ -381,9 +446,6 @@ def run_langgraph_query(
 ) -> dict[str, Any]:
     """Execute the healthcare multi-agent graph and return a response dict
     compatible with the existing ``run_query`` output shape.
-
-    When ``LANGSMITH_API_KEY`` is set, every invocation is automatically
-    traced and visible in the LangSmith dashboard.
 
     When ``MLFLOW_TRACKING_URI`` is set, the full pipeline is traced as
     an MLflow span hierarchy visible in the MLflow Tracing UI.
@@ -409,18 +471,15 @@ def _run_langgraph_pipeline(
     context_limit: int = DEFAULT_CONTEXT_LIMIT,
 ) -> dict[str, Any]:
     """Inner pipeline — separated so MLflow can wrap the full execution."""
-    compiled_graph = build_healthcare_graph()
-    final_state = compiled_graph.invoke(
-        _initial_state(
-            question,
-            patient_id,
-            structured=structured,
-            session_context=session_context,
-            context_limit=context_limit,
-        ),
-        config=_run_config(patient_id),
+    from healthcare_agent.orchestration.orchestrator import LangGraphOrchestrator
+
+    return LangGraphOrchestrator(get_compiled_graph()).run(
+        question,
+        patient_id,
+        structured=structured,
+        session_context=session_context,
+        context_limit=context_limit,
     )
-    return final_state_to_response(question, final_state)
 
 
 def stream_langgraph_query(
@@ -432,22 +491,12 @@ def stream_langgraph_query(
     context_limit: int = DEFAULT_CONTEXT_LIMIT,
 ) -> Iterator[tuple[str, dict[str, Any]]]:
     """Run the graph, yielding ``("step", event)`` per node then ``("result", response)``."""
-    compiled_graph = build_healthcare_graph()
-    final_state: dict[str, Any] = {}
-    for mode, chunk in compiled_graph.stream(
-        _initial_state(
-            question,
-            patient_id,
-            structured=structured,
-            session_context=session_context,
-            context_limit=context_limit,
-        ),
-        config=_run_config(patient_id),
-        stream_mode=["updates", "values"],
-    ):
-        if mode == "updates":
-            for node, update in chunk.items():
-                yield "step", public_step(node, update)
-        elif mode == "values":
-            final_state = chunk
-    yield "result", final_state_to_response(question, final_state)
+    from healthcare_agent.orchestration.orchestrator import LangGraphOrchestrator
+
+    yield from LangGraphOrchestrator(get_compiled_graph()).stream(
+        question,
+        patient_id,
+        structured=structured,
+        session_context=session_context,
+        context_limit=context_limit,
+    )

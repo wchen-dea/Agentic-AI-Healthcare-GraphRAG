@@ -1,129 +1,127 @@
-# Healthcare AI Agent Architectures: Industry Landscape and Platform Alignment
+# 10 — Healthcare Landscape
 
-## Purpose
+This document compares the healthcare agent with published reference models for healthcare AI agents and lists the gaps that remain. The implementation it compares against is described in [05 — AI Agents](05_ai_agents.md). Its evaluation coverage is in [06 — Quality Assurance](06_quality_assurance.md). For the business scope, see [01 — Business Requirements](01_business_requirements.md). For the system context, see [02 — Architecture](02_architecture.md).
 
-This document provides a competitive landscape analysis of healthcare AI agent architectures. It synthesizes patterns from Microsoft Research (Healthcare Agent Orchestrator), academic literature, and industry frameworks, then maps them against this platform's implementation to quantify alignment and identify strategic gaps.
+## 1. Purpose
 
-**For executives:** Where do we stand relative to industry-leading healthcare AI systems? What capabilities drive differentiation?
+| Audience | Question this document answers |
+| --- | --- |
+| Executives | How does the platform compare with leading healthcare agent systems? |
+| Architects | Which reference patterns are implemented, which are partial, and which are missing? |
+| Engineers | Which modules and interfaces would close each gap? |
 
-**For architects:** Which architectural patterns are implemented, which are partially covered, and which represent extension opportunities?
+Sources:
 
-**For engineers:** What specific modules and interfaces are needed to close the identified gaps?
+- Microsoft Research, *Healthcare Agent Orchestrator* (2025)
+- Alex G. Lee, healthcare AI agent framework taxonomy (2025)
+- PMC survey of healthcare AI agents (2025)
 
-Sources: Microsoft Research Healthcare Agent Orchestrator (2025), Alex G. Lee framework taxonomy (2025), PMC healthcare AI agents survey (2025).
+## 2. Industry reference model
 
-## Industry Consensus: Healthcare AI Agent Architecture
-
-### Six Core Modules
-
-Research across all four sources converges on six foundational modules that any healthcare AI agent system must implement:
+### 2.1 Six core modules
 
 | Module | Responsibility | Healthcare-specific requirements |
 | --- | --- | --- |
-| **Perception** | Ingest and interpret multimodal clinical data (EHR text, labs, vitals, images, biosignals) | Temporal awareness, abnormality detection, cross-source correlation |
-| **Conversational Interface** | Natural language interaction with clinicians and patients | Medical NER, intent classification, empathy modulation, evidence-backed discourse |
-| **Interaction** | Coordinate between agents, clinicians, and institutional workflows | Clinician override, feedback capture, explainability, inter-agent handoff |
-| **Tool Integration** | Execute tasks by interfacing with clinical systems (labs, imaging, EHR, pharmacy) | API orchestration, tool effectiveness tracking, regulatory compliance |
-| **Memory and Learning** | Short-term session context + long-term clinical knowledge | Longitudinal patient tracking, personalized recall, privacy-filtered retention |
-| **Reasoning** | Transform inputs and context into clinical decisions | Rule-based + probabilistic inference, uncertainty handling, multi-path reasoning |
+| Perception | Takes in and interprets multimodal clinical data: EHR text, labs, vitals, images and biosignals | Temporal awareness, abnormality detection, cross-source correlation |
+| Conversational interface | Natural-language interaction with clinicians and patients | Medical NER, intent classification, evidence-backed answers |
+| Interaction | Coordinates agents, clinicians and institutional workflows | Clinician override, feedback capture, explainability, inter-agent handoff |
+| Tool integration | Runs tasks against clinical systems such as labs, imaging, EHR and pharmacy | API orchestration, tool-effectiveness tracking, regulatory compliance |
+| Memory and learning | Keeps short-term session context and long-term clinical knowledge | Longitudinal patient tracking, personalized recall, privacy-filtered retention |
+| Reasoning | Turns inputs and context into clinical decisions | Rule-based and probabilistic inference, uncertainty handling, multi-path reasoning |
 
-### Seven Agent Types
+### 2.2 Seven agent types
 
-The healthcare AI agent taxonomy identifies seven specialized agent archetypes:
-
-| Agent Type | Core Capability | Primary Modules |
+| Agent type | Core capability | Primary modules |
 | --- | --- | --- |
-| **ReAct + RAG** | Multi-step clinical reasoning with external knowledge retrieval | Perception, Reasoning, Tool Integration |
-| **Self-Learning** | Evolve through longitudinal interactions and outcome feedback | Memory, Reasoning, Perception |
-| **Memory-Enhanced** | Continuity of care through longitudinal patient history | Memory, Perception, Reasoning |
-| **LLM-Enhanced** | Natural language generation, summarization, and clinical communication | Conversational, Reasoning, Perception |
-| **Tool-Enhanced** | Orchestrate clinical systems, devices, and APIs | Tool Integration, Interaction, Reasoning |
-| **Self-Reflecting** | Metacognitive evaluation and decision refinement | Reasoning, Memory, Interaction |
-| **Environment-Controlling** | Manage physical care environment (lighting, temperature, devices) | Perception, Tool Integration, Memory |
+| ReAct + RAG | Multi-step reasoning with external knowledge retrieval | Perception, reasoning, tool integration |
+| Self-learning | Improves from longitudinal interactions and outcome feedback | Memory, reasoning, perception |
+| Memory-enhanced | Continuity of care through patient history | Memory, perception, reasoning |
+| LLM-enhanced | Generation, summarization and clinical communication | Conversational, reasoning, perception |
+| Tool-enhanced | Orchestrates clinical systems, devices and APIs | Tool integration, interaction, reasoning |
+| Self-reflecting | Evaluates and refines its own decisions | Reasoning, memory, interaction |
+| Environment-controlling | Controls the physical care environment | Perception, tool integration, memory |
 
-### Microsoft Healthcare Agent Orchestrator Patterns
-
-Microsoft's Healthcare Agent Orchestrator demonstrates production-grade multi-agent patterns for clinical decision support:
+### 2.3 Microsoft Healthcare Agent Orchestrator patterns
 
 | Pattern | Description |
 | --- | --- |
-| **Specialist-per-modality** | Separate agents for radiology (CXRReportGen), pathology (MedImageParse), genomics, and structured EHR |
-| **Orchestrator-as-facilitator** | Central agent moderates structured group chat, assigns tasks, maintains shared context, resolves conflicts |
-| **Inter-agent communication** | Agents exchange intermediate results directly, not just through the orchestrator |
-| **Domain-specific tool planning** | Tool invocation customized for clinical workflows, not generic task chains |
-| **Verification checkpoints** | Agent outputs verified before downstream consumption to prevent error propagation |
-| **Composite evaluation** | Core metrics (agent selection accuracy, intent resolution, contextual relevance) + ROUGE-based precision + RadFact-derived factuality |
-| **Workflow integration** | Agents embedded in Microsoft Teams for natural clinician interaction |
+| Specialist per modality | Separate agents for radiology, pathology, genomics and structured EHR |
+| Orchestrator as facilitator | A central agent runs a structured group chat, assigns tasks, keeps shared context and resolves conflicts |
+| Inter-agent communication | Agents pass intermediate results to each other directly, not only through the orchestrator |
+| Domain-specific tool planning | Tool calls are planned around clinical workflows rather than generic task chains |
+| Verification checkpoints | Agent outputs are checked before other agents use them, so errors don't propagate |
+| Composite evaluation | Agent-selection accuracy, intent resolution, contextual relevance, ROUGE precision and factuality |
+| Workflow integration | Agents run inside clinical collaboration tools such as Microsoft Teams |
 
-## Alignment with Healthcare GraphRAG Platform
+## 3. Module coverage
 
-### Module Coverage
-
-| Industry Module | Healthcare GraphRAG Implementation | Coverage |
+| Module | Implementation | Coverage |
 | --- | --- | --- |
-| **Perception** | Flink streaming enrichment: ontology normalization, 14 lab signal rules, adverse event detection, clinical text embedding | Strong for structured events and labs; no image or biosignal perception |
-| **Conversational Interface** | Provider web UI + FastAPI `/query` + MCP tools | Functional but synchronous; no medical NER, intent classification, or empathy modulation |
-| **Interaction** | LangGraph conditional routing with specialist agents; MCP tool protocol | Agent-to-orchestrator flow implemented; no inter-agent communication or clinician feedback capture |
-| **Tool Integration** | 10 MCP tools with role-based authorization; Qdrant vector search + Neo4j graph traversal | Strong retrieval tool coverage; no integration with external clinical systems (EHR, pharmacy, imaging) |
-| **Memory and Learning** | Session-scoped conversation memory with TTL; in-memory store for multi-turn context | Partial: session memory implemented; no longitudinal patient tracking or outcome learning yet |
-| **Reasoning** | Deterministic graph rules (interactions, contraindications, lab signals) + LLM synthesis | Strong deterministic reasoning; no uncertainty quantification, no multi-path probabilistic inference |
+| Perception | Flink enrichment: ontology normalization, lab-signal and drug-safety rules, clinical-text embedding ([04 — Data Platform](04_data_platform.md)) | Strong for structured events and labs. No image or biosignal input. |
+| Conversational interface | Provider web UI, `POST /query`, SSE streaming on `POST /query/stream` ([Streaming](05_ai_agents.md#6-streaming)), structured output | Strong. No medical NER and no learned intent classifier; triage is rule-based. |
+| Interaction | LangGraph routing, `delegation_router` fan-out to specialists, human review through `interrupt` and `POST /query/resume` ([Memory and human review](05_ai_agents.md#7-memory-and-human-review)) | Partial. A clinician can approve or reject, but agents don't talk to each other directly and feedback is not captured for learning. |
+| Tool integration | 10 MCP tools behind role-based `ToolGovernance` with audit events ([MCP tools and skills](05_ai_agents.md#9-mcp-tools-and-skills)) | Strong for internal retrieval and generation. No external EHR, pharmacy or imaging systems. |
+| Memory and learning | Session memory with 20 turns and a 3600 s TTL, in-process or Redis | Partial. No longitudinal patient memory and no learning from outcomes. |
+| Reasoning | Deterministic graph rules for interactions, contraindications and lab signals; confidence loop; LLM synthesis | Strong for deterministic reasoning. No uncertainty quantification or multi-path probabilistic inference. |
 
-### Agent Type Mapping
+## 4. Agent type mapping
 
-| Industry Agent Type | Healthcare GraphRAG Equivalent | Status |
+| Agent type | Equivalent in this platform | Status |
 | --- | --- | --- |
-| **ReAct + RAG** | ReAct controller + hybrid vector/graph retrieval | Implemented (feature-flagged) |
-| **Self-Learning** | (none) | Gap |
-| **Memory-Enhanced** | (none) | Gap |
-| **LLM-Enhanced** | Synthesis agent with provider abstraction | Implemented |
-| **Tool-Enhanced** | MCP tools + LangGraph specialist agents | Implemented |
-| **Self-Reflecting** | MLflow evaluation harness (offline, not runtime self-reflection) | Partial |
-| **Environment-Controlling** | (not applicable to this platform's scope) | Out of scope |
+| ReAct + RAG | LangGraph graph with vector and graph retrieval, plus a confidence loop that re-runs retrieval | Implemented |
+| Self-learning | None | Gap |
+| Memory-enhanced | Session memory across turns | Partial: session scope only |
+| LLM-enhanced | `synthesis` node with provider routing, fallback and model tiers | Implemented |
+| Tool-enhanced | MCP tools, the skills layer and the specialist agents | Implemented |
+| Self-reflecting | `confidence_evaluator` loop at runtime, plus offline MLflow scorers | Partial: no answer self-critique |
+| Environment-controlling | Not applicable | Out of scope |
 
-### Microsoft Orchestrator Pattern Comparison
+## 5. Orchestrator pattern comparison
 
-| Microsoft Pattern | Healthcare GraphRAG Status |
+| Pattern | Status in this platform |
 | --- | --- |
-| Specialist-per-modality | Partially: medication_safety, lab_interpretation, coding_review agents; no imaging or genomics agents |
-| Orchestrator-as-facilitator | Implemented: triage_agent routes to specialists via conditional edges |
-| Inter-agent communication | Gap: agents share state via TypedDict reducers but don't communicate directly |
-| Domain-specific tool planning | Implemented: skills_layer.json maps business goals to agent → skill → tool chains |
-| Verification checkpoints | Partial: confidence_evaluator gates synthesis; no cross-agent output verification |
-| Composite evaluation | Partial: 6 scorers in MLflow harness; no factuality metric (RadFact-style) or ROUGE precision |
-| Workflow integration | Gap: no integration with clinical collaboration tools (Teams, Slack, EHR messaging) |
+| Specialist per modality | Partial. There are `medication_safety`, `lab_interpretation` and `coding_review` specialists, but no imaging or genomics agents. |
+| Orchestrator as facilitator | Implemented. `triage` plans the work and `delegation_router` sends it to the specialists. |
+| Inter-agent communication | Gap. Specialists write to shared graph state and don't exchange messages. |
+| Domain-specific tool planning | Implemented. `skills_layer.json` maps business goals to skills and tool chains. |
+| Verification checkpoints | Partial. `confidence_evaluator` gates synthesis and optional human review gates release. Specialist outputs are not cross-checked. |
+| Composite evaluation | Partial. MLflow has six scorers: routing, agent coverage, evidence completeness, answer quality, safety caveat and latency ([Evaluation gates](06_quality_assurance.md#5-evaluation-gates-and-mlflow-evaluation)). There is no factuality or ROUGE metric. |
+| Workflow integration | Gap. Nothing is integrated with Teams, Slack or EHR messaging. |
 
-## Extension Roadmap
+## 6. Extension roadmap
 
-Based on the industry architecture analysis, the following extensions would bring the platform closer to production healthcare AI agent standards:
+Streaming, session memory, human review and the confidence loop are already done, so they are not on this list.
 
-### Near-Term (align with existing architecture)
+### 6.1 Near term
 
-| Priority | Extension | Industry basis | Implementation approach |
+| Priority | Extension | Basis | Approach |
 | --- | --- | --- | --- |
-| High | **Persistent agent memory** | Memory-Enhanced agents; Microsoft shared context | Add session and patient-scoped memory store accessible across agent nodes |
-| High | **Verification checkpoints** | Microsoft error-propagation mitigation | Add output validation between specialist agents and synthesis |
-| High | **Factuality evaluation** | Microsoft RadFact-derived metrics | Add claim-level factuality scorer to MLflow evaluation harness |
-| Medium | **Streaming conversational interface** | LLM-Enhanced agents; Microsoft Teams integration | Add SSE streaming responses and richer conversational state |
+| High | Longitudinal patient memory | Memory-enhanced agents | Add a patient-scoped memory store with privacy filtering, next to session memory |
+| High | Factuality evaluation | Microsoft factuality metrics | Add a claim-level factuality scorer to the MLflow harness |
+| High | Shared HITL checkpointer | Production interaction | Replace `InMemorySaver` with a shared checkpointer so pending reviews survive across replicas |
+| Medium | Specialist output verification | Verification checkpoints | Cross-check specialist findings against graph evidence before synthesis |
 
-### Medium-Term (extend specialist capabilities)
+### 6.2 Medium term
 
-| Priority | Extension | Industry basis | Implementation approach |
+| Priority | Extension | Basis | Approach |
 | --- | --- | --- | --- |
-| High | **Inter-agent communication** | Microsoft group-chat orchestration | Enable specialist agents to exchange intermediate results before synthesis |
-| Medium | **Self-reflection loop** | Self-Reflecting agents | Add runtime answer-quality assessment that triggers re-generation on low confidence |
-| Medium | **Clinical NER perception** | Perception module specification | Extract medication names, dosages, and conditions from clinical notes using NER before embedding |
-| Medium | **Neural reranking** | Advanced perception and reasoning | Add cross-encoder reranking between retrieval and synthesis |
+| High | Inter-agent communication | Group-chat orchestration | Let specialists exchange intermediate findings before synthesis |
+| Medium | Answer self-critique | Self-reflecting agents | Score the draft answer and regenerate it when quality is low |
+| Medium | Clinical NER | Perception module | Extract drugs, doses and conditions from notes before embedding |
+| Medium | Neural reranking | Retrieval quality | Add a cross-encoder between retrieval and ranking |
 
-### Long-Term (new capabilities)
+### 6.3 Long term
 
-| Priority | Extension | Industry basis | Implementation approach |
+| Priority | Extension | Basis | Approach |
 | --- | --- | --- | --- |
-| Medium | **Multimodal perception** | Microsoft CXRReportGen, MedImageParse | Add imaging agent for radiology and pathology image analysis |
-| Medium | **Self-learning agents** | Self-Learning agent archetype | Add outcome feedback loops that adapt retrieval and routing based on clinical outcomes |
-| Low | **Workflow integration** | Microsoft Teams integration | Embed agent interaction in clinical communication tools |
+| Medium | Multimodal perception | Specialist per modality | Add imaging and pathology agents |
+| Medium | Self-learning | Self-learning agents | Use clinician feedback and outcomes to tune retrieval and routing |
+| Low | Workflow integration | Teams integration | Embed the agent in clinical collaboration tools |
 
 ## Related
 
-- [03_platform_blueprint.md](03_platform_blueprint.md) — Platform blueprint, target architecture, and execution backlog
-- [05_ai_agents.md](05_ai_agents.md) — Multi-agent orchestration mode comparison
-- [02_architecture.md](02_architecture.md) — System architecture and maturity scorecard
+- [01 — Business Requirements](01_business_requirements.md)
+- [02 — Architecture](02_architecture.md)
+- [05 — AI Agents](05_ai_agents.md)
+- [06 — Quality Assurance](06_quality_assurance.md)
+- [ADR 0007 — LangGraph multi-agent orchestration](adrs/0007-langgraph-multi-agent-orchestration.md)

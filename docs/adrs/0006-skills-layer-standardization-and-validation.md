@@ -1,4 +1,4 @@
-# ADR-0006: Skills Layer Standardization and Validation
+# ADR-0006: Standardize and validate the skills layer
 
 - Status: accepted
 - Date: 2026-06-12
@@ -6,78 +6,41 @@
 - Supersedes: none
 - Superseded by: none
 
-> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`. Skills live in `domains/<domain>/knowledge/skills/`; generator/validator scripts are in `domains/<domain>/scripts/`.
-
 ## Context
 
-The repository now exposes an explicit skills planning flow across REST and MCP surfaces:
-
-- REST: `POST /skills/plan`
-- MCP: `skills_plan_get`
-
-The project also generates skill packages under `domains/healthcare/skills/` from a central source of truth.
-Without a formal decision, three risks emerge:
-
-1. Runtime skills behavior can drift from generated skill package artifacts.
-2. CI can pass while skills metadata contracts silently regress.
-3. MCP tool catalog evolution can diverge from documented Business Goal -> Agent -> Skills flow.
-
-The architecture needs one authoritative format and validation policy that is enforced in both local development and CI.
+The project needed a common way to map business goals to tool chains and agent behavior. Without a formal skills layer, each domain would drift toward ad hoc prompts, tool selection and validation rules.
 
 ## Decision
 
-Adopt a standardized Skills layer with generator-plus-validator enforcement.
-
-1. Canonical source of truth for planning remains `domains/healthcare/rag-api/src/healthcare_rag_api/config/skills_layer.json`.
-2. Runtime resolution remains in `domains/healthcare/rag-api/src/healthcare_rag_api/skills_layer.py` and is exposed by:
-   - `POST /skills/plan`
-   - `skills_plan_get`
-3. Generated skill package artifacts under `domains/healthcare/skills/` are maintained by `domains/healthcare/scripts/generate_agent_skills.py`.
-4. Structural validation is enforced by `domains/healthcare/scripts/validate_agent_skills.py`.
-5. Both domains (healthcare and supply-chain) share generator/validator logic via `scripts/lib/`.
-6. CI enforces both checks in a dedicated skills validation job.
-7. Upstream `skills-ref validate` is optional and non-blocking:
-   - use it when available,
-   - attempt best-effort install when missing,
-   - skip gracefully when still unavailable.
+Model the business logic in a skills layer that maps request types to agent actions, tool calls and validation constraints. The same layer is used by both healthcare and supply-chain services and is checked in CI for drift.
 
 ## Consequences
 
 Positive:
 
-- Skills planning contracts are explicit, testable, and reproducible.
-- Runtime behavior and generated skills artifacts remain synchronized.
-- CI catches schema drift before merge.
-- The project can consume stricter upstream tooling when available without adding fragility.
+- Shared agent behavior is easier to reason about.
+- Skills make tool selection explicit and testable.
+- The same interface can evolve without breaking each domain separately.
 
 Trade-offs:
 
-- Additional scripts and CI steps increase maintenance surface.
-- Optional upstream validation is not guaranteed on every runner.
-- Contributors must regenerate artifacts when skills config changes.
+- Skills require maintenance when new workflows are introduced.
+- A strong schema may slow exploratory changes.
+- Validation logic must stay aligned with the runtime.
 
 ## Alternatives Considered
 
-- Runtime-only skills with no generated artifacts:
-  - rejected because external consumers and documentation lose a stable package format.
-- Manual curation of `domains/healthcare/skills/*/SKILL.md` files:
-  - rejected due to high drift risk and review burden.
-- Require `skills-ref` as a hard CI dependency:
-  - rejected because availability differs by runner environment and would create unnecessary pipeline failures.
+- Free-form prompt orchestration only: easier to start, harder to govern and review.
+- Per-domain custom logic: duplicates effort and increases regressions.
 
 ## Rollout and Verification
 
-1. Maintain planner source in `domains/healthcare/rag-api/src/healthcare_rag_api/config/skills_layer.json`.
-2. Generate artifacts with `python domains/healthcare/scripts/generate_agent_skills.py`.
-3. Validate artifacts with `python domains/healthcare/scripts/validate_agent_skills.py`.
-4. Enforce generator `--check` plus validator in CI.
-5. Run optional upstream `skills-ref validate` with best-effort install and graceful skip.
-6. Verify contract behavior through `domains/healthcare/rag-api/tests/test_contracts.py` coverage for skills plan resolution.
+- Generate and validate skill manifests for both domains.
+- Run CI checks against the generated packages and tool maps.
+- Review skill changes with any change to domain behavior.
 
 ## Related
 
-- [ADR-0005: Embed FastMCP in rag-api](./0005-embed-fastmcp-in-rag-api.md)
-- [Skills Layer](../05_ai_agents.md)
-- [MCP Layer Design](../05_ai_agents.md)
-- [Platform Blueprint](../03_platform_blueprint.md)
-- [AI QA](../06_quality_assurance.md)
+- [05_ai_agents.md](../05_ai_agents.md)
+- [ADR-0005](0005-embed-fastmcp-in-rag-api.md)
+- [ADR-0012](0012-capability-oriented-layout.md)

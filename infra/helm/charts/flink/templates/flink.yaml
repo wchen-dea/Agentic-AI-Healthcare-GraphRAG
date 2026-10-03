@@ -37,6 +37,13 @@ spec:
         - name: {{ $key }}
           value: {{ $value | quote }}
         {{- end }}
+        {{- range $key, $ref := .Values.secretEnv }}
+        - name: {{ $key }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $ref.name }}
+              key: {{ $ref.key }}
+        {{- end }}
         resources:
           {{- toYaml .Values.jobmanager.resources | nindent 10 }}
 ---
@@ -71,6 +78,13 @@ spec:
         {{- range $key, $value := .Values.config }}
         - name: {{ $key }}
           value: {{ $value | quote }}
+        {{- end }}
+        {{- range $key, $ref := .Values.secretEnv }}
+        - name: {{ $key }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $ref.name }}
+              key: {{ $ref.key }}
         {{- end }}
         resources:
           {{- toYaml .Values.taskmanager.resources | nindent 10 }}

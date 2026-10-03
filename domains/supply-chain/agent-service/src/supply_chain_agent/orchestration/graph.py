@@ -13,6 +13,7 @@ Topology::
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from typing import Any
 
 from langgraph.graph import END, StateGraph
@@ -97,6 +98,20 @@ def build_supply_chain_graph():
     return graph.compile()
 
 
+@lru_cache(maxsize=2)
+def _cached_graph(tracing: bool) -> Any:
+    return build_supply_chain_graph()
+
+
+def get_compiled_graph() -> Any:
+    """Return the compiled graph, building it once per tracing configuration."""
+    return _cached_graph(mlflow_enabled())
+
+
+def clear_graph_cache() -> None:
+    _cached_graph.cache_clear()
+
+
 def run_langgraph_query(
     question: str, entity_id: str | None = None, *, context_limit: int = DEFAULT_CONTEXT_LIMIT
 ) -> dict[str, Any]:
@@ -121,14 +136,7 @@ def _run_pipeline(question: str, entity_id: str | None, *, context_limit: int) -
         "iteration": 0,
     }
 
-    config: dict[str, Any] = {}
-    if os.getenv("LANGSMITH_API_KEY"):
-        config["metadata"] = {
-            "project": os.getenv("LANGSMITH_PROJECT", "supplychain-graphrag"),
-            "entity_id": entity_id or "none",
-        }
-
-    final_state = build_supply_chain_graph().invoke(initial_state, config=config)
+    final_state = get_compiled_graph().invoke(initial_state)
     request_type = final_state.get("request_type", "procurement_overview")
     return {
         "question": question,

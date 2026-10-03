@@ -1,20 +1,16 @@
 """Supply Chain GraphRAG streaming processor."""
 
+import hashlib
 import json
 import os
+import time
 
 from app.graph_writes import (
-    merge_base_event,
-    merge_disruption_alert,
     merge_facility_reference,
-    merge_inventory_level,
     merge_part_reference,
-    merge_purchase_order,
-    merge_quality_result,
-    merge_shipment,
     merge_supplier_reference,
 )
-from app.pipeline_service import SupplyChainPipelineService, clinical_text
+from app.pipeline_service import SupplyChainPipelineService
 from confluent_kafka import Consumer, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
@@ -23,11 +19,40 @@ from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
+_PROVIDER_DEFAULT_DIMS = {"local": 384, "databricks": 1024}
+
+
+def _configured_vector_size() -> int:
+    """Mirror knowledge_core.get_vector_size() for runs without knowledge_core."""
+    override = os.getenv("EMBEDDING_DIM", "").strip()
+    if override:
+        return int(override)
+    provider = os.getenv("EMBEDDING_PROVIDER", "local").strip().lower() or "local"
+    return _PROVIDER_DEFAULT_DIMS.get(provider, 384)
+
+
+VECTOR_SIZE = _configured_vector_size()
+
+
+def _md5_embedding(text: str, dim: int = VECTOR_SIZE) -> list[float]:
+    """Deterministic bag-of-words vector; matches knowledge_core's fallback."""
+    vec = [0.0] * dim
+    for token in text.lower().split():
+        vec[int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16) % dim] += 1.0
+    norm = sum(x * x for x in vec) ** 0.5
+    return [x / norm if norm else 0.0 for x in vec]
+
+
+def _require_model() -> bool:
+    return os.getenv("EMBEDDING_REQUIRE_MODEL", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 try:
     from knowledge_core.embedding import VECTOR_SIZE, stable_embedding
 except ImportError:
-    from app.pipeline_service import _md5_embedding as stable_embedding
-    VECTOR_SIZE = 384
+    if _require_model():
+        raise
+    stable_embedding = _md5_embedding
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant-sc:6333")
@@ -55,14 +80,6 @@ ALL_TOPICS = TOPICS + REFERENCE_TOPICS
 TOPIC_SET = set(TOPICS)
 REFERENCE_TOPIC_SET = set(REFERENCE_TOPICS)
 
-EVENT_TYPE_HANDLER = {
-    "PURCHASE_ORDER": merge_purchase_order,
-    "SHIPMENT_UPDATE": merge_shipment,
-    "QUALITY_RESULT": merge_quality_result,
-    "DISRUPTION_ALERT": merge_disruption_alert,
-    "INVENTORY_LEVEL": merge_inventory_level,
-}
-
 REFERENCE_TYPE_HANDLER = {
     "SUPPLIER_MASTER_UPSERT": merge_supplier_reference,
     "PART_MASTER_UPSERT": merge_part_reference,
@@ -72,15 +89,12 @@ REFERENCE_TYPE_HANDLER = {
 
 def _embed(text: str) -> list[float]:
     try:
-        return stable_embedding(text)
+        return stable_embedding(text, VECTOR_SIZE)
     except Exception:
-        import hashlib
-        vec = [0.0] * VECTOR_SIZE
-        for token in text.lower().split():
-            h = int(hashlib.md5(token.encode()).hexdigest(), 16)
-            vec[h % VECTOR_SIZE] += 1.0
-        norm = sum(x * x for x in vec) ** 0.5
-        return [x / norm if norm else 0.0 for x in vec]
+        # Strict mode: never mix MD5 vectors into a collection queried with the model.
+        if _require_model():
+            raise
+        return _md5_embedding(text, VECTOR_SIZE)
 
 
 class SupplyChainProcessor:
@@ -134,16 +148,7 @@ class SupplyChainProcessor:
                     session.execute_write(handler, event, payload)
             return f"REF:{event_type}"
 
-        text = clinical_text(event)
-        vector = _embed(text)
-
-        self.pipeline._write_qdrant(event, payload, text, vector)
-
-        with self.neo4j.session() as session:
-            session.execute_write(merge_base_event, event, text)
-            handler = EVENT_TYPE_HANDLER.get(event_type)
-            if handler:
-                session.execute_write(handler, event, payload)
+        self.pipeline.process_event(event)
 
         print(f"Processed {event_type} event {event.get('event_id', '?')}")
         return f"OK:{event_type}"
@@ -171,7 +176,6 @@ def main():
                 c.commit(msg, asynchronous=False)
             except Exception as ex:
                 print(f"FAILED key={msg.key()} error={ex}")
-                import time
                 time.sleep(1)
     finally:
         processor.close()

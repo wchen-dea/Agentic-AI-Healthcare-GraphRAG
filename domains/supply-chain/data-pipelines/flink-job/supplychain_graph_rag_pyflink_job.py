@@ -5,6 +5,7 @@ processor for side-effect sinks (Qdrant + Neo4j), submitted to the shared
 Flink cluster via flink run.
 """
 
+import logging
 import os
 
 from pyflink.common import WatermarkStrategy
@@ -17,6 +18,8 @@ from supplychain_graph_rag_job import (
     ALL_TOPICS,
     SupplyChainProcessor,
 )
+
+logger = logging.getLogger(__name__)
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 GROUP_ID = os.getenv("FLINK_KAFKA_GROUP_ID", "supplychain-graphrag-pyflink")
@@ -39,10 +42,12 @@ class SupplyChainSideEffectMap(MapFunction):
         processor = self._get_processor()
         raw = value.encode("ISO-8859-1") if isinstance(value, str) else value
         try:
-            result = processor.handle_topic_message(self.topic, raw)
-            return result
-        except Exception as ex:
-            return f"error:{self.topic}:{ex}"
+            return processor.handle_topic_message(self.topic, raw)
+        except Exception:
+            # Re-raise so Flink fails the task and restarts from the last
+            # checkpoint instead of silently dropping the event.
+            logger.exception("Failed processing message from topic %s", self.topic)
+            raise
 
 
 def main():

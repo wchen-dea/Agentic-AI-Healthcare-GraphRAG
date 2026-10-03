@@ -11,6 +11,7 @@ from typing import Any
 
 from agent_core.audit import utc_timestamp
 from agent_core.governance import ToolGovernance, scope_for
+from agent_core.mcp_server import ToolSpec, register_skills_surface, register_tools
 from mcp.server.fastmcp import FastMCP
 
 from healthcare_agent.api.responses import ResponseShaper
@@ -31,18 +32,69 @@ from healthcare_agent.orchestration.query_service import QueryService
 from healthcare_agent.safety.response_policy import apply_response_budget, truncate_text, vector_text_mode
 from healthcare_agent.tools.skills import build_skill_plan
 
-TOOL_NAMES = (
-    "patient_context_get",
-    "vector_evidence_search",
-    "graphrag_answer_generate",
-    "risk_summary_generate",
-    "evidence_bundle_export",
-    "timeline_explain",
-    "medication_risk_assess",
-    "coding_gap_detect",
-    "cohort_risk_summary",
-    "skills_plan_get",
+TOOL_SPECS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        "patient_context_get",
+        "Patient context",
+        "read_only",
+        "Return a patient's graph context: conditions, medications, claims and drug interactions.",
+    ),
+    ToolSpec(
+        "vector_evidence_search",
+        "Vector evidence search",
+        "read_only",
+        "Semantic search over clinical notes and evidence chunks, optionally scoped to one patient.",
+    ),
+    ToolSpec(
+        "graphrag_answer_generate",
+        "GraphRAG answer",
+        "generation",
+        "Answer a clinical question with graph and vector evidence, returning citations.",
+    ),
+    ToolSpec(
+        "risk_summary_generate",
+        "Patient risk summary",
+        "generation",
+        "Generate an evidence-grounded clinical risk summary for one patient.",
+    ),
+    ToolSpec(
+        "evidence_bundle_export",
+        "Evidence bundle export",
+        "export",
+        "Export the audit-ready evidence bundle (graph facts and vector hits) for a patient question.",
+    ),
+    ToolSpec(
+        "timeline_explain",
+        "Clinical timeline",
+        "generation",
+        "Explain a patient's clinical timeline of encounters, diagnoses and medications.",
+    ),
+    ToolSpec(
+        "medication_risk_assess",
+        "Medication risk",
+        "generation",
+        "Assess medication risks such as interactions and contraindications for a patient.",
+    ),
+    ToolSpec(
+        "coding_gap_detect",
+        "Coding gap detection",
+        "generation",
+        "Detect documentation or coding gaps between clinical evidence and recorded codes.",
+    ),
+    ToolSpec(
+        "cohort_risk_summary",
+        "Cohort risk summary",
+        "generation",
+        "Summarize risk patterns across a patient cohort.",
+    ),
+    ToolSpec(
+        "skills_plan_get",
+        "Skills plan",
+        "read_only",
+        "Return the skill plan (skills, context requirements, tools) for a business goal.",
+    ),
 )
+TOOL_NAMES = tuple(spec.name for spec in TOOL_SPECS)
 
 
 class HealthcareMcpTools:
@@ -62,8 +114,14 @@ class HealthcareMcpTools:
         self._load_skills = load_skills
 
     def register(self, mcp: FastMCP) -> None:
-        for name in TOOL_NAMES:
-            mcp.tool()(getattr(self, name))
+        register_tools(mcp, self, TOOL_SPECS)
+        register_skills_surface(
+            mcp,
+            lambda: self._load_skills(str(self._settings.skills_layer_path)),
+            prompt_name="clinical_review",
+            prompt_title="Clinical review plan",
+            subject_label="Patient",
+        )
 
     def patient_context_get(
         self,
@@ -443,7 +501,3 @@ class HealthcareMcpTools:
             scope="none",
             fn=_handler,
         )
-
-
-    # Register the streamable HTTP route directly so the documented `POST /mcp`
-    # endpoint is served as-is (a `/mcp` mount would nest it at `/mcp/mcp`).

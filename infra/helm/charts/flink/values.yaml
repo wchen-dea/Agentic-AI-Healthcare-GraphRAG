@@ -27,6 +27,16 @@ job:
     tag: latest
   mainClass: healthcare_graph_rag_pyflink_job.py
 config:
+  # Ingest (Flink) and query (agent) must embed with the same provider/model.
+  # Dev: local all-MiniLM-L6-v2 (384 dims) baked into the image. Prod overlay:
+  #   EMBEDDING_PROVIDER: "databricks"
+  #   DATABRICKS_HOST: "https://<workspace>.cloud.databricks.com"
+  #   DATABRICKS_EMBEDDING_ENDPOINT: "databricks-gte-large-en"
+  #   EMBEDDING_DIM: "1024"
+  # plus DATABRICKS_TOKEN via secretEnv. Switching requires re-ingesting Qdrant.
+  EMBEDDING_PROVIDER: "local"
+  EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+  EMBEDDING_REQUIRE_MODEL: "true"
   KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
   SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
   NEO4J_URI: "bolt://neo4j:7687"
@@ -34,3 +44,9 @@ config:
   NEO4J_PASSWORD: "healthcare123"
   QDRANT_URL: "http://qdrant:6333"
   QDRANT_COLLECTION: "healthcare_events"
+# Env vars sourced from existing Kubernetes Secrets (never put tokens in config).
+# secretEnv:
+#   DATABRICKS_TOKEN:
+#     name: databricks-credentials
+#     key: token
+secretEnv: {}

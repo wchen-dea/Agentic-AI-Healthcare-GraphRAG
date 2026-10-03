@@ -1,1 +1,1 @@
-"""Tool surfaces: MCP server tools, LangChain tool adapters, and the skills layer."""
+"""Tool surfaces: MCP server tools and the skills layer."""

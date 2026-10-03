@@ -1,127 +1,54 @@
 # Agentic AI Healthcare + Supply Chain GraphRAG
 
-A local-first multi-domain Python workspace for building and running GraphRAG-style AI systems across healthcare and supply-chain domains. The repository is organized as a uv-managed monorepo with shared runtime packages and domain-specific agent services, streaming pipelines, knowledge assets, and web apps.
+This repository implements a local-first, multi-domain GraphRAG platform for healthcare and supply-chain workloads. The code is organized as a uv workspace with shared runtime packages, domain-specific agent services, streaming pipelines, knowledge assets, and web apps.
 
-The implementation is broader than the older single-platform README narrative: the codebase is currently structured around shared infrastructure plus two active domains,
-- Healthcare
-- Supply chain
+The platform is intentionally provider-neutral and modular: it can run locally with Ollama and MiniLM in development and switch to Databricks-hosted embeddings and LLMs in production without changing the app contract.
 
-with Docker Compose overlays, a Makefile-driven developer workflow, and domain-specific data pipelines and agent services.
+## Architecture
 
-## What the repo contains
-
-The current project structure is a real workspace, not a single app package:
-
-- `packages/agent-core` — shared orchestration/runtime utilities
-- `packages/knowledge-core` — shared knowledge and graph-related abstractions
-- `domains/healthcare/` — healthcare agent service, data pipelines, knowledge seeds, scripts, web app
-- `domains/supply-chain/` — supply-chain agent service, data pipelines, knowledge seeds, scripts, web app
-- `infra/compose/` — shared infra stack and domain overlays
-- `infra/helm/` — Helm deployment assets
-- `scripts/` — validation and workflow helpers
-- `docs/` — architecture, operations, and domain documentation
-
-## Architecture summary
-
-The runtime model is organized into tiers:
-
-- Shared infrastructure: Kafka, Schema Registry, Ollama, Prometheus, Grafana, MLflow, LocalStack, and supporting services
-- Healthcare domain overlay: Neo4j, Qdrant, Kafka topics, Flink job, producer, agent service, webapp
-- Supply-chain domain overlay: separate Neo4j, Qdrant, Kafka topics, producer, Flink job, and agent service
-- Shared Python packages used by both domains
-
-This is a local development and experimentation platform with a multi-domain GraphRAG stack rather than a single product service.
-
-## Core stack
-
-The implementation currently reflects these technologies:
-
-- Python + uv workspace management
-- FastAPI + Uvicorn
-- LangGraph / LangChain / LangSmith
-- Neo4j for graph memory and ontology data
-- Qdrant for vector retrieval
-- Kafka + Schema Registry + Flink for streaming ingestion and processing
-- MLflow + Grafana + Prometheus for observability
-- Docker Compose and Helm for local and deployment workflows
-- Pydantic and typed Python services across the shared packages and domain services
-
-## Local developer workflow
-
-The project uses a Makefile as the main entry point for local orchestration.
-
-### Bootstrap and lifecycle
-
-```bash
-make up          # Start shared infra + healthcare + supply-chain
-make up-hc       # Start infra + healthcare domain
-make up-sc       # Start infra + supply-chain domain
-make down        # Stop everything and remove the network
-make ps          # Show running containers
-make logs        # Tail healthcare logs
-make logs-sc     # Tail supply-chain logs
+```mermaid
+flowchart LR
+    UI[Healthcare / supply-chain web apps] --> API[FastAPI agent service]
+    API --> ORCH[LangGraph orchestration]
+    ORCH --> RETR[Vector + graph retrieval]
+    RETR --> NEO4J[(Neo4j)]
+    RETR --> QDRANT[(Qdrant)]
+    ORCH --> MCP[MCP tools + skills]
+    ORCH --> GEN[LLM provider router]
+    KAFKA[Kafka topics] --> FLINK[Flink enrichment]
+    FLINK --> QDRANT
+    FLINK --> NEO4J
+    MON[MLflow / Grafana / Prometheus] --> API
+    MON --> ORCH
 ```
 
-### Domain and service access
+## Quickstart
+
+Use the Makefile for the default local workflow.
 
 ```bash
-make api-hc      # Health check for healthcare API
-make api-sc      # Health check for supply-chain API
-make query-hc    # Run healthcare query examples
-make query-sc    # Run supply-chain query examples
-make flink-hc    # Healthcare Flink overview
-make flink-sc    # Supply-chain Flink overview
-make topics      # List Kafka topics
-make mlflow      # MLflow health check
+make up
+make api-hc
+make query-hc
+make validate-docs
 ```
 
-### Validation and tests
+Common targets:
 
-```bash
-make validate            # Cross-domain stack validation
-make validate-docs       # Markdown validation
-make validate-skills     # Agent skill package sync checks
-make validate-ontology   # Ontology validation for both domains
-make test-unit           # Fast unit tests for agent-core + domains
-make test-integration    # Integration tests (no live services)
-make test-evals          # Offline evaluation suites
-make lint                # Ruff linting across packages and domains
-```
+- `make up` starts the shared infra plus both domains.
+- `make up-hc` starts the healthcare domain.
+- `make up-sc` starts the supply-chain domain.
+- `make validate` runs stack validation.
+- `make validate-docs` runs markdownlint.
+- `make test-unit` runs unit tests across the workspace.
+- `make lint` runs Ruff checks.
 
-### Healthcare web UI
+## Domains
 
-```bash
-make web-hc-dev      # Vite dev server for healthcare UI
-make web-hc-test     # Typecheck and unit tests for healthcare web app
-make web-hc-build    # Production build for healthcare web app
-```
-
-## Service endpoints
-
-The current local stack exposes the following ports:
-
-| Service | URL |
-|---------|-----|
-| Healthcare agent service | http://localhost:8000 |
-| Supply-chain agent service | http://localhost:8001 |
-| Healthcare web app | http://localhost:8088 |
-| Supply-chain web app | http://localhost:8089 |
-| Healthcare Neo4j Browser | http://localhost:7474 |
-| Supply-chain Neo4j Browser | http://localhost:7475 |
-| Healthcare Qdrant | http://localhost:6333 |
-| Supply-chain Qdrant | http://localhost:6335 |
-| Healthcare Flink dashboard | http://localhost:8082 |
-| Supply-chain Flink dashboard | http://localhost:8083 |
-| Grafana | http://localhost:3000 |
-| MLflow | http://localhost:5000 |
-
-## Default credentials
-
-| Service | Username | Password |
-|---------|----------|----------|
-| Healthcare Neo4j | neo4j | healthcare123 |
-| Supply-chain Neo4j | neo4j | supplychain123 |
-| Grafana | admin | admin123 |
+| Domain | Core focus | Key runtime |
+| --- | --- | --- |
+| Healthcare | drug safety, lab interpretation, coding review, patient summaries | `domains/healthcare/agent-service`, Flink jobs, Neo4j, Qdrant |
+| Supply chain | logistics, inventory and disruption analysis | `domains/supply-chain/agent-service`, Flink jobs, Neo4j, Qdrant |
 
 ## Repository layout
 
@@ -130,49 +57,58 @@ The current local stack exposes the following ports:
 ├── Makefile
 ├── pyproject.toml
 ├── uv.lock
-├── docs/                          # Architecture, operations, and domain design docs
+├── docs/
 ├── domains/
 │   ├── healthcare/
-│   │   ├── agent-service/
-│   │   ├── data-pipelines/
-│   │   ├── knowledge/
-│   │   ├── scripts/
-│   │   └── webapp/
 │   └── supply-chain/
-│       ├── agent-service/
-│       ├── data-pipelines/
-│       ├── knowledge/
-│       ├── scripts/
-│       └── webapp/
 ├── packages/
 │   ├── agent-core/
 │   └── knowledge-core/
 ├── infra/
 │   ├── compose/
 │   ├── helm/
-│   ├── environments/
-│   ├── observability/
-│   ├── images/
-│   └── web/
+│   └── observability/
 ├── scripts/
-├── deploy/
-├── container/
-├── volume/
-└── README.md
+├── README.md
+└── docs/adrs/
 ```
 
-## Documentation
+## Documentation index
 
-See the project docs for the deeper architecture and operating model:
+| Document | Purpose |
+| --- | --- |
+| [docs/01_business_requirements.md](docs/01_business_requirements.md) | Business scope, personas and requirements |
+| [docs/02_architecture.md](docs/02_architecture.md) | System architecture and runtime model |
+| [docs/03_platform_blueprint.md](docs/03_platform_blueprint.md) | Target platform blueprint and backlog |
+| [docs/04_data_platform.md](docs/04_data_platform.md) | Kafka, Flink, Neo4j, Qdrant and embeddings |
+| [docs/05_ai_agents.md](docs/05_ai_agents.md) | Agent orchestration, request types, memory, MCP and guardrails |
+| [docs/06_quality_assurance.md](docs/06_quality_assurance.md) | QA strategy, evaluations and MLflow gates |
+| [docs/07_cicd_automation.md](docs/07_cicd_automation.md) | CI/CD and release flow |
+| [docs/08_operation_runbook.md](docs/08_operation_runbook.md) | Operations, troubleshooting and re-indexing |
+| [docs/09_supply_chain_domain.md](docs/09_supply_chain_domain.md) | Supply-chain domain architecture |
+| [docs/10_healthcare_landscape.md](docs/10_healthcare_landscape.md) | Healthcare reference patterns and gaps |
+| [docs/adrs/README.md](docs/adrs/README.md) | Architecture decision index |
 
-- [docs/](docs/)
-- [docs/01_business_requirements.md](docs/01_business_requirements.md)
-- [docs/02_architecture.md](docs/02_architecture.md)
-- [docs/04_data_platform.md](docs/04_data_platform.md)
-- [docs/05_ai_agents.md](docs/05_ai_agents.md)
-- [docs/08_operation_runbook.md](docs/08_operation_runbook.md)
-- [docs/adrs/README.md](docs/adrs/README.md)
+## ADRs
 
-## Safety note
+The ADRs describe the major architectural decisions behind the platform:
 
-This repository contains synthetic or demo-oriented data and local development assets. It is not a clinical system, not a regulated medical device, and any AI-generated output should be treated as advisory only and validated independently before use in operational or clinical settings.
+- [ADR-0001](docs/adrs/0001-dual-persistence-qdrant-neo4j.md) — dual persistence with Qdrant and Neo4j
+- [ADR-0002](docs/adrs/0002-qdrant-streaming-vector-store.md) — streaming vector store choice
+- [ADR-0003](docs/adrs/0003-ontology-governance-and-seed-generation.md) — ontology governance and seed generation
+- [ADR-0004](docs/adrs/0004-local-first-llm-provider-routing.md) — local-first routing with provider fallback
+- [ADR-0005](docs/adrs/0005-embed-fastmcp-in-rag-api.md) — embedded MCP server in the API
+- [ADR-0006](docs/adrs/0006-skills-layer-standardization-and-validation.md) — skills-layer standardization
+- [ADR-0007](docs/adrs/0007-langgraph-multi-agent-orchestration.md) — multi-agent orchestration with LangGraph
+- [ADR-0008](docs/adrs/0008-mlflow-tracing-and-evaluation.md) — observability and MLflow evaluation
+- [ADR-0009](docs/adrs/0009-domain-module-extraction.md) — extraction of domain-specific modules
+- [ADR-0010](docs/adrs/0010-layered-agentic-architecture.md) — layered runtime architecture
+- [ADR-0011](docs/adrs/0011-uv-workspace-packaging.md) — uv workspace packaging
+- [ADR-0012](docs/adrs/0012-capability-oriented-layout.md) — capability-oriented repository layout
+
+## Related
+
+- [docs/05_ai_agents.md](docs/05_ai_agents.md) for the runtime behavior of the agents
+- [docs/04_data_platform.md](docs/04_data_platform.md) for the ingestion and persistence model
+- [docs/08_operation_runbook.md](docs/08_operation_runbook.md) for deployment and operations
+- [docs/06_quality_assurance.md](docs/06_quality_assurance.md) for evaluation gates and validation

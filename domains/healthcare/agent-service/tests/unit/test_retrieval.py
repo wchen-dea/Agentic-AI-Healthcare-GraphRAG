@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
-from healthcare_agent.retrieval.search import classify_query_domains, vector_search
+from httpx import Headers
+from neo4j import Query
+from qdrant_client.http.exceptions import UnexpectedResponse
+
+from healthcare_agent.retrieval import search as search_module
+from healthcare_agent.retrieval.search import classify_query_domains, graph_search, vector_search
 
 
 class ClassifyQueryDomainsTests(unittest.TestCase):
@@ -94,6 +99,62 @@ class VectorSearchMultiDomainTests(unittest.TestCase):
         results = vector_search(client, "coll", "heart rate", None, limit=5)
 
         self.assertEqual(results[0]["embedding_domain"], "device")
+
+    def test_falls_back_to_unnamed_vector_on_schema_error(self):
+        schema_error = UnexpectedResponse(400, "Bad Request", b"Wrong vector name", Headers())
+        client = self._mock_qdrant([schema_error, [self._make_hit("e1", 0.9)]])
+
+        results = vector_search(client, "coll", "diagnosis?", None, limit=5)
+
+        self.assertEqual([r["event_id"] for r in results], ["e1"])
+        self.assertIsInstance(client.search.call_args_list[1].kwargs["query_vector"], list)
+
+    def test_transport_errors_are_not_masked_by_fallback(self):
+        client = self._mock_qdrant([ConnectionError("qdrant down")])
+
+        with self.assertRaises(ConnectionError):
+            vector_search(client, "coll", "diagnosis?", None, limit=5)
+        self.assertEqual(client.search.call_count, 1)
+
+    def test_server_errors_are_not_masked_by_fallback(self):
+        client = self._mock_qdrant([UnexpectedResponse(503, "Unavailable", b"", Headers())])
+
+        with self.assertRaises(UnexpectedResponse):
+            vector_search(client, "coll", "diagnosis?", None, limit=5)
+
+
+class GraphSearchTests(unittest.TestCase):
+    def _driver(self, records):
+        session = MagicMock()
+        session.run.return_value = records
+        driver = MagicMock()
+        driver.session.return_value.__enter__.return_value = session
+        return driver, session
+
+    def test_uses_query_timeout_and_dedupes_patient_ids(self):
+        driver, session = self._driver([{"patient_id": "p-1"}])
+
+        results = graph_search(driver, ["p-1", "p-1", "", "p-2"])
+
+        query, params = session.run.call_args.args
+        self.assertIsInstance(query, Query)
+        self.assertEqual(query.timeout, search_module.graph_query_timeout_seconds)
+        self.assertEqual(params["patient_ids"], ["p-1", "p-2"])
+        self.assertEqual(results, [{"patient_id": "p-1"}])
+
+    def test_caps_patient_ids(self):
+        driver, session = self._driver([])
+        ids = [f"p-{i}" for i in range(search_module.max_graph_patient_ids + 10)]
+
+        graph_search(driver, ids)
+
+        self.assertEqual(len(session.run.call_args.args[1]["patient_ids"]), search_module.max_graph_patient_ids)
+
+    def test_empty_patient_ids_skips_neo4j(self):
+        driver, session = self._driver([])
+
+        self.assertEqual(graph_search(driver, []), [])
+        session.run.assert_not_called()
 
 
 if __name__ == "__main__":

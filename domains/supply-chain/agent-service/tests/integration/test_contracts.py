@@ -135,6 +135,31 @@ def test_mcp_tool_surface_matches_policy(service) -> None:
     assert tools == allowed
 
 
+def test_mcp_surface_exposes_tool_metadata_skills_resources_and_prompt(service) -> None:
+    from supply_chain_agent.tools.mcp_server import TOOL_SPECS
+
+    mcp = service.mcp
+    tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+    for spec in TOOL_SPECS:
+        assert tools[spec.name].title == spec.title
+        assert tools[spec.name].description
+        assert tools[spec.name].annotations.readOnlyHint is True
+    assert tools["supplier_context_get"].annotations.idempotentHint is True
+    assert tools["evidence_bundle_export"].annotations.openWorldHint is False
+    assert mcp.instructions
+
+    assert "skills://catalog" in {str(r.uri) for r in asyncio.run(mcp.list_resources())}
+    catalog = json.loads(next(iter(asyncio.run(mcp.read_resource("skills://catalog")))).content)
+    assert "supplier_risk_assessment" in catalog["business_goals"]
+
+    prompt = asyncio.run(
+        mcp.get_prompt("supply_risk_review", {"business_goal": "supplier_risk_assessment", "subject_id": "SUP-001"})
+    )
+    text = prompt.messages[0].content.text
+    assert "Entity: SUP-001" in text
+    assert "supplier_risk_agent" in text
+
+
 def test_mcp_vector_search_is_redacted_and_scoped(service, audit_path: Path) -> None:
     with patch.object(service, "vector_context", return_value=[dict(VECTOR_HIT)]):
         result = service.mcp_tools.vector_evidence_search("supplier risk signals", entity_id="SUP-001", top_k=3)

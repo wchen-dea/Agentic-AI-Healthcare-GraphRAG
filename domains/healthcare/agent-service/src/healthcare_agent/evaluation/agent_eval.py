@@ -1,40 +1,15 @@
-"""LangSmith tracing and evaluation integration for healthcare LangGraph agents.
+"""Offline evaluation dataset and healthcare-specific scorers for the LangGraph agent.
 
 Provides:
-- Automatic tracing via environment variables (LANGSMITH_API_KEY, LANGSMITH_PROJECT)
-- Evaluation datasets and scoring for comparing single-pass vs ReAct vs LangGraph
-- Custom healthcare-specific evaluators
+- An evaluation dataset covering each specialist route
+- Deterministic scorers (routing, evidence, coverage, answer quality)
+- ``run_evaluation_suite`` used by the release gates and MLflow evaluation
+
+Tracing is handled by MLflow (see ``observability.tracing``).
 """
 from __future__ import annotations
 
-import os
 from typing import Any
-
-
-def get_langsmith_config(
-    *,
-    run_name: str | None = None,
-    patient_id: str | None = None,
-    mode: str = "langgraph",
-) -> dict[str, Any]:
-    """Build a LangSmith-compatible config dict for graph invocation.
-
-    Tracing activates automatically when ``LANGSMITH_API_KEY`` is set.
-    """
-    config: dict[str, Any] = {
-        "metadata": {
-            "mode": mode,
-            "patient_id": patient_id or "none",
-        },
-    }
-    if run_name:
-        config["run_name"] = run_name
-    return config
-
-
-def langsmith_enabled() -> bool:
-    return bool(os.getenv("LANGSMITH_API_KEY"))
-
 
 # ── Evaluation helpers ─────────────────────────────────────────────────────
 

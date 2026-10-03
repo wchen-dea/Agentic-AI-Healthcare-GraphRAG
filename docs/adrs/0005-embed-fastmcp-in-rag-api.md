@@ -1,4 +1,4 @@
-# ADR-0005: Embed FastMCP in rag-api
+# ADR-0005: Embed FastMCP in the API layer
 
 - Status: accepted
 - Date: 2026-06-12
@@ -6,60 +6,41 @@
 - Supersedes: none
 - Superseded by: none
 
-> **Current locations (post-ADR 0012):** `rag-api` / `healthcare_rag_api` is now `domains/healthcare/agent-service` (package `healthcare_agent`); shared governance, metrics, and settings live in `packages/agent-core/src/agent_core/`. The FastMCP server is `healthcare_agent/tools/mcp_server.py`.
-
 ## Context
 
-The project exposes two API surfaces:
-
-- RAG REST API for application clients.
-- FastMCP API for agent/tool clients.
-
-Running a separate MCP service adds deployment complexity and duplicate runtime concerns for local development.
+The system needed governed tool access for retrieval, graph navigation and causal checks without creating a separate service for each tool. The API already owned request routing and policy enforcement, so a shared embedded MCP server was the natural seam.
 
 ## Decision
 
-Embed FastMCP in the same rag-api process and expose MCP at `/mcp`.
-
-- RAG REST remains at `/query`.
-- Human diagnostic endpoint remains at `/mcp/health`.
-- The standalone mcp-server scaffold has been removed; embedded MCP is the only runtime.
-
-Implementation:
-
-- Embedded MCP tools run in the same process as REST query orchestration.
-- Ten MCP tools are exposed: `patient_context_get`, `vector_evidence_search`, `graphrag_answer_generate`, `risk_summary_generate`, `evidence_bundle_export`, `timeline_explain`, `medication_risk_assess`, `coding_gap_detect`, `cohort_risk_summary`, `skills_plan_get`.
-- Skills planning is available through both REST (`POST /skills/plan`) and MCP (`skills_plan_get`).
-- Tool policy gating is centralized in `domains/healthcare/rag-api/src/healthcare_rag_api/config/tool_policies.json`.
+Integrate a FastMCP server into the agent service and expose a governed tool layer to the graph nodes. Tool access is filtered by policy and explicit tool metadata, which keeps the runtime auditable and reviewable.
 
 ## Consequences
 
 Positive:
 
-- Single API container for local stack.
-- Shared retrieval/generation logic between REST and MCP surfaces.
-- Simpler compose topology.
+- The tool surface is governed in one place.
+- Agent services can re-use the same MCP pattern across domains.
+- Tool invocation remains close to the orchestration logic.
 
 Trade-offs:
 
-- Shared process resources across REST and MCP traffic.
-- Requires careful route and lifecycle handling for MCP streamable HTTP.
+- The API must own more governance logic.
+- Failure modes include tool-policy drift and broken tool registration.
+- The framework requires clear versioning as tools evolve.
 
 ## Alternatives Considered
 
-- Separate MCP service process: rejected because it duplicates retrieval and authorization logic and doubles the container count for local development.
-- gRPC protocol instead of MCP: rejected because MCP provides a standard tool protocol with ecosystem compatibility for agent frameworks.
+- Separate tool microservice: more operational overhead and latency.
+- No MCP layer: harder to govern and test tools.
 
 ## Rollout and Verification
 
-- Verify MCP health: `curl -s http://localhost:8000/mcp/health | jq .`
-- Run MCP handshake smoke test: `python3 ./domains/healthcare/scripts/mcp_smoke_test.py`
-- Contract tests in `domains/healthcare/rag-api/tests/test_contracts.py` validate MCP tool shapes.
+- Register tool policies and validate them in CI.
+- Check role-based access at runtime before calling any tool.
+- Exercise the end-to-end tool call path in integration tests.
 
 ## Related
 
-- [ADR-0004: Local-first LLM with provider routing](./0004-local-first-llm-provider-routing.md)
-- [Architecture](../02_architecture.md)
-- [MCP Layer Design](../05_ai_agents.md)
-- [Skills Layer](../05_ai_agents.md)
-- [Runbook](../08_operation_runbook.md)
+- [05_ai_agents.md](../05_ai_agents.md)
+- [ADR-0006](0006-skills-layer-standardization-and-validation.md)
+- [ADR-0007](0007-langgraph-multi-agent-orchestration.md)
