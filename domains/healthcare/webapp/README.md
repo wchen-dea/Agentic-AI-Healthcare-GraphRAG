@@ -12,9 +12,10 @@ It is decision support only. Clinical review is required before anyone acts on i
   - medication interactions and lab signals
   - safety caveat
   - guardrail input/output block alerts
-- **MCP tools mode** calls the 10 server tools over MCP streamable HTTP (`POST /mcp`):
+- **MCP tools mode** calls the 11 server tools over MCP streamable HTTP (`POST /mcp`):
   - performs the initialize → initialized → `tools/call` handshake and session teardown
   - renders a typed form per tool, validated against server enums
+  - patient-memory writes require the governed `memory_write` role and explicit consent
 - **Evidence explorer**: search, type filter, sorting, score bars and a redaction notice.
 - **Knowledge-graph view**:
   - SVG graph of `graph_context` with a legend

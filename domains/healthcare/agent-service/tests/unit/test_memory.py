@@ -223,6 +223,29 @@ class DurablePatientMemoryTests(unittest.TestCase):
             second["patient_memory_context"],
         )
 
+    def test_policy_override_cannot_relax_configured_limits(self):
+        service = QueryService(
+            max_context_items=5,
+            patient_memory_store=self.store,
+            patient_memory_policy=PatientMemoryPolicy(
+                consent_required=True,
+                retention_seconds=60,
+                max_facts=1,
+            ),
+        )
+        with self.assertRaises(PermissionError):
+            service.write_patient_memory(
+                "p1",
+                [PatientMemoryFact(key="risk", value="high")],
+                "test",
+                True,
+                policy=PatientMemoryPolicy(
+                    consent_required=False,
+                    retention_seconds=3600,
+                    max_facts=100,
+                ),
+            )
+
     def test_duplicate_fact_id_is_updated_not_duplicated(self):
         fact = PatientMemoryFact(fact_id="f1", key="risk", value="low")
         self.service.write_patient_memory("p1", [fact], "source-a", True)

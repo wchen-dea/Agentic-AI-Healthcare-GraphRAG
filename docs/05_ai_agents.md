@@ -43,7 +43,8 @@ Embeddings and store clients come from `packages/knowledge-core`; see [04 — Da
 ```mermaid
 flowchart TD
   IG[input_guardrail] --> T[triage]
-  T --> VR[vector_retrieval]
+  T --> PM[patient_memory_retrieval]
+  PM --> VR[vector_retrieval]
   VR --> GR[graph_retrieval]
   GR --> DR{delegation_router}
   DR --> MS[medication_safety]
@@ -60,7 +61,7 @@ flowchart TD
 
 1. `input_guardrail` rejects prompt-injection attempts and over-length questions.
 2. `triage` classifies the request type and builds a `RetrievalPlan` (`name`, `query_text`, `top_k`, `reason`).
-3. `vector_retrieval` and `graph_retrieval` collect evidence.
+3. `patient_memory_retrieval` loads active, consented facts for an explicit patient scope; `vector_retrieval` and `graph_retrieval` collect source evidence.
 4. One or more specialists run. When a request needs several, `delegation_router` sends it to each of them.
 5. `confidence_evaluator` scores the evidence. Below 0.75 it loops back to retrieval, up to `LANGGRAPH_MAX_ITERATIONS` times (default 3, capped at 6).
 6. `human_review` runs only when HITL is enabled; see [Memory and human review](#7-memory-and-human-review).
@@ -180,6 +181,7 @@ Healthcare agent, port 8000. The caller role comes from the `X-Caller-Role` head
 | `POST /query` | Run the graph |
 | `POST /query/stream` | Run the graph and stream progress (SSE) |
 | `POST /query/resume` | Approve or reject a paused run |
+| `POST /patient-memory` | Store consented, provenance-bearing normalized patient facts |
 | `GET /` | Redirects to `/docs` (OpenAPI UI) |
 
 `POST /query` request fields:
@@ -217,6 +219,7 @@ The MCP server is built with `agent_core.mcp_server.build_mcp_server` and mounte
 | `coding_gap_detect` | `generation` |
 | `cohort_risk_summary` | `generation` |
 | `evidence_bundle_export` | `export` |
+| `patient_memory_write` | `memory_write` |
 
 Role-to-tool rules are in `config/tool_policies.json`. Override the file with `AGENT_TOOL_POLICY_PATH`.
 
@@ -275,6 +278,10 @@ The service settings are Pydantic `BaseSettings` classes (`config/settings.py`, 
 | `LANGGRAPH_MAX_ITERATIONS` | `3` (max 6) | Retrieval retry loop |
 | `HITL_ENABLED`, `HITL_CONFIDENCE_THRESHOLD`, `HITL_MAX_PENDING` | off, `0.75`, `1000` | Human review |
 | `SESSION_STORE_BACKEND`, `REDIS_URL`, `SESSION_TTL_SECONDS` | `memory`, —, `3600` | Session memory |
+| `PATIENT_MEMORY_STORE_BACKEND` | `memory` | Durable patient-memory adapter (`memory` or `redis`) |
+| `PATIENT_MEMORY_RETENTION_SECONDS` | `2592000` | Maximum stored fact age |
+| `PATIENT_MEMORY_MAX_FACTS` | `100` | Per-patient fact cap |
+| `PATIENT_MEMORY_CONSENT_REQUIRED` | `true` | Require explicit consent for writes |
 | `MCP_SERVER_NAME` and `MCP_*` transport options | see [section 9](#9-mcp-tools-and-skills) | MCP server |
 | `MLFLOW_TRACKING_URI` | empty | Tracing |
 | `AGENT_DEFAULT_CALLER_ROLE`, `AGENT_ALLOW_ROLE_HEADER` | `generation`, `true` | Caller role |

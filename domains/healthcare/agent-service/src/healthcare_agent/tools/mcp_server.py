@@ -22,6 +22,7 @@ from healthcare_agent.api.schemas import (
     GraphRagAnswerRequest,
     MedicationRiskAssessRequest,
     PatientContextGetRequest,
+    PatientMemoryWriteRequest,
     RiskSummaryRequest,
     SkillsPlanRequest,
     TimelineExplainRequest,
@@ -93,6 +94,12 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         "read_only",
         "Return the skill plan (skills, context requirements, tools) for a business goal.",
     ),
+    ToolSpec(
+        "patient_memory_write",
+        "Patient memory write",
+        "memory_write",
+        "Store a consented, provenance-bearing minimized patient memory fact set.",
+    ),
 )
 TOOL_NAMES = tuple(spec.name for spec in TOOL_SPECS)
 
@@ -121,6 +128,39 @@ class HealthcareMcpTools:
             prompt_name="clinical_review",
             prompt_title="Clinical review plan",
             subject_label="Patient",
+        )
+
+    def patient_memory_write(
+        self,
+        patient_id: str,
+        facts: list[dict[str, object]],
+        provenance: dict[str, object] | str,
+        consent: bool,
+    ) -> dict[str, Any]:
+        req = PatientMemoryWriteRequest(
+            patient_id=patient_id,
+            facts=facts,
+            provenance=provenance,
+            consent=consent,
+        )
+        return self._governance.execute(
+            tool_name="patient_memory_write",
+            caller_role="memory_write",
+            request_payload=req.model_dump(),
+            scope=[req.patient_id],
+            fn=lambda trace_id: {
+                "patient_id": req.patient_id,
+                "fact_count": len(
+                    self._queries.write_patient_memory(
+                        req.patient_id,
+                        req.facts,
+                        req.provenance,
+                        req.consent,
+                    ).facts
+                ),
+                "trace_id": trace_id,
+                "status": "stored",
+            },
         )
 
     def patient_context_get(

@@ -7,7 +7,7 @@ time, so the models stay static and importable without a settings instance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Literal
+from typing import Any, Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
@@ -92,6 +92,13 @@ class PatientContextGetRequest(_Request):
     patient_id: PatientId
     include_claims: bool = True
     include_interactions: bool = True
+
+
+class PatientMemoryWriteRequest(_Request):
+    patient_id: PatientId
+    facts: list[dict[str, Any]] = Field(min_length=1, max_length=100)
+    provenance: dict[str, Any] | str = Field(min_length=1)
+    consent: bool
 
 
 class VectorEvidenceSearchRequest(_QuestionRequest):

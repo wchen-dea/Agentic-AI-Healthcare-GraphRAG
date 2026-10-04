@@ -16,6 +16,9 @@
     ],
     "export": [
       "evidence_bundle_export"
+    ],
+    "memory_write": [
+      "patient_memory_write"
     ]
   }
 }

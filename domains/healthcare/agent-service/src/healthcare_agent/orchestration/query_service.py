@@ -6,7 +6,7 @@ MCP tools, evaluation gates) call this service instead of the graph directly.
 """
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any, Literal
 
 from healthcare_agent.orchestration.memory import (
@@ -27,10 +27,12 @@ class QueryService:
         max_context_items: int,
         orchestrator: LangGraphOrchestrator | None = None,
         patient_memory_store: PatientMemoryStore | None = None,
+        patient_memory_policy: PatientMemoryPolicy | None = None,
     ) -> None:
         self._max_context_items = max_context_items
         self._orchestrator = orchestrator or LangGraphOrchestrator.build()
         self._patient_memory_store = patient_memory_store or InMemoryPatientMemoryStore()
+        self._patient_memory_policy = patient_memory_policy or PatientMemoryPolicy()
 
     def context_limit(self, top_k: int | None) -> int:
         return min(top_k or self._max_context_items, max(self._max_context_items, 8))
@@ -60,7 +62,7 @@ class QueryService:
     def write_patient_memory(
         self,
         patient_id: str,
-        facts: list[PatientMemoryFact | dict[str, Any]],
+        facts: Sequence[PatientMemoryFact | dict[str, Any]],
         provenance: dict[str, Any] | str,
         consent: bool,
         *,
@@ -69,7 +71,31 @@ class QueryService:
         """Persist normalized, minimized facts only after governance checks."""
         if not patient_id.strip():
             raise ValueError("patient_id is required")
-        active_policy = policy or PatientMemoryPolicy(consent_granted=consent)
+        configured = self._patient_memory_policy
+        requested = policy or configured
+        configured_categories = configured.allowed_categories
+        requested_categories = requested.allowed_categories
+        if (
+            (configured.consent_required and not requested.consent_required)
+            or requested.retention_seconds > configured.retention_seconds
+            or requested.max_facts > configured.max_facts
+            or (
+                configured_categories
+                and not requested_categories.issubset(configured_categories)
+            )
+        ):
+            raise PermissionError("policy_override_exceeds_configured_limits")
+        active_policy = PatientMemoryPolicy(
+            consent_required=configured.consent_required,
+            consent_granted=consent,
+            retention_seconds=min(requested.retention_seconds, configured.retention_seconds),
+            max_facts=min(requested.max_facts, configured.max_facts),
+            allowed_categories=(
+                set(requested_categories)
+                if requested_categories
+                else set(configured_categories)
+            ),
+        )
         allowed, reason = self.evaluate_retention_and_consent(
             active_policy, consent=consent
         )

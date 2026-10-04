@@ -250,6 +250,22 @@ def get_session_store() -> SessionStoreProtocol:
     return _store
 
 
+def get_patient_memory_store() -> "PatientMemoryStore":
+    """Build the configured durable patient-memory adapter.
+
+    ``PATIENT_MEMORY_STORE_BACKEND=memory`` is the safe development default.
+    Redis is selected explicitly and reuses ``REDIS_URL``.
+    """
+    backend = os.getenv("PATIENT_MEMORY_STORE_BACKEND", "memory").lower()
+    if backend == "redis":
+        return RedisPatientMemoryStore(
+            redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        )
+    if backend != "memory":
+        raise ValueError(f"Unsupported patient memory backend: {backend}")
+    return InMemoryPatientMemoryStore()
+
+
 # ── Durable patient memory ───────────────────────────────────────────────────
 
 

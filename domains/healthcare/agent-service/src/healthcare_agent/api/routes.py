@@ -17,7 +17,12 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from healthcare_agent.agents.registry import AGENT_REGISTRY
 from healthcare_agent.api.responses import ResponseShaper
-from healthcare_agent.api.schemas import QueryRequest, ResumeRequest, SkillsPlanRequest
+from healthcare_agent.api.schemas import (
+    PatientMemoryWriteRequest,
+    QueryRequest,
+    ResumeRequest,
+    SkillsPlanRequest,
+)
 from healthcare_agent.config.settings import HealthcareAgentSettings
 from healthcare_agent.orchestration.query_service import QueryService
 from healthcare_agent.tools.skills import SkillsLayerError, build_skill_plan
@@ -109,6 +114,41 @@ def build_router(
     @router.get("/favicon.ico")
     def favicon() -> Response:
         return Response(status_code=204)
+
+    @router.post("/patient-memory")
+    def patient_memory_write(
+        req: PatientMemoryWriteRequest,
+        x_caller_role: str | None = CALLER_ROLE_HEADER,
+    ) -> dict[str, Any]:
+        caller_role = governance.resolve_caller_role(x_caller_role)
+        try:
+            return governance.execute(
+                tool_name="patient_memory_write",
+                caller_role=caller_role,
+                request_payload=req.model_dump(),
+                scope=scope_for(req.patient_id),
+                fn=lambda trace_id: {
+                    "patient_id": req.patient_id,
+                    "fact_count": len(
+                        queries.write_patient_memory(
+                            req.patient_id,
+                            req.facts,
+                            req.provenance,
+                            req.consent,
+                        ).facts
+                    ),
+                    "trace_id": trace_id,
+                    "status": "stored",
+                },
+            )
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @router.post("/query")
     def query(req: QueryRequest, x_caller_role: str | None = CALLER_ROLE_HEADER) -> dict[str, Any]:

@@ -60,8 +60,8 @@ Sources:
 | Perception | Flink enrichment: ontology normalization, lab-signal and drug-safety rules, clinical-text embedding ([04 — Data Platform](04_data_platform.md)) | Strong for structured events and labs. No image or biosignal input. |
 | Conversational interface | Provider web UI, `POST /query`, SSE streaming on `POST /query/stream` ([Streaming](05_ai_agents.md#6-streaming)), structured output | Strong. No medical NER and no learned intent classifier; triage is rule-based. |
 | Interaction | LangGraph routing, `delegation_router` fan-out to specialists, human review through `interrupt` and `POST /query/resume` ([Memory and human review](05_ai_agents.md#7-memory-and-human-review)) | Partial. A clinician can approve or reject, but agents don't talk to each other directly and feedback is not captured for learning. |
-| Tool integration | 10 MCP tools behind role-based `ToolGovernance` with audit events ([MCP tools and skills](05_ai_agents.md#9-mcp-tools-and-skills)) | Strong for internal retrieval and generation. No external EHR, pharmacy or imaging systems. |
-| Memory and learning | Session memory with 20 turns and a 3600 s TTL, in-process or Redis | Partial. No longitudinal patient memory and no learning from outcomes. |
+| Tool integration | 11 MCP tools behind role-based `ToolGovernance` with audit events ([MCP tools and skills](05_ai_agents.md#9-mcp-tools-and-skills)) | Strong for internal retrieval, generation and governed patient-memory writes. No external EHR, pharmacy or imaging systems. |
+| Memory and learning | Session memory plus governed patient-scoped durable memory with consent, provenance, retention and expiry controls | Partial. Longitudinal memory is implemented; no learning from outcomes. |
 | Reasoning | Deterministic graph rules for interactions, contraindications and lab signals; confidence loop; LLM synthesis | Strong for deterministic reasoning. No uncertainty quantification or multi-path probabilistic inference. |
 
 ## 4. Agent type mapping
@@ -70,7 +70,7 @@ Sources:
 | --- | --- | --- |
 | ReAct + RAG | LangGraph graph with vector and graph retrieval, plus a confidence loop that re-runs retrieval | Implemented |
 | Self-learning | None | Gap |
-| Memory-enhanced | Session memory across turns | Partial: session scope only |
+| Memory-enhanced | Session memory plus `PatientMemoryFact` retrieval through LangGraph | Implemented with consent and retention controls; not adaptive learning |
 | LLM-enhanced | `synthesis` node with provider routing, fallback and model tiers | Implemented |
 | Tool-enhanced | MCP tools, the skills layer and the specialist agents | Implemented |
 | Self-reflecting | `confidence_evaluator` loop at runtime, plus offline MLflow scorers | Partial: no answer self-critique |
@@ -90,13 +90,13 @@ Sources:
 
 ## 6. Extension roadmap
 
-Streaming, session memory, human review and the confidence loop are already done, so they are not on this list.
+Streaming, session memory, human review, the confidence loop and governed longitudinal patient memory are already implemented, so they are not on this list.
 
 ### 6.1 Near term
 
 | Priority | Extension | Basis | Approach |
 | --- | --- | --- | --- |
-| High | Longitudinal patient memory | Memory-enhanced agents | Add a patient-scoped memory store with privacy filtering, next to session memory |
+| High | Durable-memory lifecycle and outcome learning | Memory-enhanced agents | Extend the governed patient-memory service with deletion workflows, concurrent production persistence and outcome-feedback learning |
 | High | Factuality evaluation | Microsoft factuality metrics | Add a claim-level factuality scorer to the MLflow harness |
 | High | Shared HITL checkpointer | Production interaction | Replace `InMemorySaver` with a shared checkpointer so pending reviews survive across replicas |
 | Medium | Specialist output verification | Verification checkpoints | Cross-check specialist findings against graph evidence before synthesis |
