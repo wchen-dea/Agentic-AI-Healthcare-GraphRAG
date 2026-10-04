@@ -26,6 +26,9 @@ ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} \
 	HF_HOME=/opt/hf-cache \
 	SENTENCE_TRANSFORMERS_HOME=/opt/hf-cache
 WORKDIR /app
+# The Flink base image ships an old Debian pip whose resolver can crash with
+# apache-flink's large transitive dependency graph (notably on ARM64).
+RUN python3 -m pip install --no-cache-dir --upgrade "pip<26"
 RUN pip3 install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 COPY domains/healthcare/data-pipelines/flink-job/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt

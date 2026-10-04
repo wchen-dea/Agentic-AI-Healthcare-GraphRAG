@@ -32,6 +32,7 @@ from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import Distance, VectorParams
 
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
@@ -72,13 +73,19 @@ class HealthcareGraphRagProcessor:
         self.qdrant = QdrantClient(url=QDRANT_URL)
         existing = [c.name for c in self.qdrant.get_collections().collections]
         if QDRANT_COLLECTION not in existing:
-            self.qdrant.create_collection(
-                collection_name=QDRANT_COLLECTION,
-                vectors_config={
-                    domain: VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
-                    for domain in ALL_DOMAINS
-                },
-            )
+            try:
+                self.qdrant.create_collection(
+                    collection_name=QDRANT_COLLECTION,
+                    vectors_config={
+                        domain: VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
+                        for domain in ALL_DOMAINS
+                    },
+                )
+            except UnexpectedResponse as exc:
+                # Multiple parallel topic operators can initialize processors
+                # concurrently. A 409 means another worker won the race.
+                if exc.status_code != 409:
+                    raise
         self.neo4j = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
         self.schema_registry = SchemaRegistryClient({"url": SCHEMA_REGISTRY_URL})
         self.avro_deserializer = AvroDeserializer(

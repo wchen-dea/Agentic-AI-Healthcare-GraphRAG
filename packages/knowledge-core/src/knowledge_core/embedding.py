@@ -90,7 +90,7 @@ def _load_model(model_name: str):
         logger.info("Loaded embedding model: %s", model_name)
         _domain_models[model_name] = model
     except Exception:
-        logger.warning("sentence-transformers not available for %s, using MD5 fallback", model_name)
+        logger.exception("Unable to load embedding model %s", model_name)
         _domain_models[model_name] = False
     return _domain_models[model_name]
 
