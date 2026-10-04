@@ -1,8 +1,18 @@
 # Agentic AI Healthcare + Supply Chain GraphRAG
 
-This repository implements a local-first, multi-domain GraphRAG platform for healthcare and supply-chain workloads. The code is organized as a uv workspace with shared runtime packages, domain-specific agent services, streaming pipelines, knowledge assets, and web apps.
+This repository implements a modern AI system for healthcare and supply-chain workloads built on the leading edge of enterprise GenAI architecture: multi-model LLM orchestration, graph-grounded retrieval, live knowledge ingestion, and governed agent execution. The platform is organized as a uv workspace with shared runtime packages, domain-specific agent services, realtime streaming pipelines, knowledge assets, and web applications.
 
-The platform is intentionally provider-neutral and modular: it can run locally with Ollama and MiniLM in development and switch to Databricks-hosted embeddings and LLMs in production without changing the app contract.
+The system is designed for modern healthcare AI use cases that need high-trust reasoning across fragmented clinical, claims, and operational data. It combines Databricks-hosted foundation models with local-first development workflows, and it remains model-flexible so the runtime can also leverage AWS Bedrock-hosted foundation models and other provider-backed deployments without changing the application contract. The platform pairs those model choices with dual persistent data stores for semantic and relational retrieval, and a shared orchestration layer built around LangGraph and MCP tool servers. The runtime is intentionally provider-neutral and modular: it can run locally with Ollama and MiniLM in development and switch to Databricks AI, AWS Bedrock, or other enterprise model services in production without changing the application contract.
+
+## Modern AI platform capabilities
+
+- Multi-model LLM access with provider abstraction and model routing across local and Databricks foundation models
+- Dual persistence with Neo4j for explicit relationships and Qdrant for vector search and semantic retrieval
+- End-to-end realtime knowledge ingestion from streaming healthcare and supply-chain events into a live knowledge base
+- LangGraph orchestration for multi-agent reasoning, specialist delegation, confidence evaluation, and human-in-the-loop review
+- Embedded MCP server patterns for governed tool access, skills, and role-aware execution
+- Layered runtime architecture that separates UI, API/BFF, orchestration, domain agents, tools, and data platforms
+- Unified delivery model across development and production with containerized services and infrastructure-as-code deployment patterns
 
 ## Architecture
 
