@@ -146,7 +146,17 @@ Authorization runs before the stream opens, so a denied caller gets a plain `401
 
 - Each `session_id` keeps its last 20 turns for `SESSION_TTL_SECONDS` (default 3600).
 - The store is in-process by default. Set `SESSION_STORE_BACKEND=redis` and `REDIS_URL` to share sessions across replicas.
-- `QueryService` loads a short summary of recent turns into the graph state and records each new turn.
+- `QueryService` loads a short summary of recent turns into `session_context` and records each new turn.
+- Session memory is transient conversational continuity; it is not a longitudinal patient record.
+
+**Durable patient memory** (`orchestration/memory.py` and `QueryService`):
+
+- `PatientMemoryFact` stores a normalized, patient-scoped fact with source provenance, confidence, observation time, and optional expiry.
+- `PatientMemoryPolicy` governs consent, retention, category allowlists, and fact limits. Writes are rejected without consent and facts outside retention or expiry are filtered on load.
+- The governed write path minimizes stored PHI, attaches provenance, deduplicates facts, and keeps records isolated by `patient_id`.
+- `InMemoryPatientMemoryStore` is the default provider-neutral adapter; `RedisPatientMemoryStore` is a Redis-ready persistence shim.
+- The graph loads durable facts through `patient_memory_retrieval` into separate trusted state fields. Patient memory is not concatenated into session history and is available to synthesis only as an explicitly labeled context channel.
+- Patient memory is not a replacement for the source graph/vector evidence or a clinician decision; retention and consent policy remain authoritative.
 
 **Human-in-the-loop** (`orchestration/hitl.py`):
 

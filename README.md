@@ -12,6 +12,7 @@ The system is designed for modern healthcare AI use cases that need high-trust r
 - LangGraph orchestration for multi-agent reasoning, specialist delegation, confidence evaluation, and human-in-the-loop review
 - Embedded MCP server patterns for governed tool access, skills, and role-aware execution
 - Layered runtime architecture that separates UI, API/BFF, orchestration, domain agents, tools, and data platforms
+- Separate session memory for short-lived conversational continuity and governed durable patient memory with consent, provenance, retention, and expiry controls
 - Unified delivery model across development and production with containerized services and infrastructure-as-code deployment patterns
 
 ## Architecture
@@ -20,6 +21,8 @@ The system is designed for modern healthcare AI use cases that need high-trust r
 flowchart LR
     UI[Healthcare / supply-chain web apps] --> API[FastAPI agent service]
     API --> ORCH[LangGraph orchestration]
+    ORCH --> SM[Session memory]
+    ORCH --> PM[Governed patient memory]
     ORCH --> RETR[Vector + graph retrieval]
     RETR --> NEO4J[(Neo4j)]
     RETR --> QDRANT[(Qdrant)]

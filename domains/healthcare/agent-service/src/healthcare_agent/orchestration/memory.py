@@ -248,3 +248,218 @@ def get_session_store() -> SessionStoreProtocol:
     else:
         _store = SessionStore()
     return _store
+
+
+# ── Durable patient memory ───────────────────────────────────────────────────
+
+
+@dataclass
+class PatientMemoryFact:
+    """A governed longitudinal fact associated with one patient.
+
+    ``value`` is intentionally typed as ``str``: durable memory stores a
+    minimized representation rather than raw clinical documents.  Callers may
+    retain a stable ``fact_id`` for idempotent writes and provenance audits.
+    """
+
+    key: str
+    value: str
+    fact_id: str | None = None
+    category: str = "clinical"
+    source: str = ""
+    source_type: str = "unknown"
+    observed_at: float = field(default_factory=time.time)
+    expires_at: float | None = None
+    confidence: float = 1.0
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def normalized(self) -> "PatientMemoryFact":
+        """Return a normalized, PHI-minimized copy suitable for persistence."""
+        key = " ".join(self.key.strip().lower().split())[:128]
+        value = " ".join(self.value.strip().split())[:1000]
+        metadata = {
+            str(k): str(v)[:256]
+            for k, v in self.metadata.items()
+            if str(k).lower() not in {"name", "address", "phone", "email", "ssn"}
+        }
+        return PatientMemoryFact(
+            key=key,
+            value=value,
+            fact_id=self.fact_id,
+            category=" ".join(self.category.strip().lower().split())[:64] or "clinical",
+            source=self.source.strip()[:256],
+            source_type=self.source_type.strip().lower()[:64] or "unknown",
+            observed_at=self.observed_at,
+            expires_at=self.expires_at,
+            confidence=max(0.0, min(float(self.confidence), 1.0)),
+            metadata=metadata,
+        )
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_at is not None and self.expires_at <= time.time()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "value": self.value,
+            "fact_id": self.fact_id,
+            "category": self.category,
+            "source": self.source,
+            "source_type": self.source_type,
+            "observed_at": self.observed_at,
+            "expires_at": self.expires_at,
+            "confidence": self.confidence,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PatientMemoryFact":
+        return cls(
+            key=str(data.get("key", "")),
+            value=str(data.get("value", "")),
+            fact_id=data.get("fact_id"),
+            category=str(data.get("category", "clinical")),
+            source=str(data.get("source", "")),
+            source_type=str(data.get("source_type", "unknown")),
+            observed_at=float(data.get("observed_at", time.time())),
+            expires_at=data.get("expires_at"),
+            confidence=float(data.get("confidence", 1.0)),
+            metadata=dict(data.get("metadata") or {}),
+        )
+
+
+@dataclass
+class PatientMemoryPolicy:
+    """Consent and retention policy for durable patient memory."""
+
+    consent_required: bool = True
+    consent_granted: bool = False
+    retention_seconds: int = 30 * 24 * 60 * 60
+    max_facts: int = 100
+    allowed_categories: set[str] = field(default_factory=set)
+
+    def evaluate(self, *, consent: bool | None = None, now: float | None = None) -> tuple[bool, str]:
+        if self.consent_required and not (self.consent_granted if consent is None else consent):
+            return False, "consent_denied"
+        if self.retention_seconds <= 0:
+            return False, "retention_disabled"
+        return True, "allowed"
+
+
+@dataclass
+class PatientMemoryRecord:
+    """Patient-scoped durable memory plus policy metadata."""
+
+    patient_id: str
+    facts: list[PatientMemoryFact] = field(default_factory=list)
+    policy: PatientMemoryPolicy = field(default_factory=PatientMemoryPolicy)
+    created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default_factory=time.time)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def active_facts(self, *, now: float | None = None) -> list[PatientMemoryFact]:
+        current = time.time() if now is None else now
+        return [
+            fact for fact in self.facts
+            if (fact.expires_at is None or fact.expires_at > current)
+            and current - fact.observed_at <= self.policy.retention_seconds
+        ]
+
+    def to_context(self) -> list[dict[str, Any]]:
+        return [
+            {
+                **fact.to_dict(),
+                "patient_id": self.patient_id,
+                "memory_type": "durable_patient_memory",
+                "trusted": True,
+            }
+            for fact in self.active_facts()
+        ]
+
+
+class PatientMemoryStore(Protocol):
+    def load(self, patient_id: str) -> PatientMemoryRecord | None: ...
+    def save(self, record: PatientMemoryRecord) -> None: ...
+    def delete(self, patient_id: str) -> None: ...
+
+
+class InMemoryPatientMemoryStore:
+    """Provider-neutral development store with patient-ID isolation."""
+
+    def __init__(self) -> None:
+        self._records: dict[str, PatientMemoryRecord] = {}
+
+    def load(self, patient_id: str) -> PatientMemoryRecord | None:
+        record = self._records.get(patient_id)
+        if record is None:
+            return None
+        active = record.active_facts()
+        record.facts = active
+        return record
+
+    def save(self, record: PatientMemoryRecord) -> None:
+        self._records[record.patient_id] = record
+
+    def delete(self, patient_id: str) -> None:
+        self._records.pop(patient_id, None)
+
+
+class RedisPatientMemoryStore:
+    """Redis-ready patient store; Redis is imported only when selected."""
+
+    _KEY_PREFIX = "patient-memory:"
+
+    def __init__(self, redis_url: str = "redis://localhost:6379/0") -> None:
+        try:
+            import redis
+        except ImportError as exc:
+            raise ImportError("redis package required: pip install redis") from exc
+        self._client = redis.Redis.from_url(redis_url, decode_responses=True)
+
+    def _key(self, patient_id: str) -> str:
+        return f"{self._KEY_PREFIX}{patient_id}"
+
+    def load(self, patient_id: str) -> PatientMemoryRecord | None:
+        data = self._client.get(self._key(patient_id))
+        if data is None:
+            return None
+        obj = json.loads(data)
+        policy_data = obj.get("policy", {})
+        policy = PatientMemoryPolicy(
+            consent_required=policy_data.get("consent_required", True),
+            consent_granted=policy_data.get("consent_granted", False),
+            retention_seconds=int(policy_data.get("retention_seconds", 30 * 24 * 60 * 60)),
+            max_facts=int(policy_data.get("max_facts", 100)),
+            allowed_categories=set(policy_data.get("allowed_categories", [])),
+        )
+        record = PatientMemoryRecord(
+            patient_id=obj["patient_id"],
+            facts=[PatientMemoryFact.from_dict(item) for item in obj.get("facts", [])],
+            policy=policy,
+            created_at=float(obj.get("created_at", time.time())),
+            updated_at=float(obj.get("updated_at", time.time())),
+            metadata=dict(obj.get("metadata") or {}),
+        )
+        record.facts = record.active_facts()
+        return record
+
+    def save(self, record: PatientMemoryRecord) -> None:
+        payload = {
+            "patient_id": record.patient_id,
+            "facts": [fact.to_dict() for fact in record.facts],
+            "policy": {
+                "consent_required": record.policy.consent_required,
+                "consent_granted": record.policy.consent_granted,
+                "retention_seconds": record.policy.retention_seconds,
+                "max_facts": record.policy.max_facts,
+                "allowed_categories": sorted(record.policy.allowed_categories),
+            },
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "metadata": record.metadata,
+        }
+        self._client.set(self._key(record.patient_id), json.dumps(payload))
+
+    def delete(self, patient_id: str) -> None:
+        self._client.delete(self._key(patient_id))
