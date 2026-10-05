@@ -16,6 +16,7 @@ from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from healthcare_agent.agents.registry import AGENT_REGISTRY
+from healthcare_agent.api.patient_scope import PatientScopeAuthorizer, PatientScopeDenied
 from healthcare_agent.api.responses import ResponseShaper
 from healthcare_agent.api.schemas import (
     PatientMemoryWriteRequest,
@@ -56,6 +57,21 @@ def _authorize_dev_patient(
         raise HTTPException(status_code=403, detail="Caller is not entitled to this patient.")
 
 
+def _authorize_patient(
+    *, settings: HealthcareAgentSettings, patient_id: str | None, caller_id: str | None
+) -> None:
+    """Apply production entitlements, with the legacy dev map as a compatibility fallback."""
+    if settings.patient_scope_auth_required:
+        try:
+            PatientScopeAuthorizer.from_raw(
+                enabled=True, raw=settings.patient_scope_entitlements
+            ).authorize(patient_id=patient_id, caller_id=caller_id)
+        except PatientScopeDenied as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        return
+    _authorize_dev_patient(settings=settings, patient_id=patient_id, caller_id=caller_id)
+
+
 def build_router(
     *,
     settings: HealthcareAgentSettings,
@@ -69,6 +85,11 @@ def build_router(
     @router.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @router.get("/ready")
+    def ready() -> dict[str, str]:
+        """Readiness endpoint; dependency calls remain outside liveness probes."""
+        return {"status": "ready"}
 
     @router.get("/metrics")
     def metrics() -> Response:
@@ -147,7 +168,7 @@ def build_router(
         x_caller_role: str | None = CALLER_ROLE_HEADER,
         x_caller_id: str | None = CALLER_ID_HEADER,
     ) -> dict[str, Any]:
-        _authorize_dev_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
+        _authorize_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
         caller_role = governance.resolve_caller_role(x_caller_role)
         try:
             return governance.execute(
@@ -184,7 +205,7 @@ def build_router(
         x_caller_role: str | None = CALLER_ROLE_HEADER,
         x_caller_id: str | None = CALLER_ID_HEADER,
     ) -> dict[str, Any]:
-        _authorize_dev_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
+        _authorize_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
         caller_role = governance.resolve_caller_role(x_caller_role)
         try:
             return governance.execute(
@@ -237,7 +258,7 @@ def build_router(
         pending = queries.pending_review(req.thread_id)
         if pending is None:
             raise HTTPException(status_code=404, detail="No pending review for this thread_id.")
-        _authorize_dev_patient(
+        _authorize_patient(
             settings=settings, patient_id=pending.get("patient_id"), caller_id=x_caller_id
         )
 
@@ -278,7 +299,7 @@ def build_router(
         event is the same role-sanitized, budgeted payload returned by ``/query``.
         """
         tool_name = "query"
-        _authorize_dev_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
+        _authorize_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
         request_payload = req.model_dump(exclude_none=True)
         caller_role = governance.resolve_caller_role(x_caller_role)
         scope = scope_for(req.patient_id)

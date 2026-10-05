@@ -19,6 +19,7 @@ from agent_core.mcp_server import build_mcp_server
 from agent_core.metrics import ServiceMetrics
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
 
@@ -187,6 +188,16 @@ async def instrument_http_requests(request: Request, call_next):
     finally:
         if request.url.path != "/metrics":
             metrics.observe_http(request.method, request.url.path, status_code, time.perf_counter() - started)
+
+
+@app.middleware("http")
+async def authenticate_mcp(request: Request, call_next):
+    if request.url.path.startswith("/mcp") and settings.mcp_auth_required:
+        expected = settings.mcp_auth_token.get_secret_value()
+        supplied = request.headers.get("authorization", "")
+        if not expected or supplied != f"Bearer {expected}":
+            return JSONResponse(status_code=401, content={"detail": "MCP authentication required"})
+    return await call_next(request)
 
 
 app.include_router(

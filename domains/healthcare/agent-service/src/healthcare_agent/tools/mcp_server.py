@@ -12,7 +12,7 @@ from typing import Any
 from agent_core.audit import utc_timestamp
 from agent_core.governance import ToolGovernance, scope_for
 from agent_core.mcp_server import ToolSpec, register_skills_surface, register_tools
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
 from healthcare_agent.api.responses import ResponseShaper
 from healthcare_agent.api.schemas import (
@@ -29,6 +29,7 @@ from healthcare_agent.api.schemas import (
     VectorEvidenceSearchRequest,
 )
 from healthcare_agent.config.settings import HealthcareAgentSettings
+from healthcare_agent.api.patient_scope import PatientScopeAuthorizer, PatientScopeDenied
 from healthcare_agent.orchestration.query_service import QueryService
 from healthcare_agent.safety.response_policy import apply_response_budget, truncate_text, vector_text_mode
 from healthcare_agent.tools.skills import build_skill_plan
@@ -120,6 +121,20 @@ class HealthcareMcpTools:
         self._queries = queries
         self._load_skills = load_skills
 
+    def _authorize_patient(self, patient_id: str | None, ctx: Context | None) -> None:
+        """Authorize against the transport identity; never trust a tool argument as identity."""
+        if not self._settings.patient_scope_auth_required:
+            return
+        caller_id = None
+        if ctx is not None and ctx.request_context.request is not None:
+            caller_id = ctx.request_context.request.headers.get("x-caller-id")
+        try:
+            PatientScopeAuthorizer.from_raw(
+                enabled=True, raw=self._settings.patient_scope_entitlements
+            ).authorize(patient_id=patient_id, caller_id=caller_id)
+        except PatientScopeDenied as exc:
+            raise PermissionError(str(exc)) from exc
+
     def register(self, mcp: FastMCP) -> None:
         register_tools(mcp, self, TOOL_SPECS)
         register_skills_surface(
@@ -136,7 +151,9 @@ class HealthcareMcpTools:
         facts: list[dict[str, object]],
         provenance: dict[str, object] | str,
         consent: bool,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id, ctx)
         req = PatientMemoryWriteRequest(
             patient_id=patient_id,
             facts=facts,
@@ -168,7 +185,9 @@ class HealthcareMcpTools:
         patient_id: str,
         include_claims: bool = True,
         include_interactions: bool = True,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id, ctx)
         req = PatientContextGetRequest(
             patient_id=patient_id,
             include_claims=include_claims,
@@ -216,7 +235,9 @@ class HealthcareMcpTools:
         question: str,
         patient_id: str = "",
         top_k: int = 5,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id or None, ctx)
         req = VectorEvidenceSearchRequest(question=question, patient_id=(patient_id or None), top_k=top_k)
         return self._governance.execute(
             tool_name="vector_evidence_search",
@@ -248,7 +269,9 @@ class HealthcareMcpTools:
         question: str,
         patient_id: str = "",
         response_style: str = "concise",
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id or None, ctx)
         req = GraphRagAnswerRequest(question=question, patient_id=(patient_id or None), response_style=response_style)
         style_prefix = {
             "concise": "Answer concisely. ",
@@ -271,7 +294,9 @@ class HealthcareMcpTools:
         self,
         patient_id: str,
         time_window_hours: int = 72,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id, ctx)
         req = RiskSummaryRequest(patient_id=patient_id, time_window_hours=time_window_hours)
 
         def _handler(trace_id: str) -> dict[str, Any]:
@@ -312,7 +337,9 @@ class HealthcareMcpTools:
         question: str,
         patient_id: str = "",
         include_raw_payload: bool = False,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id or None, ctx)
         req = EvidenceBundleExportRequest(question=question, patient_id=(patient_id or None), include_raw_payload=include_raw_payload)
 
         def _handler(trace_id: str) -> dict[str, Any]:
@@ -357,7 +384,9 @@ class HealthcareMcpTools:
         self,
         patient_id: str,
         time_window_hours: int = 168,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id, ctx)
         req = TimelineExplainRequest(patient_id=patient_id, time_window_hours=time_window_hours)
 
         def _handler(trace_id: str) -> dict[str, Any]:
@@ -397,7 +426,8 @@ class HealthcareMcpTools:
             fn=_handler,
         )
 
-    def medication_risk_assess(self, patient_id: str) -> dict[str, Any]:
+    def medication_risk_assess(self, patient_id: str, ctx: Context | None = None) -> dict[str, Any]:
+        self._authorize_patient(patient_id, ctx)
         req = MedicationRiskAssessRequest(patient_id=patient_id)
 
         def _handler(trace_id: str) -> dict[str, Any]:
@@ -439,7 +469,9 @@ class HealthcareMcpTools:
         self,
         patient_id: str,
         question: str = "Review coding and claims consistency gaps for this patient.",
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
+        self._authorize_patient(patient_id, ctx)
         req = CodingGapDetectRequest(patient_id=patient_id, question=question)
 
         def _handler(trace_id: str) -> dict[str, Any]:

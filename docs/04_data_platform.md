@@ -18,7 +18,7 @@ flowchart LR
     sr[Schema Registry] -.-> prod
     kafka --> flink[Flink job<br/>process_event]
     flink -->|1. MERGE, one tx| neo4j[(Neo4j)]
-    flink -->|2. upsert| qdrant[(Qdrant)]
+    flink -->|2. durable outbox + upsert| qdrant[(Qdrant)]
     seeds[Ontology seeds<br/>bootstrap.sh] --> neo4j
 ```
 
@@ -43,6 +43,21 @@ the `kafka-init` service with 3 partitions and replication factor 3.
 
 The DLQ topic is provisioned but the jobs do not yet publish to it; failed messages
 are logged and retried (see [Failure handling](#failure-handling)).
+
+### Neo4j-to-Qdrant replay coordination
+
+Healthcare ingestion commits Neo4j first, then records the deterministic Qdrant
+operation in a SQLite outbox before attempting the vector upsert. The default
+database is `/var/lib/flink/qdrant-outbox.sqlite3`, configurable with
+`QDRANT_OUTBOX_PATH`. This prevents a successful graph write from losing its
+corresponding vector operation when Qdrant is unavailable.
+
+The outbox provides idempotent event keys, SQLite WAL/concurrency protection,
+leases for crashed workers, acknowledgement on successful upsert, and exponential
+backoff on failure. Replayed writes use deterministic Qdrant point IDs and are safe
+to repeat. The normal production backend is SQLite. A path ending in `.jsonl`
+selects the legacy compatibility mode, which retains only failed operations and
+does not provide SQLite lease or acknowledgement semantics.
 
 Use `make topics` to list topics and `make shell-kafka` for a broker shell.
 
@@ -262,6 +277,10 @@ Switching provider or model changes the vector space. To switch:
 1. Set the new provider variables on **both** the Flink job and the agent service.
 2. Delete and recreate the Qdrant collections with the new dimension.
 3. Replay the Kafka topics from the earliest offset (new consumer group or reset offsets).
+
+For a Qdrant-only outage, restore Qdrant and restart or allow the Flink job to
+replay the SQLite outbox. Do not delete the outbox database during recovery;
+deleting it discards pending graph-to-vector reconciliation work.
 
 ## 8. Supply-chain pipeline
 

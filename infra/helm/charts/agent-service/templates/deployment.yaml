@@ -27,6 +27,8 @@ spec:
         {{- with .Values.securityContext }}
         securityContext:
           {{- toYaml . | nindent 10 }}
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
         {{- end }}
         ports:
         - containerPort: 8000
@@ -38,9 +40,16 @@ spec:
         - secretRef:
             name: agent-service-secrets
         {{- end }}
+        volumeMounts:
+        - name: audit-log
+          mountPath: /var/log/agent-service
+        - name: model-cache
+          mountPath: /home/app/.cache
+        - name: tmp
+          mountPath: /tmp
         readinessProbe:
           httpGet:
-            path: /health
+            path: /ready
             port: http
           initialDelaySeconds: 10
           periodSeconds: 10
@@ -52,3 +61,10 @@ spec:
           periodSeconds: 20
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: audit-log
+        emptyDir: {}
+      - name: model-cache
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}

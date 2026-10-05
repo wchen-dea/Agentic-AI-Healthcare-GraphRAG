@@ -170,6 +170,17 @@ The Minikube profile enables a synthetic patient-entitlement guard. Patient-scop
 requests must include `X-Caller-Id`; the configured `dev-clinician` identity is
 limited to the synthetic patients listed in `infra/helm/values-dev.yaml`.
 
+In production, set `PATIENT_SCOPE_AUTH_REQUIRED=true` and inject
+`PATIENT_SCOPE_ENTITLEMENTS` through a Kubernetes Secret or trusted gateway
+configuration. The value uses this format:
+
+```text
+caller-a=patient-0001,patient-0002;caller-b=patient-0003
+```
+
+Requests with no trusted `X-Caller-Id`, no `patient_id`, or no matching entitlement
+are denied with HTTP 403. An empty entitlement map is fail-closed.
+
 The response holds `answer`, `vector_context`, `graph_context`, `patients`, `trace_id`, `retrieved_at`, `guardrails` and `langgraph` (`enabled`, `iterations`, `final_reason`, `confidence`, `agent_trace`). The full field list is in [05 — AI Agents](05_ai_agents.md#8-http-api).
 
 More examples: `make query-hc` and `make query-sc`, which run `domains/*/scripts/query_examples.sh`.
@@ -280,6 +291,7 @@ Production deployment requires:
 - GitHub Actions variable `DATABRICKS_HOST`.
 - GitHub Actions secrets `DATABRICKS_TOKEN`, `NEO4J_PASSWORD`, and any configured LLM credentials.
 - A Kubernetes Secret named `databricks-credentials` with key `token` for Flink.
+- A Secret-backed `PATIENT_SCOPE_ENTITLEMENTS` mapping for patient-scoped access.
 
 The production workflow creates or updates the Databricks Secret, injects the Databricks host into both agent and Flink workloads, and waits for agent, web, and Flink rollouts. Use the same `EMBEDDING_PROVIDER=databricks`, `DATABRICKS_EMBEDDING_ENDPOINT=databricks-gte-large-en`, and `EMBEDDING_DIM=1024` for ingestion and query. Re-index Qdrant before switching from local 384-dimensional vectors.
 
@@ -298,6 +310,7 @@ helm upgrade --install healthcare infra/helm \
   --set agent-service.config.DATABRICKS_HOST="$DATABRICKS_HOST" \
   --set agent-service.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
   --set agent-service.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+   --set agent-service.secrets.PATIENT_SCOPE_ENTITLEMENTS="$PATIENT_SCOPE_ENTITLEMENTS" \
   --set flink.config.DATABRICKS_HOST="$DATABRICKS_HOST" \
   --wait --timeout 5m
 

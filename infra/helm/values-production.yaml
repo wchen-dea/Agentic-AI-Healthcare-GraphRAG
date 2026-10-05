@@ -34,11 +34,10 @@ agent-service:
     MLFLOW_TRACKING_URI: "http://mlflow:5000"
     MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"
     AGENT_ALLOW_ROLE_HEADER: "false"
+    PATIENT_SCOPE_AUTH_REQUIRED: "true"
   secrets:
-    DATABRICKS_TOKEN: ""
-    NEO4J_PASSWORD: ""
-    OPENAI_API_KEY: ""
-    ANTHROPIC_API_KEY: ""
+    # Inject through an external Secret; do not put credential values in this file.
+    PATIENT_SCOPE_ENTITLEMENTS: ""
 provider-web:
   replicaCount: 2
   autoscaling:

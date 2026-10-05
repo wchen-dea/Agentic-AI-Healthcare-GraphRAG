@@ -5,8 +5,7 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 # The image runs as the non-root `app` user (uid/gid 10001); see ADR-0011.
-# readOnlyRootFilesystem stays off: the Hugging Face model cache (HF_HOME) and
-# the audit log (/var/log/agent-service) are written inside the container.
+# Runtime state is mounted explicitly; the container root filesystem is read-only.
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 10001
@@ -60,7 +59,7 @@ config:
   MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"
   AGENT_ALLOW_ROLE_HEADER: "false"
   PATIENT_MEMORY_STORE_BACKEND: "postgres"
-  PATIENT_MEMORY_DATABASE_URL: "postgresql://patient_memory:change_me@patient-memory-postgres:5432/patient_memory"
+  PATIENT_MEMORY_DATABASE_URL: ""
 secrets: {}
 patientMemoryPostgres:
   enabled: true
@@ -70,7 +69,7 @@ patientMemoryPostgres:
     pullPolicy: IfNotPresent
   database: patient_memory
   user: patient_memory
-  password: change_me
+  password: ""
   storage:
     size: 1Gi
     storageClassName: ""

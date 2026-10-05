@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -141,6 +143,38 @@ class PipelineServiceTests(unittest.TestCase):
         self.assertEqual(kwargs["points"][0]["id"], 101)
         self.assertIn("embedding_domain", kwargs["points"][0]["payload"])
         self.assertEqual(kwargs["points"][0]["payload"]["embedding_domain"], "clinical")
+
+    def test_qdrant_failure_is_recorded_for_replay(self):
+        with TemporaryDirectory() as tmp_dir:
+            svc = self._make_service()
+            svc.reconciliation_path = Path(tmp_dir) / "replay.jsonl"
+            event = {
+                "event_id": "evt-replay",
+                "event_ts": "2026-08-12T00:00:00Z",
+                "event_type": "LAB_RESULT",
+                "source_type": "LAB",
+            }
+            payload = {"lab_name": "Potassium", "value": 5.8}
+            svc.qdrant.upsert.side_effect = RuntimeError("qdrant unavailable")
+
+            with patch(
+                "app.pipeline_service.provenance_for_source_type", return_value={}
+            ), patch("app.pipeline_service.build_qdrant_payload", return_value={}), patch(
+                "app.pipeline_service.PointStruct", side_effect=lambda **kwargs: kwargs
+            ):
+                svc.write_neo4j = Mock()
+                svc.write_neo4j(event, payload, "text")
+                with self.assertRaises(RuntimeError):
+                    svc.write_qdrant(event, payload, "text", [0.1], "clinical")
+                svc._record_reconciliation(event, payload, "text", [0.1], "clinical")
+
+            self.assertTrue(svc.reconciliation_path.exists())
+            svc.qdrant.upsert.side_effect = None
+            with patch("app.pipeline_service.provenance_for_source_type", return_value={}), patch(
+                "app.pipeline_service.build_qdrant_payload", return_value={}
+            ), patch("app.pipeline_service.PointStruct", side_effect=lambda **kwargs: kwargs):
+                self.assertEqual(svc.replay_reconciliation(), 1)
+            self.assertFalse(svc.reconciliation_path.exists())
 
     def test_write_neo4j_dispatches_lab_result_signal_path(self):
         svc = self._make_service()

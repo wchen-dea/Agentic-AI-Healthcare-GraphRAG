@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 ENV_PREFIX = "AGENT_"
@@ -40,6 +40,7 @@ class AgentServiceSettings(BaseSettings):
     default_caller_role: str = Field(default="generation", validation_alias=env_name("DEFAULT_CALLER_ROLE"))
     allow_role_header: bool = Field(default=True, validation_alias=env_name("ALLOW_ROLE_HEADER"))
     audit_log_path: Path = Field(default=Path("logs/agent_audit.log"), validation_alias=env_name("AUDIT_LOG_PATH"))
+    audit_fail_closed: bool = Field(default=False, validation_alias=env_name("AUDIT_FAIL_CLOSED"))
     allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["*"], validation_alias=env_name("ALLOW_ORIGINS")
     )
@@ -55,6 +56,8 @@ class AgentServiceSettings(BaseSettings):
     mcp_instructions: str = Field(default="", validation_alias="MCP_INSTRUCTIONS")
     mcp_stateless_http: bool = Field(default=False, validation_alias="MCP_STATELESS_HTTP")
     mcp_json_response: bool = Field(default=False, validation_alias="MCP_JSON_RESPONSE")
+    mcp_auth_required: bool = Field(default=False, validation_alias="MCP_AUTH_REQUIRED")
+    mcp_auth_token: SecretStr = Field(default=SecretStr(""), validation_alias="MCP_AUTH_TOKEN")
     mcp_dns_rebinding_protection: bool = Field(default=False, validation_alias="MCP_DNS_REBINDING_PROTECTION")
     mcp_allowed_hosts: Annotated[list[str], NoDecode] = Field(
         default_factory=list, validation_alias="MCP_ALLOWED_HOSTS"
