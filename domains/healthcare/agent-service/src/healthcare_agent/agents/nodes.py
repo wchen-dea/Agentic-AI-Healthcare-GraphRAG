@@ -325,7 +325,18 @@ def synthesis_agent(state: HealthcareAgentState) -> dict[str, Any]:
     runtime = get_runtime()
     question = state["question"]
     session_context = state.get("session_context") or ""
-    prompt_question = f"{session_context}\n\nCurrent question: {question}" if session_context else question
+    patient_memory = state.get("patient_memory_context", [])
+    prompt_question = question
+    if session_context:
+        prompt_question = f"{session_context}\n\nCurrent question: {prompt_question}"
+    if patient_memory:
+        prompt_question = (
+            f"{prompt_question}\n\nTrusted longitudinal patient memory:\n"
+            + "\n".join(
+                f"- {item.get('key', 'fact')}: {item.get('value', '')}"
+                for item in patient_memory
+            )
+        )
     vector_ctx = state.get("vector_context", [])
     graph_ctx = state.get("graph_context", [])
 

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from typing import Any, Literal, Protocol, cast
+
+from healthcare_agent.orchestration.memory import PatientMemoryRecord
 from uuid import uuid4
 
 from langgraph.types import Command
@@ -83,6 +85,7 @@ class LangGraphOrchestrator:
         *,
         structured: bool = False,
         session_context: str = "",
+        patient_memory: PatientMemoryRecord | None = None,
         context_limit: int = DEFAULT_CONTEXT_LIMIT,
     ) -> dict[str, Any]:
         thread_id = uuid4().hex
@@ -94,6 +97,7 @@ class LangGraphOrchestrator:
                     patient_id,
                     structured=structured,
                     session_context=session_context,
+                    patient_memory=patient_memory,
                     context_limit=context_limit,
                 ),
             ),
@@ -108,6 +112,7 @@ class LangGraphOrchestrator:
         *,
         structured: bool = False,
         session_context: str = "",
+        patient_memory: PatientMemoryRecord | None = None,
         context_limit: int = DEFAULT_CONTEXT_LIMIT,
     ) -> Iterator[tuple[str, dict[str, Any]]]:
         thread_id = uuid4().hex
@@ -121,6 +126,7 @@ class LangGraphOrchestrator:
                     patient_id,
                     structured=structured,
                     session_context=session_context,
+                    patient_memory=patient_memory,
                     context_limit=context_limit,
                 ),
             ),

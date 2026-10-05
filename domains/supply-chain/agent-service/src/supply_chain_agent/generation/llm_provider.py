@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 import requests
@@ -98,7 +99,53 @@ class OllamaProvider:
         return str(response.json().get("response") or "")
 
 
+class DatabricksProvider:
+    """Calls a Databricks Model Serving / AI Gateway endpoint (OpenAI-compatible chat format)."""
+
+    def __init__(self, *, configured_model: str) -> None:
+        self.model = configured_model or "databricks-gpt-5-6-luna"
+        self.host = os.getenv("DATABRICKS_HOST", "").rstrip("/")
+        self.token = os.getenv("DATABRICKS_TOKEN", "")
+
+    def generate(
+        self,
+        *,
+        prompt: str,
+        timeout_seconds: int,
+        max_tokens: int,
+        temperature: float = 0.2,
+    ) -> str:
+        if not self.host:
+            return "LLM error: DATABRICKS_HOST not set."
+        if not self.token:
+            return "LLM error: DATABRICKS_TOKEN not set."
+        url = f"{self.host}/serving-endpoints/{self.model}/invocations"
+        headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        payload: dict[str, Any] = {
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=timeout_seconds)
+            if response.status_code == 400 and "temperature" in response.text:
+                payload.pop("temperature")
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout_seconds)
+        except requests.Timeout:
+            return f"LLM error: Databricks request timed out after {timeout_seconds} seconds."
+        except requests.RequestException:
+            return "LLM error: unable to reach the Databricks AI Gateway endpoint."
+        if response.status_code != 200:
+            return f"LLM error: Databricks AI Gateway returned status {response.status_code}."
+        try:
+            return str(response.json()["choices"][0]["message"]["content"])
+        except (ValueError, KeyError, IndexError):
+            return "LLM error: invalid response format from Databricks AI Gateway."
+
+
 def create_provider(provider_name: str, *, base_url: str, configured_model: str) -> Any:
     if provider_name == "ollama":
         return OllamaProvider(base_url=base_url, configured_model=configured_model)
+    if provider_name == "databricks":
+        return DatabricksProvider(configured_model=configured_model)
     raise LLMProviderError(f"Unsupported LLM provider '{provider_name}'")

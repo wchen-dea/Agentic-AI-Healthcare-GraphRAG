@@ -14,12 +14,18 @@ agent-service:
     NEO4J_USER: "neo4j"
     LLM_PROVIDER: "bedrock"
     LLM_MODEL: "anthropic.claude-3-5-haiku-20241022-v1:0"
+    EMBEDDING_PROVIDER: "databricks"
+    EMBEDDING_MODEL: ""
+    EMBEDDING_DIM: "1024"
+    DATABRICKS_EMBEDDING_ENDPOINT: "databricks-gte-large-en"
+    EMBEDDING_REQUIRE_MODEL: "true"
     LLM_MODEL_SIMPLE: "bedrock:anthropic.claude-3-5-haiku-20241022-v1:0"
     LLM_MODEL_MODERATE: "bedrock:amazon.nova-pro-v1:0"
     LLM_MODEL_COMPLEX: "bedrock:anthropic.claude-3-5-sonnet-20240620-v1:0"
     LLM_FALLBACK_PROVIDER: "anthropic"
     LLM_FALLBACK_MODEL: "claude-sonnet-4-20250514"
     AWS_REGION: "us-east-1"
+    DATABRICKS_HOST: "https://<workspace>.cloud.databricks.com"
     LLM_TIMEOUT_SECONDS: "120"
     LLM_MAX_TOKENS: "1200"
     OLLAMA_URL: ""
@@ -28,11 +34,11 @@ agent-service:
     MLFLOW_TRACKING_URI: "http://mlflow:5000"
     MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"
     AGENT_ALLOW_ROLE_HEADER: "false"
-  secrets: {}
-  # Inject via external secret manager:
-  # NEO4J_PASSWORD: ""
-  # OPENAI_API_KEY: ""
-  # ANTHROPIC_API_KEY: ""
+  secrets:
+    DATABRICKS_TOKEN: ""
+    NEO4J_PASSWORD: ""
+    OPENAI_API_KEY: ""
+    ANTHROPIC_API_KEY: ""
 provider-web:
   replicaCount: 2
   autoscaling:
@@ -42,6 +48,17 @@ provider-web:
 flink:
   taskmanager:
     replicas: 2
+  config:
+    EMBEDDING_PROVIDER: "databricks"
+    EMBEDDING_MODEL: ""
+    EMBEDDING_DIM: "1024"
+    DATABRICKS_HOST: "https://<workspace>.cloud.databricks.com"
+    DATABRICKS_EMBEDDING_ENDPOINT: "databricks-gte-large-en"
+    EMBEDDING_REQUIRE_MODEL: "true"
+  secretEnv:
+    DATABRICKS_TOKEN:
+      name: databricks-credentials
+      key: token
 mlflow:
   persistence:
     enabled: true

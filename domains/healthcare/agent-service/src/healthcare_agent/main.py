@@ -29,6 +29,10 @@ from healthcare_agent.config.settings import load_settings
 from healthcare_agent.generation.factory import build_llm_provider, llm_model_info
 from healthcare_agent.generation.structured_output import build_structured_prompt, parse_structured_response
 from healthcare_agent.generation.synthesis import compact_graph_context, compact_vector_context, synthesize_answer
+from healthcare_agent.orchestration.memory import (
+    PatientMemoryPolicy,
+    get_patient_memory_store,
+)
 from healthcare_agent.orchestration.orchestrator import LangGraphOrchestrator
 from healthcare_agent.orchestration.query_service import QueryService
 from healthcare_agent.orchestration.runtime import AgentRuntime, configure_runtime
@@ -127,6 +131,12 @@ orchestrator = LangGraphOrchestrator.build()
 queries = QueryService(
     max_context_items=settings.max_context_items,
     orchestrator=orchestrator,
+    patient_memory_store=get_patient_memory_store(),
+    patient_memory_policy=PatientMemoryPolicy(
+        consent_required=settings.patient_memory_consent_required,
+        retention_seconds=settings.patient_memory_retention_seconds,
+        max_facts=settings.patient_memory_max_facts,
+    ),
 )
 MCP_INSTRUCTIONS = (
     "Healthcare GraphRAG tools over a patient knowledge graph and clinical evidence. Patient-scoped tools"

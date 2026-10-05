@@ -41,6 +41,7 @@ from healthcare_agent.orchestration.hitl import (
     hitl_enabled,
     human_review,
 )
+from healthcare_agent.orchestration.memory import PatientMemoryRecord
 from healthcare_agent.orchestration.state import HealthcareAgentState
 
 DEFAULT_CONTEXT_LIMIT = 5
@@ -153,6 +154,34 @@ def _after_input_guardrail(state: HealthcareAgentState) -> str:
     return "blocked" if (state.get("guardrails") or {}).get("input_blocked") else "allowed"
 
 
+def patient_memory_retrieval(state: HealthcareAgentState) -> dict[str, Any]:
+    """Load governed patient facts into a separate trusted context channel."""
+    record = state.get("_patient_memory_record")
+    if not isinstance(record, PatientMemoryRecord):
+        return {
+            "patient_memory_context": [],
+            "patient_memory_facts": [],
+            "patient_memory_policy": {},
+            "patient_memory_metadata": {"loaded": False},
+        }
+    facts = record.active_facts()
+    return {
+        "patient_memory_context": record.to_context(),
+        "patient_memory_facts": [fact.to_dict() for fact in facts],
+        "patient_memory_policy": {
+            "consent_required": record.policy.consent_required,
+            "consent_granted": record.policy.consent_granted,
+            "retention_seconds": record.policy.retention_seconds,
+            "max_facts": record.policy.max_facts,
+        },
+        "patient_memory_metadata": {
+            "loaded": True,
+            "patient_id": record.patient_id,
+            "fact_count": len(facts),
+        },
+    }
+
+
 # ── Graph builder ──────────────────────────────────────────────────────────
 
 def build_healthcare_graph(*, with_hitl: bool | None = None) -> Any:
@@ -219,6 +248,7 @@ def build_healthcare_graph(*, with_hitl: bool | None = None) -> Any:
     graph.add_node("output_guardrail", output_guardrail)
 
     graph.add_node("triage", _triage)
+    graph.add_node("patient_memory_retrieval", patient_memory_retrieval)
     graph.add_node("vector_retrieval", _vector)
     graph.add_node("graph_retrieval", _graph)
     graph.add_node("medication_safety", _med)
@@ -235,7 +265,8 @@ def build_healthcare_graph(*, with_hitl: bool | None = None) -> Any:
         _after_input_guardrail,
         {"blocked": END, "allowed": "triage"},
     )
-    graph.add_edge("triage", "vector_retrieval")
+    graph.add_edge("triage", "patient_memory_retrieval")
+    graph.add_edge("patient_memory_retrieval", "vector_retrieval")
     graph.add_edge("vector_retrieval", "graph_retrieval")
 
     # Conditional: specialist or straight to confidence
@@ -343,13 +374,19 @@ def _initial_state(
     *,
     structured: bool,
     session_context: str,
-    context_limit: int,
+    patient_memory: PatientMemoryRecord | None = None,
+    context_limit: int = DEFAULT_CONTEXT_LIMIT,
 ) -> HealthcareAgentState:
     return {
         "question": question,
         "patient_id": patient_id,
         "structured": structured,
         "session_context": session_context,
+        "_patient_memory_record": patient_memory,
+        "patient_memory_context": [],
+        "patient_memory_facts": [],
+        "patient_memory_policy": {},
+        "patient_memory_metadata": {"loaded": False},
         "context_limit": context_limit,
         "vector_context": [],
         "graph_context": [],
@@ -412,6 +449,7 @@ def final_state_to_response(
         "patients": patient_ids,
         "vector_context": final_state.get("vector_context", []),
         "graph_context": final_state.get("graph_context", []),
+        "patient_memory_context": final_state.get("patient_memory_context", []),
         "answer": PENDING_ANSWER if pending_review else final_state.get("answer", ""),
         "guardrails": dict(final_state.get("guardrails") or {}),
         "status": "pending_approval" if pending_review else "completed",

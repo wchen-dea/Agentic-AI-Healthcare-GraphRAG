@@ -53,6 +53,13 @@ class HealthcareAgentState(TypedDict, total=False):
     structured: bool
     # Prior-turn summary from session memory; used only for synthesis prompts.
     session_context: str
+    # Governed, patient-scoped durable memory; never used as session history.
+    patient_memory_context: Annotated[list[dict[str, Any]], merge_unique]
+    patient_memory_facts: Annotated[list[dict[str, Any]], merge_unique]
+    patient_memory_policy: dict[str, Any]
+    patient_memory_metadata: dict[str, Any]
+    # Internal application-to-graph handoff; never exposed as prompt text.
+    _patient_memory_record: Any
     context_limit: int  # upper bound on retrieved evidence items for this request
 
     # ── guardrails (input/output policy nodes) ──────────────────────────

@@ -48,7 +48,42 @@ Host ports:
 
 ## 2. Lifecycle
 
-Run `make help` for the full target list.
+Run `make help` for the full target list. Choose one local deployment path per environment.
+
+### Docker Compose-only path
+
+All services run as Docker containers on `graphrag-net`:
+
+```bash
+make compose-up       # full stack
+make compose-up-hc    # healthcare only
+make compose-down
+```
+
+Use `make ps`, `make validate`, `make api-hc`, and `make mlflow` for checks. This path uses host ports directly, including the healthcare API on port 8000.
+
+### Minikube-in-Docker path
+
+Minikube runs with the Docker driver; workloads run as Kubernetes pods inside the Minikube node:
+
+```bash
+make minikube-up
+make minikube-ports
+# use localhost:8000 and localhost:8088
+make minikube-ports-stop
+make minikube-down
+```
+
+Required tools are Docker, `minikube`, `kubectl`, and `helm`. The setup script builds images after `minikube docker-env` is applied, so Kubernetes uses local images rather than pulling them from a registry. Inspect this path with:
+
+```bash
+kubectl -n healthcare-ai-dev get pods
+kubectl -n healthcare-ai-dev get events --sort-by=.lastTimestamp
+```
+
+Use `minikube delete` for a full cluster reset. Do not use `make compose-down` to tear down Minikube workloads.
+
+### Existing lifecycle aliases
 
 | Task | Command |
 | --- | --- |
@@ -224,21 +259,43 @@ The umbrella chart is `infra/helm` with sub-charts under `infra/helm/charts`. De
 | Task | Command |
 | --- | --- |
 | Deploy to minikube | `make helm-dev` (runs `infra/environments/dev/setup-minikube.sh`) |
-| Port-forward services | `make helm-ports`; stop with `make helm-ports-stop` |
-| Tear down dev | `make helm-dev-down` |
+| Port-forward services | `make minikube-ports`; stop with `make minikube-ports-stop` |
+| Tear down dev | `make minikube-down` |
 | Lint and render | `make helm-lint`, `make helm-prd` (dry-run only) |
 | Pull the model in-cluster | `kubectl -n healthcare-ai-dev exec deploy/ollama -- ollama pull llama3.1` |
 
-Production install. Supply secrets from your secret store; never commit them:
+Production deployment requires:
+
+- An EKS cluster and AWS role with permissions to update kubeconfig and deploy into `healthcare-ai`.
+- Reachable external Qdrant and Neo4j services.
+- GitHub Actions variable `DATABRICKS_HOST`.
+- GitHub Actions secrets `DATABRICKS_TOKEN`, `NEO4J_PASSWORD`, and any configured LLM credentials.
+- A Kubernetes Secret named `databricks-credentials` with key `token` for Flink.
+
+The production workflow creates or updates the Databricks Secret, injects the Databricks host into both agent and Flink workloads, and waits for agent, web, and Flink rollouts. Use the same `EMBEDDING_PROVIDER=databricks`, `DATABRICKS_EMBEDDING_ENDPOINT=databricks-gte-large-en`, and `EMBEDDING_DIM=1024` for ingestion and query. Re-index Qdrant before switching from local 384-dimensional vectors.
+
+For a manual deployment, supply secrets from your secret store; never commit them:
 
 ```bash
-helm install healthcare infra/helm \
+kubectl create namespace healthcare-ai --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic databricks-credentials \
+  -n healthcare-ai \
+  --from-literal=token="$DATABRICKS_TOKEN" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+helm upgrade --install healthcare infra/helm \
   -f infra/helm/values-production.yaml \
   -n healthcare-ai --create-namespace \
+  --set agent-service.config.DATABRICKS_HOST="$DATABRICKS_HOST" \
   --set agent-service.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
-  --set agent-service.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+  --set agent-service.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  --set flink.config.DATABRICKS_HOST="$DATABRICKS_HOST" \
+  --wait --timeout 5m
 
-helm upgrade healthcare infra/helm -f infra/helm/values-production.yaml -n healthcare-ai
+kubectl rollout status deployment/agent-service -n healthcare-ai --timeout=300s
+kubectl rollout status deployment/provider-web -n healthcare-ai --timeout=300s
+kubectl rollout status deployment/flink-jobmanager -n healthcare-ai --timeout=300s
+kubectl rollout status deployment/flink-taskmanager -n healthcare-ai --timeout=300s
 helm rollback healthcare <revision> -n healthcare-ai
 ```
 
@@ -290,7 +347,18 @@ kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000
 | Ollama `OOMKilled` | Not enough memory | `MINIKUBE_MEMORY=20480 make helm-dev` |
 | `ImagePullBackOff` | Image built outside minikube's Docker | `eval $(minikube docker-env)` and rebuild; the setup script does this |
 | Flink task manager cannot register | RPC port blocked | Check port 6124 in the network policy |
-| Port-forward drops | `kubectl` limit on long connections | Re-run `make helm-ports` |
+| Port-forward drops | `kubectl` limit on long connections | Re-run `make minikube-ports` |
+
+### Minikube credentials, reboot and troubleshooting
+
+- Put real credentials in the gitignored `infra/helm/values-dev.local.yaml` (`agent-service.secrets.DATABRICKS_TOKEN`). `setup-minikube.sh` applies it automatically; for manual upgrades pass `-f infra/helm/values-dev.yaml -f infra/helm/values-dev.local.yaml`. Never commit tokens (GitHub push protection will block them).
+- Reboot: `minikube stop && minikube start`, wait for pods to be Ready, then `make minikube-ports`.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| localhost:5000 down, mlflow `OOMKilled` | Dev memory too low / persistence | Dev values disable persistence and raise limits; re-run helm upgrade |
+| Agent UI "Request timed out after 120s" | mlflow down (agent retries) or `Permission denied: /mlflow` | Ensure mlflow runs with `--serve-artifacts`; restart agent-service |
+| "LLM error: unable to reach Databricks AI Gateway" | `DATABRICKS_HOST/TOKEN` still `change_me` | Fill `values-dev.local.yaml`, helm upgrade, restart agent-service |
 
 ### Conduktor
 

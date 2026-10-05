@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
 from healthcare_agent.orchestration.memory import (
     ConversationSession,
+    InMemoryPatientMemoryStore,
+    PatientMemoryFact,
+    PatientMemoryPolicy,
+    PatientMemoryRecord,
     RedisSessionStore,
     SessionStore,
     _deserialize_session,
     _serialize_session,
     generate_session_id,
 )
+from healthcare_agent.orchestration.graph import patient_memory_retrieval
+from healthcare_agent.orchestration.query_service import QueryService
 
 
 class SerializationTests(unittest.TestCase):
@@ -137,6 +144,121 @@ class GenerateSessionIdTests(unittest.TestCase):
         id1 = generate_session_id("user1", "127.0.0.1")
         id2 = generate_session_id("user2", "127.0.0.1")
         self.assertNotEqual(id1, id2)
+
+
+class DurablePatientMemoryTests(unittest.TestCase):
+    def setUp(self):
+        self.store = InMemoryPatientMemoryStore()
+        self.service = QueryService(max_context_items=5, patient_memory_store=self.store)
+
+    def test_round_trip_and_provenance(self):
+        record = self.service.write_patient_memory(
+            "p1",
+            [PatientMemoryFact(key=" Allergies ", value="  penicillin  ")],
+            provenance={"source": "clinician_note"},
+            consent=True,
+        )
+
+        loaded = self.service.load_patient_memory("p1")
+        self.assertIsNotNone(loaded)
+        self.assertEqual(record.patient_id, "p1")
+        self.assertEqual(loaded.to_context()[0]["key"], "allergies")
+        self.assertEqual(loaded.to_context()[0]["value"], "penicillin")
+        self.assertEqual(
+            loaded.to_context()[0]["metadata"]["provenance"]["source"],
+            "clinician_note",
+        )
+
+    def test_consent_denied_write_rejected(self):
+        with self.assertRaises(PermissionError):
+            self.service.write_patient_memory(
+                "p1",
+                [PatientMemoryFact(key="risk", value="high")],
+                provenance="assessment",
+                consent=False,
+            )
+        self.assertIsNone(self.service.load_patient_memory("p1"))
+
+    def test_expired_and_out_of_retention_facts_filtered(self):
+        now = time.time()
+        policy = PatientMemoryPolicy(retention_seconds=60, consent_granted=True)
+        record = PatientMemoryRecord(
+            patient_id="p1",
+            policy=policy,
+            facts=[
+                PatientMemoryFact(key="expired", value="x", expires_at=now - 1),
+                PatientMemoryFact(key="old", value="x", observed_at=now - 120),
+                PatientMemoryFact(key="active", value="x", observed_at=now),
+            ],
+        )
+        self.store.save(record)
+
+        loaded = self.service.load_patient_memory("p1")
+        self.assertEqual([fact.key for fact in loaded.active_facts()], ["active"])
+
+    def test_patient_isolation(self):
+        self.service.write_patient_memory(
+            "p1", [PatientMemoryFact(key="condition", value="asthma")], "source-a", True
+        )
+        self.service.write_patient_memory(
+            "p2", [PatientMemoryFact(key="condition", value="diabetes")], "source-b", True
+        )
+
+        self.assertEqual(self.service.load_patient_memory("p1").facts[0].value, "asthma")
+        self.assertEqual(self.service.load_patient_memory("p2").facts[0].value, "diabetes")
+
+    def test_graph_state_loads_and_deduplicates_patient_memory(self):
+        record = PatientMemoryRecord(
+            patient_id="p1",
+            policy=PatientMemoryPolicy(consent_granted=True),
+            facts=[PatientMemoryFact(fact_id="f1", key="risk", value="stable")],
+        )
+        state = {"_patient_memory_record": record}
+        first = patient_memory_retrieval(state)
+        second = patient_memory_retrieval(state)
+
+        self.assertEqual(first["patient_memory_metadata"]["fact_count"], 1)
+        self.assertEqual(
+            first["patient_memory_context"],
+            second["patient_memory_context"],
+        )
+
+    def test_policy_override_cannot_relax_configured_limits(self):
+        service = QueryService(
+            max_context_items=5,
+            patient_memory_store=self.store,
+            patient_memory_policy=PatientMemoryPolicy(
+                consent_required=True,
+                retention_seconds=60,
+                max_facts=1,
+            ),
+        )
+        with self.assertRaises(PermissionError):
+            service.write_patient_memory(
+                "p1",
+                [PatientMemoryFact(key="risk", value="high")],
+                "test",
+                True,
+                policy=PatientMemoryPolicy(
+                    consent_required=False,
+                    retention_seconds=3600,
+                    max_facts=100,
+                ),
+            )
+
+    def test_duplicate_fact_id_is_updated_not_duplicated(self):
+        fact = PatientMemoryFact(fact_id="f1", key="risk", value="low")
+        self.service.write_patient_memory("p1", [fact], "source-a", True)
+        self.service.write_patient_memory(
+            "p1",
+            [PatientMemoryFact(fact_id="f1", key="risk", value="high")],
+            "source-b",
+            True,
+        )
+
+        loaded = self.service.load_patient_memory("p1")
+        self.assertEqual(len(loaded.facts), 1)
+        self.assertEqual(loaded.facts[0].value, "high")
 
 
 if __name__ == "__main__":

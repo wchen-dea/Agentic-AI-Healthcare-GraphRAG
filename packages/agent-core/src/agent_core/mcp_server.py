@@ -24,16 +24,17 @@ from mcp.types import ToolAnnotations
 
 from agent_core.settings import AgentServiceSettings
 
-ToolKind = Literal["read_only", "generation", "export"]
+ToolKind = Literal["read_only", "generation", "export", "memory_write"]
 
 # MCP annotations are client hints, not enforcement: role policy is still
-# applied by ToolGovernance before any tool body runs. No tool mutates stores,
-# so every kind is read-only and non-destructive. Generation calls the LLM, so
-# results are neither idempotent nor closed-world.
+# applied by ToolGovernance before any tool body runs. Patient-memory writes
+# are explicitly marked as mutating and idempotent because fact IDs or keys
+# provide upsert semantics.
 _ANNOTATIONS: dict[ToolKind, dict[str, bool]] = {
     "read_only": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
     "generation": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False, "openWorldHint": True},
     "export": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
+    "memory_write": {"readOnlyHint": True, "destructiveHint": True, "idempotentHint": True, "openWorldHint": False},
 }
 
 SKILLS_CATALOG_URI = "skills://catalog"

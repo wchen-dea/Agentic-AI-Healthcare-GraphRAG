@@ -1,13 +1,11 @@
-"""MLflow tracing and evaluation for healthcare multi-agent pipelines.
+"""MLflow tracing for the healthcare multi-agent pipeline.
 
-Provides:
-- ``@mlflow_trace`` decorator for wrapping agent nodes, retrieval, and LLM calls
-- Automatic span creation with healthcare-specific attributes
-- Evaluation harness comparing single-pass / ReAct / LangGraph modes
-- Custom healthcare scorers: routing, evidence, answer quality, safety
+Tracing is optional. Set ``MLFLOW_TRACKING_URI`` to enable it; when unset,
+all wrappers call the underlying functions directly.
 
-Activation: set ``MLFLOW_TRACKING_URI`` (e.g. ``http://mlflow:5000``)
-and optionally ``MLFLOW_EXPERIMENT_NAME``.
+The implementation deliberately records bounded metadata and counts rather
+than unrestricted clinical payloads. Do not add raw patient records, access
+tokens, or credentials to span attributes.
 """
 from __future__ import annotations
 
@@ -19,79 +17,83 @@ from typing import Any, Callable
 import mlflow
 from mlflow.entities import SpanType
 
-# ── Configuration ──────────────────────────────────────────────────────────
-
 _DEFAULT_EXPERIMENT = "healthcare-graphrag"
+_MAX_ERROR_LENGTH = 500
 
 
 def mlflow_enabled() -> bool:
-    return bool(os.getenv("MLFLOW_TRACKING_URI"))
+    """Return whether the service should emit MLflow spans."""
+    return bool(os.getenv("MLFLOW_TRACKING_URI", "").strip())
 
 
 def _ensure_experiment() -> str:
+    """Select the configured MLflow experiment and return its name."""
     name = os.getenv("MLFLOW_EXPERIMENT_NAME", _DEFAULT_EXPERIMENT)
     mlflow.set_experiment(name)
     return name
 
 
-# ── Tracing decorator ─────────────────────────────────────────────────────
+def _safe_repr(obj: Any, max_len: int = 2000) -> Any:
+    """Return bounded, recursively simplified data for span I/O logging.
+
+    This limits collection sizes and string values, but it is not a
+    de-identification mechanism. Callers must avoid passing sensitive values.
+    """
+    if isinstance(obj, (str, int, float, bool, type(None))):
+        return obj[:max_len] if isinstance(obj, str) else obj
+    if isinstance(obj, dict):
+        return {k: _safe_repr(v, max_len) for k, v in list(obj.items())[:20]}
+    if isinstance(obj, (list, tuple)):
+        return [_safe_repr(v, max_len) for v in obj[:20]]
+    text = str(obj)
+    return text[:max_len]
+
+
+def _error_attributes(exc: BaseException, elapsed_ms: float) -> dict[str, Any]:
+    return {
+        "latency_ms": round(elapsed_ms, 2),
+        "outcome": "error",
+        "error_type": type(exc).__name__,
+        "error": str(exc)[:_MAX_ERROR_LENGTH],
+    }
+
 
 def mlflow_trace(
     span_type: str = SpanType.CHAIN,
     name: str | None = None,
 ):
-    """Decorator that wraps a function in an MLflow trace span.
+    """Decorate a function with an MLflow span.
 
-    Usage::
+    Example::
 
         @mlflow_trace(span_type=SpanType.RETRIEVER, name="vector_search")
         def vector_context(question, patient_id, limit):
             ...
     """
+
     def decorator(fn: Callable) -> Callable:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             if not mlflow_enabled():
                 return fn(*args, **kwargs)
 
-            span_name = name or fn.__name__
-            with mlflow.start_span(name=span_name, span_type=span_type) as span:
+            with mlflow.start_span(name=name or fn.__name__, span_type=span_type) as span:
                 span.set_inputs({"args": _safe_repr(args), "kwargs": _safe_repr(kwargs)})
                 started = time.perf_counter()
                 try:
                     result = fn(*args, **kwargs)
-                    elapsed_ms = (time.perf_counter() - started) * 1000
-                    span.set_outputs(_safe_repr(result))
-                    span.set_attributes({
-                        "latency_ms": round(elapsed_ms, 2),
-                        "outcome": "success",
-                    })
-                    return result
                 except Exception as exc:
-                    elapsed_ms = (time.perf_counter() - started) * 1000
-                    span.set_attributes({
-                        "latency_ms": round(elapsed_ms, 2),
-                        "outcome": "error",
-                        "error": str(exc)[:500],
-                    })
+                    span.set_attributes(_error_attributes(exc, (time.perf_counter() - started) * 1000))
                     raise
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                span.set_outputs(_safe_repr(result))
+                span.set_attributes({"latency_ms": round(elapsed_ms, 2), "outcome": "success"})
+                return result
+
         return wrapper
+
     return decorator
 
-
-def _safe_repr(obj: Any, max_len: int = 2000) -> Any:
-    """Truncate large objects for span I/O logging."""
-    if isinstance(obj, (str, int, float, bool, type(None))):
-        return obj
-    if isinstance(obj, dict):
-        return {k: _safe_repr(v, max_len) for k, v in list(obj.items())[:20]}
-    if isinstance(obj, (list, tuple)):
-        return [_safe_repr(v, max_len) for v in obj[:20]]
-    text = str(obj)
-    return text[:max_len] if len(text) > max_len else text
-
-
-# ── Trace lifecycle for full query pipelines ───────────────────────────────
 
 def trace_query(
     question: str,
@@ -102,124 +104,139 @@ def trace_query(
     top_k: int | None = None,
     **extra_kwargs: Any,
 ) -> dict[str, Any]:
-    """Execute a query function inside an MLflow trace.
+    """Run a query inside a parent span for the complete healthcare pipeline.
 
-    Creates a parent trace span containing the full pipeline, with
-    metadata for the query mode and patient scope.
+    Child spans created by agent, retriever, and LLM wrappers are nested under
+    this span when MLflow's active-span context is available.
     """
-    kwargs: dict[str, Any] = {k: v for k, v in extra_kwargs.items() if v}
+    kwargs = {key: value for key, value in extra_kwargs.items() if value is not None}
     if not mlflow_enabled():
-        if top_k is not None:
-            return query_fn(question, patient_id, top_k, **kwargs)
-        return query_fn(question, patient_id, **kwargs)
+        return (
+            query_fn(question, patient_id, top_k, **kwargs)
+            if top_k is not None
+            else query_fn(question, patient_id, **kwargs)
+        )
 
     _ensure_experiment()
-
     with mlflow.start_span(name=f"healthcare_query_{mode}", span_type=SpanType.CHAIN) as root:
-        root.set_inputs({
-            "question": question,
-            "patient_id": patient_id,
-            "mode": mode,
-        })
+        root.set_inputs({"question": question, "patient_id": patient_id, "mode": mode})
         started = time.perf_counter()
-
-        if top_k is not None:
-            result = query_fn(question, patient_id, top_k, **kwargs)
-        else:
-            result = query_fn(question, patient_id, **kwargs)
+        try:
+            result = (
+                query_fn(question, patient_id, top_k, **kwargs)
+                if top_k is not None
+                else query_fn(question, patient_id, **kwargs)
+            )
+        except Exception as exc:
+            root.set_attributes(_error_attributes(exc, (time.perf_counter() - started) * 1000))
+            raise
 
         elapsed_ms = (time.perf_counter() - started) * 1000
-        root.set_attributes({
-            "latency_ms": round(elapsed_ms, 2),
-            "mode": mode,
-            "request_type": result.get("request_type", "unknown"),
-            "patient_count": len(result.get("patients", [])),
-            "vector_hits": len(result.get("vector_context", [])),
-            "graph_hits": len(result.get("graph_context", [])),
-            "answer_length": len(result.get("answer", "")),
-        })
+        root.set_attributes(
+            {
+                "latency_ms": round(elapsed_ms, 2),
+                "outcome": "success",
+                "mode": mode,
+                "request_type": result.get("request_type", "unknown"),
+                "patient_count": len(result.get("patients", [])),
+                "vector_hits": len(result.get("vector_context", [])),
+                "graph_hits": len(result.get("graph_context", [])),
+                "answer_length": len(result.get("answer", "")),
+            }
+        )
         root.set_outputs(_safe_repr(result))
+        return result
 
-    return result
-
-
-# ── Agent node tracing ────────────────────────────────────────────────────
 
 def trace_agent_node(agent_name: str, fn: Callable) -> Callable:
-    """Wrap a LangGraph agent node function with an MLflow span."""
+    """Wrap a LangGraph node with an ``AGENT`` span."""
+
     @functools.wraps(fn)
     def wrapper(state):
         if not mlflow_enabled():
             return fn(state)
 
-        with mlflow.start_span(
-            name=f"agent:{agent_name}",
-            span_type=SpanType.AGENT,
-        ) as span:
-            span.set_inputs({
-                "question": state.get("question", ""),
-                "request_type": state.get("request_type", ""),
-                "iteration": state.get("iteration", 0),
-            })
+        with mlflow.start_span(name=f"agent:{agent_name}", span_type=SpanType.AGENT) as span:
+            span.set_inputs(
+                {
+                    "question": state.get("question", ""),
+                    "request_type": state.get("request_type", ""),
+                    "iteration": state.get("iteration", 0),
+                }
+            )
             started = time.perf_counter()
-            result = fn(state)
-            elapsed_ms = (time.perf_counter() - started) * 1000
+            try:
+                result = fn(state)
+            except Exception as exc:
+                span.set_attributes(_error_attributes(exc, (time.perf_counter() - started) * 1000))
+                raise
 
-            attrs = {"latency_ms": round(elapsed_ms, 2), "agent": agent_name}
+            elapsed_ms = (time.perf_counter() - started) * 1000
             messages = result.get("messages", [])
+            attributes = {
+                "latency_ms": round(elapsed_ms, 2),
+                "outcome": "success",
+                "agent": agent_name,
+                "message_count": len(messages),
+            }
             if messages:
-                attrs["action"] = messages[-1].get("action", "")
-            span.set_attributes(attrs)
+                attributes["action"] = messages[-1].get("action", "")
+            span.set_attributes(attributes)
             span.set_outputs(_safe_repr(result))
             return result
 
     return wrapper
 
 
-# ── LLM call tracing ─────────────────────────────────────────────────────
+def trace_llm_call(
+    fn: Callable,
+    *,
+    get_model_info: Callable[[], dict[str, Any]] | None = None,
+) -> Callable:
+    """Wrap LLM generation with an ``LLM`` span and model-routing metadata."""
 
-def trace_llm_call(fn: Callable, *, get_model_info: Callable[[], dict[str, Any]] | None = None) -> Callable:
-    """Wrap the LLM synthesis function with an MLflow LLM span.
-
-    ``get_model_info`` is invoked after generation completes and its result
-    (e.g. provider/model/tier from ModelRouter) is merged into the span
-    attributes, so which model served the request is visible in the trace.
-    """
     @functools.wraps(fn)
     def wrapper(question, vector_ctx, graph_ctx):
         if not mlflow_enabled():
             return fn(question, vector_ctx, graph_ctx)
 
         with mlflow.start_span(name="llm_generate", span_type=SpanType.LLM) as span:
-            span.set_inputs({
-                "question": question,
-                "vector_context_count": len(vector_ctx),
-                "graph_context_count": len(graph_ctx),
-            })
+            span.set_inputs(
+                {
+                    "question": question,
+                    "vector_context_count": len(vector_ctx),
+                    "graph_context_count": len(graph_ctx),
+                }
+            )
             started = time.perf_counter()
-            answer = fn(question, vector_ctx, graph_ctx)
+            try:
+                answer = fn(question, vector_ctx, graph_ctx)
+            except Exception as exc:
+                span.set_attributes(_error_attributes(exc, (time.perf_counter() - started) * 1000))
+                raise
+
             elapsed_ms = (time.perf_counter() - started) * 1000
-            attrs = {
+            attributes = {
                 "latency_ms": round(elapsed_ms, 2),
+                "outcome": "success",
                 "answer_length": len(answer),
                 "is_error": answer.startswith("LLM error:"),
             }
             if get_model_info is not None:
                 try:
-                    attrs.update(get_model_info())
+                    attributes.update(get_model_info())
                 except Exception:
-                    pass
-            span.set_attributes(attrs)
+                    attributes["model_info_error"] = True
+            span.set_attributes(attributes)
             span.set_outputs({"answer": answer[:1000]})
             return answer
 
     return wrapper
 
 
-# ── Retriever tracing ────────────────────────────────────────────────────
-
 def trace_retriever(name: str, fn: Callable) -> Callable:
-    """Wrap a retrieval function with an MLflow RETRIEVER span."""
+    """Wrap vector or graph retrieval with a ``RETRIEVER`` span."""
+
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         if not mlflow_enabled():
@@ -228,12 +245,21 @@ def trace_retriever(name: str, fn: Callable) -> Callable:
         with mlflow.start_span(name=name, span_type=SpanType.RETRIEVER) as span:
             span.set_inputs(_safe_repr({"args": args, "kwargs": kwargs}))
             started = time.perf_counter()
-            result = fn(*args, **kwargs)
+            try:
+                result = fn(*args, **kwargs)
+            except Exception as exc:
+                span.set_attributes(_error_attributes(exc, (time.perf_counter() - started) * 1000))
+                raise
+
             elapsed_ms = (time.perf_counter() - started) * 1000
-            span.set_attributes({
-                "latency_ms": round(elapsed_ms, 2),
-                "result_count": len(result) if isinstance(result, list) else 1,
-            })
+            result_count = len(result) if isinstance(result, (list, tuple, dict)) else 1
+            span.set_attributes(
+                {
+                    "latency_ms": round(elapsed_ms, 2),
+                    "outcome": "success",
+                    "result_count": result_count,
+                }
+            )
             span.set_outputs(_safe_repr(result))
             return result
 

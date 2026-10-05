@@ -1,26 +1,41 @@
 # Agentic AI Healthcare + Supply Chain GraphRAG
 
-This repository implements a local-first, multi-domain GraphRAG platform for healthcare and supply-chain workloads. The code is organized as a uv workspace with shared runtime packages, domain-specific agent services, streaming pipelines, knowledge assets, and web apps.
+This repository is a provider-neutral reference platform for governed GraphRAG applications in healthcare and supply-chain domains. It combines realtime event ingestion, graph and vector retrieval, multi-agent orchestration, and cited responses into one local-first workspace.
 
-The platform is intentionally provider-neutral and modular: it can run locally with Ollama and MiniLM in development and switch to Databricks-hosted embeddings and LLMs in production without changing the app contract.
+## Start here
 
-## Architecture
+Choose the path that matches your goal:
 
-```mermaid
-flowchart LR
-    UI[Healthcare / supply-chain web apps] --> API[FastAPI agent service]
-    API --> ORCH[LangGraph orchestration]
-    ORCH --> RETR[Vector + graph retrieval]
-    RETR --> NEO4J[(Neo4j)]
-    RETR --> QDRANT[(Qdrant)]
-    ORCH --> MCP[MCP tools + skills]
-    ORCH --> GEN[LLM provider router]
-    KAFKA[Kafka topics] --> FLINK[Flink enrichment]
-    FLINK --> QDRANT
-    FLINK --> NEO4J
-    MON[MLflow / Grafana / Prometheus] --> API
-    MON --> ORCH
-```
+| Goal | Start with |
+| --- | --- |
+| Run the platform locally | [Quickstart](#quickstart) |
+| Understand the system boundary and runtime flow | [Architecture](#architecture) |
+| Deploy with Compose, Minikube, or EKS | [03 — Platform Blueprint](docs/03_platform_blueprint.md) |
+| Operate, troubleshoot, or re-index services | [08 — Operations Runbook](docs/08_operation_runbook.md) |
+| Add or extend a domain | [09 — Supply Chain Domain](docs/09_supply_chain_domain.md) |
+| Review the business scope and safety constraints | [01 — Business Requirements](docs/01_business_requirements.md) |
+
+## Scope and boundaries
+
+- **Purpose:** demonstrate an auditable, grounded agent runtime over synthetic healthcare
+  and supply-chain data.
+- **Supported providers:** local Ollama/MiniLM development plus Databricks AI, AWS
+  Bedrock, and other provider-backed deployments through the same application contract.
+- **Core stores:** Neo4j for explicit relationships and Qdrant for semantic retrieval.
+- **Safety boundary:** this is not a medical device, EHR, clinical data repository, or
+  source of clinical decisions. Answers are advisory, synthetic, and subject to the
+  repository's guardrails and human-review paths.
+
+## Modern AI platform capabilities
+
+- Multi-model LLM access with provider abstraction and model routing across local and Databricks foundation models
+- Dual persistence with Neo4j for explicit relationships and Qdrant for vector search and semantic retrieval
+- End-to-end realtime knowledge ingestion from streaming healthcare and supply-chain events into a live knowledge base
+- LangGraph orchestration for multi-agent reasoning, specialist delegation, confidence evaluation, and human-in-the-loop review
+- Embedded MCP server patterns for governed tool access, skills, and role-aware execution
+- Layered runtime architecture that separates UI, API/BFF, orchestration, domain agents, tools, and data platforms
+- Separate session memory for short-lived conversational continuity and governed durable patient memory with consent, provenance, retention, and expiry controls
+- Unified delivery model across development and production with containerized services and infrastructure-as-code deployment patterns
 
 ## Quickstart
 
@@ -42,6 +57,26 @@ Common targets:
 - `make validate-docs` runs markdownlint.
 - `make test-unit` runs unit tests across the workspace.
 - `make lint` runs Ruff checks.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[Healthcare / supply-chain web apps] --> API[FastAPI agent service]
+    API --> ORCH[LangGraph orchestration]
+    ORCH --> SM[Session memory]
+    ORCH --> PM[Governed patient memory]
+    ORCH --> RETR[Vector + graph retrieval]
+    RETR --> NEO4J[(Neo4j)]
+    RETR --> QDRANT[(Qdrant)]
+    ORCH --> MCP[MCP tools + skills]
+    ORCH --> GEN[LLM provider router]
+    KAFKA[Kafka topics] --> FLINK[Flink enrichment]
+    FLINK --> QDRANT
+    FLINK --> NEO4J
+    MON[MLflow / Grafana / Prometheus] --> API
+    MON --> ORCH
+```
 
 ## Domains
 
@@ -72,6 +107,19 @@ Common targets:
 ├── README.md
 └── docs/adrs/
 ```
+
+## Local deployment paths
+
+Choose one path for local development:
+
+| Path | Start | Stop | Runtime |
+| --- | --- | --- | --- |
+| Docker Compose only | `make compose-up` | `make compose-down` | Docker containers on `graphrag-net` |
+| Minikube with Docker driver | `make minikube-up` | `make minikube-down` | Kubernetes pods inside a Docker-backed Minikube node |
+
+For Minikube service access, run `make minikube-ports`. See [03 — Platform Blueprint](docs/03_platform_blueprint.md#2-local-deployment-paths) for prerequisites and details. The existing `make up` and `make up-hc` commands remain Compose aliases.
+
+Put your real `DATABRICKS_TOKEN` in the gitignored `infra/helm/values-dev.local.yaml`; `make minikube-up` applies it automatically. Never commit it.
 
 ## Documentation index
 

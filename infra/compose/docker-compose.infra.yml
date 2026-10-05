@@ -140,6 +140,7 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: infra-ollama
+    profiles: ["ollama"]
     ports:
       - "11434:11434"
     volumes:

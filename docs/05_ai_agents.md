@@ -43,7 +43,8 @@ Embeddings and store clients come from `packages/knowledge-core`; see [04 — Da
 ```mermaid
 flowchart TD
   IG[input_guardrail] --> T[triage]
-  T --> VR[vector_retrieval]
+  T --> PM[patient_memory_retrieval]
+  PM --> VR[vector_retrieval]
   VR --> GR[graph_retrieval]
   GR --> DR{delegation_router}
   DR --> MS[medication_safety]
@@ -60,7 +61,7 @@ flowchart TD
 
 1. `input_guardrail` rejects prompt-injection attempts and over-length questions.
 2. `triage` classifies the request type and builds a `RetrievalPlan` (`name`, `query_text`, `top_k`, `reason`).
-3. `vector_retrieval` and `graph_retrieval` collect evidence.
+3. `patient_memory_retrieval` loads active, consented facts for an explicit patient scope; `vector_retrieval` and `graph_retrieval` collect source evidence.
 4. One or more specialists run. When a request needs several, `delegation_router` sends it to each of them.
 5. `confidence_evaluator` scores the evidence. Below 0.75 it loops back to retrieval, up to `LANGGRAPH_MAX_ITERATIONS` times (default 3, capped at 6).
 6. `human_review` runs only when HITL is enabled; see [Memory and human review](#7-memory-and-human-review).
@@ -146,7 +147,17 @@ Authorization runs before the stream opens, so a denied caller gets a plain `401
 
 - Each `session_id` keeps its last 20 turns for `SESSION_TTL_SECONDS` (default 3600).
 - The store is in-process by default. Set `SESSION_STORE_BACKEND=redis` and `REDIS_URL` to share sessions across replicas.
-- `QueryService` loads a short summary of recent turns into the graph state and records each new turn.
+- `QueryService` loads a short summary of recent turns into `session_context` and records each new turn.
+- Session memory is transient conversational continuity; it is not a longitudinal patient record.
+
+**Durable patient memory** (`orchestration/memory.py` and `QueryService`):
+
+- `PatientMemoryFact` stores a normalized, patient-scoped fact with source provenance, confidence, observation time, and optional expiry.
+- `PatientMemoryPolicy` governs consent, retention, category allowlists, and fact limits. Writes are rejected without consent and facts outside retention or expiry are filtered on load.
+- The governed write path minimizes stored PHI, attaches provenance, deduplicates facts, and keeps records isolated by `patient_id`.
+- `InMemoryPatientMemoryStore` is the default provider-neutral adapter; `RedisPatientMemoryStore` is a Redis-ready persistence shim.
+- The graph loads durable facts through `patient_memory_retrieval` into separate trusted state fields. Patient memory is not concatenated into session history and is available to synthesis only as an explicitly labeled context channel.
+- Patient memory is not a replacement for the source graph/vector evidence or a clinician decision; retention and consent policy remain authoritative.
 
 **Human-in-the-loop** (`orchestration/hitl.py`):
 
@@ -170,6 +181,7 @@ Healthcare agent, port 8000. The caller role comes from the `X-Caller-Role` head
 | `POST /query` | Run the graph |
 | `POST /query/stream` | Run the graph and stream progress (SSE) |
 | `POST /query/resume` | Approve or reject a paused run |
+| `POST /patient-memory` | Store consented, provenance-bearing normalized patient facts |
 | `GET /` | Redirects to `/docs` (OpenAPI UI) |
 
 `POST /query` request fields:
@@ -207,6 +219,7 @@ The MCP server is built with `agent_core.mcp_server.build_mcp_server` and mounte
 | `coding_gap_detect` | `generation` |
 | `cohort_risk_summary` | `generation` |
 | `evidence_bundle_export` | `export` |
+| `patient_memory_write` | `memory_write` |
 
 Role-to-tool rules are in `config/tool_policies.json`. Override the file with `AGENT_TOOL_POLICY_PATH`.
 
@@ -243,7 +256,51 @@ The `guardrails` block in each response reports the redaction level, access leve
 
 ## Observability
 
-- **Tracing**: when `MLFLOW_TRACKING_URI` is set, `observability/tracing.py` enables MLflow tracing for the LangGraph run and the LLM calls. Otherwise a no-op tracer is used. Every response carries a `trace_id`. See [ADR 0008](adrs/0008-mlflow-tracing-and-evaluation.md).
+MLflow tracing is optional and is independent from Prometheus metrics and the governance audit log.
+
+### Enable tracing locally
+
+Start the infrastructure and healthcare services, then set the tracking configuration before starting the agent service:
+
+```bash
+make up
+export MLFLOW_TRACKING_URI=http://localhost:5000
+export MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
+make query-hc
+```
+
+Open [http://localhost:5000](http://localhost:5000) to view the experiment. The MLflow health check is:
+
+```bash
+make mlflow
+```
+
+In Docker Compose, the healthcare overlay already supplies `http://mlflow:5000` as the service-to-service URI. In Kubernetes, use the same cluster service name. The browser URL is different from the URI used inside the agent container: use `http://localhost:5000` from the host and `http://mlflow:5000` from the cluster network.
+
+### What is traced
+
+`healthcare_agent.observability.tracing` creates the following spans:
+
+| Span | Type | Contents |
+| --- | --- | --- |
+| `healthcare_query_<mode>` | `CHAIN` | Query mode, request type, latency, patient/vector/graph counts, answer length |
+| `agent:<name>` | `AGENT` | Agent name, iteration, action, message count, latency |
+| `vector_search` / `graph_search` | `RETRIEVER` | Bounded inputs/results, result count and latency |
+| `llm_generate` | `LLM` | Context counts, model-routing attributes, answer length, latency and error state |
+| `@mlflow_trace` functions | Configured type | Bounded inputs/outputs, outcome, latency and error type |
+
+Use the API response `trace_id` to correlate the request with application logs and audit records. The MLflow span name is the operation name; `trace_id` is the platform correlation identifier and may not be the MLflow UI's internal trace identifier.
+
+### Privacy and data handling
+
+Tracing is observability, not authorization. Existing response guardrails still apply, but MLflow is an additional data store. Do not add raw patient records, access tokens, credentials, or unrestricted prompts to span attributes. The tracing helpers bound collections and strings, but `_safe_repr` does **not** de-identify data. Prefer counts, classifications, IDs that are already approved for observability, and hashes where correlation is required.
+
+Disable tracing by leaving `MLFLOW_TRACKING_URI` empty. The wrappers then call the original functions directly and do not contact MLflow. This mode is used by unit tests and offline evaluation.
+
+### Failure behavior
+
+Span failures are recorded with `outcome=error`, `error_type`, a bounded error message, and `latency_ms`; the original exception is re-raised. Successful spans include `outcome=success`. A tracing failure must not convert a successful agent response into a different response contract.
+
 - **Metrics**: `GET /metrics` exposes Prometheus counters and histograms for HTTP method, path, status and duration.
 - **Audit**: tool calls are appended as JSON lines to `AGENT_AUDIT_LOG_PATH` (default `logs/agent_audit.log`). Arguments are hashed, not stored.
 
@@ -265,8 +322,13 @@ The service settings are Pydantic `BaseSettings` classes (`config/settings.py`, 
 | `LANGGRAPH_MAX_ITERATIONS` | `3` (max 6) | Retrieval retry loop |
 | `HITL_ENABLED`, `HITL_CONFIDENCE_THRESHOLD`, `HITL_MAX_PENDING` | off, `0.75`, `1000` | Human review |
 | `SESSION_STORE_BACKEND`, `REDIS_URL`, `SESSION_TTL_SECONDS` | `memory`, —, `3600` | Session memory |
+| `PATIENT_MEMORY_STORE_BACKEND` | `memory` | Durable patient-memory adapter (`memory` or `redis`) |
+| `PATIENT_MEMORY_RETENTION_SECONDS` | `2592000` | Maximum stored fact age |
+| `PATIENT_MEMORY_MAX_FACTS` | `100` | Per-patient fact cap |
+| `PATIENT_MEMORY_CONSENT_REQUIRED` | `true` | Require explicit consent for writes |
 | `MCP_SERVER_NAME` and `MCP_*` transport options | see [section 9](#9-mcp-tools-and-skills) | MCP server |
-| `MLFLOW_TRACKING_URI` | empty | Tracing |
+| `MLFLOW_TRACKING_URI` | empty | MLflow tracking server URL; non-empty enables tracing |
+| `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | Experiment selected by the tracing and evaluation helpers |
 | `AGENT_DEFAULT_CALLER_ROLE`, `AGENT_ALLOW_ROLE_HEADER` | `generation`, `true` | Caller role |
 | `AGENT_TOOL_POLICY_PATH`, `AGENT_SKILLS_LAYER_PATH` | bundled files | Policy and skills overrides |
 | `AGENT_ALLOW_ORIGINS` | `*` | CORS |

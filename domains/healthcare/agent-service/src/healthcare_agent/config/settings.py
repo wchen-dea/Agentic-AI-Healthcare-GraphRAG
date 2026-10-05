@@ -46,8 +46,32 @@ class HealthcareAgentSettings(AgentServiceSettings):
     mcp_server_name: str = Field(default="HealthcareGraphRAG MCP", validation_alias="MCP_SERVER_NAME")
     skills_layer_path: Path | None = Field(default=None, validation_alias=env_name("SKILLS_LAYER_PATH"))
 
+    # Durable patient memory
+    patient_memory_store_backend: str = Field(
+        default="memory", validation_alias="PATIENT_MEMORY_STORE_BACKEND"
+    )
+    patient_memory_retention_seconds: int = Field(
+        default=30 * 24 * 60 * 60,
+        ge=0,
+        validation_alias="PATIENT_MEMORY_RETENTION_SECONDS",
+    )
+    patient_memory_max_facts: int = Field(
+        default=100, ge=1, validation_alias="PATIENT_MEMORY_MAX_FACTS"
+    )
+    patient_memory_consent_required: bool = Field(
+        default=True, validation_alias="PATIENT_MEMORY_CONSENT_REQUIRED"
+    )
+
     # Observability
     mlflow_tracking_uri: str = Field(default="", validation_alias="MLFLOW_TRACKING_URI")
+
+    @field_validator("patient_memory_store_backend")
+    @classmethod
+    def _validate_patient_memory_backend(cls, value: str) -> str:
+        backend = value.strip().lower()
+        if backend not in {"memory", "redis"}:
+            raise ValueError("PATIENT_MEMORY_STORE_BACKEND must be 'memory' or 'redis'")
+        return backend
 
     @field_validator("tool_policy_path", mode="after")
     @classmethod

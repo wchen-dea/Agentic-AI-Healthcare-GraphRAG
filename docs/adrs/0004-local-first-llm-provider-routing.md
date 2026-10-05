@@ -44,3 +44,7 @@ Trade-offs:
 - [05_ai_agents.md](../05_ai_agents.md)
 - [06_quality_assurance.md](../06_quality_assurance.md)
 - [ADR-0008](0008-mlflow-tracing-and-evaluation.md)
+
+## Update: Databricks default
+
+The default provider is now Databricks foundation models (`LLM_PROVIDER=databricks`, `LLM_MODEL=databricks-gpt-5-6-luna`) for every service. Ollama is opt-in: set `LLM_PROVIDER=ollama`, `LLM_MODEL`, and `OLLAMA_URL`, and start the compose service with `--profile ollama`.

@@ -162,10 +162,11 @@ class TestStreaming:
 class TestSettings:
     def test_defaults(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.chdir(tmp_path)
-        for name in ("LLM_MODEL", "OLLAMA_MODEL", "AGENT_ALLOW_ORIGINS", "AGENT_AUDIT_LOG_PATH"):
+        for name in ("LLM_PROVIDER", "LLM_MODEL", "OLLAMA_MODEL", "AGENT_ALLOW_ORIGINS", "AGENT_AUDIT_LOG_PATH"):
             monkeypatch.delenv(name, raising=False)
         settings = AgentServiceSettings()
-        assert settings.llm_model == "llama3.1"
+        assert settings.llm_provider == "databricks"
+        assert settings.llm_model == "databricks-gpt-5-6-luna"
         assert settings.allowed_origins == ["*"]
         assert settings.audit_log_path == tmp_path / "logs" / "agent_audit.log"
 
@@ -184,7 +185,7 @@ class TestSettings:
         monkeypatch.delenv("LLM_MODEL", raising=False)
         monkeypatch.setenv("OLLAMA_MODEL", "llama3.2")
         monkeypatch.setenv("DATABRICKS_MODEL", "databricks-x")
-        assert AgentServiceSettings().llm_model == "llama3.1"
+        assert AgentServiceSettings().llm_model == "databricks-gpt-5-6-luna"
 
     def test_removed_rag_api_names_are_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("AGENT_MAX_CONTEXT_ITEMS", raising=False)

@@ -6,10 +6,17 @@ MCP tools, evaluation gates) call this service instead of the graph directly.
 """
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any, Literal
 
-from healthcare_agent.orchestration.memory import get_session_store
+from healthcare_agent.orchestration.memory import (
+    InMemoryPatientMemoryStore,
+    PatientMemoryFact,
+    PatientMemoryPolicy,
+    PatientMemoryRecord,
+    PatientMemoryStore,
+    get_session_store,
+)
 from healthcare_agent.orchestration.orchestrator import LangGraphOrchestrator
 
 
@@ -19,9 +26,13 @@ class QueryService:
         *,
         max_context_items: int,
         orchestrator: LangGraphOrchestrator | None = None,
+        patient_memory_store: PatientMemoryStore | None = None,
+        patient_memory_policy: PatientMemoryPolicy | None = None,
     ) -> None:
         self._max_context_items = max_context_items
         self._orchestrator = orchestrator or LangGraphOrchestrator.build()
+        self._patient_memory_store = patient_memory_store or InMemoryPatientMemoryStore()
+        self._patient_memory_policy = patient_memory_policy or PatientMemoryPolicy()
 
     def context_limit(self, top_k: int | None) -> int:
         return min(top_k or self._max_context_items, max(self._max_context_items, 8))
@@ -31,6 +42,91 @@ class QueryService:
         if not session_id:
             return ""
         return get_session_store().get_or_create(session_id).get_context_summary()
+
+    def load_patient_memory(self, patient_id: str | None) -> PatientMemoryRecord | None:
+        """Load only active, patient-scoped durable facts."""
+        if not patient_id:
+            return None
+        return self._patient_memory_store.load(patient_id)
+
+    def evaluate_retention_and_consent(
+        self,
+        policy: PatientMemoryPolicy | None = None,
+        *,
+        consent: bool | None = None,
+        now: float | None = None,
+    ) -> tuple[bool, str]:
+        """Evaluate policy before any durable-memory write."""
+        return (policy or PatientMemoryPolicy()).evaluate(consent=consent, now=now)
+
+    def write_patient_memory(
+        self,
+        patient_id: str,
+        facts: Sequence[PatientMemoryFact | dict[str, Any]],
+        provenance: dict[str, Any] | str,
+        consent: bool,
+        *,
+        policy: PatientMemoryPolicy | None = None,
+    ) -> PatientMemoryRecord:
+        """Persist normalized, minimized facts only after governance checks."""
+        if not patient_id.strip():
+            raise ValueError("patient_id is required")
+        configured = self._patient_memory_policy
+        requested = policy or configured
+        configured_categories = configured.allowed_categories
+        requested_categories = requested.allowed_categories
+        if (
+            (configured.consent_required and not requested.consent_required)
+            or requested.retention_seconds > configured.retention_seconds
+            or requested.max_facts > configured.max_facts
+            or (
+                configured_categories
+                and not requested_categories.issubset(configured_categories)
+            )
+        ):
+            raise PermissionError("policy_override_exceeds_configured_limits")
+        active_policy = PatientMemoryPolicy(
+            consent_required=configured.consent_required,
+            consent_granted=consent,
+            retention_seconds=min(requested.retention_seconds, configured.retention_seconds),
+            max_facts=min(requested.max_facts, configured.max_facts),
+            allowed_categories=(
+                set(requested_categories)
+                if requested_categories
+                else set(configured_categories)
+            ),
+        )
+        allowed, reason = self.evaluate_retention_and_consent(
+            active_policy, consent=consent
+        )
+        if not allowed:
+            raise PermissionError(reason)
+
+        normalized: list[PatientMemoryFact] = []
+        for raw_fact in facts:
+            fact = raw_fact if isinstance(raw_fact, PatientMemoryFact) else PatientMemoryFact.from_dict(raw_fact)
+            fact = fact.normalized()
+            fact.metadata = {**fact.metadata, "provenance": provenance}
+            if active_policy.allowed_categories and fact.category not in active_policy.allowed_categories:
+                continue
+            if not fact.key or not fact.value or fact.is_expired:
+                continue
+            normalized.append(fact)
+
+        existing = self._patient_memory_store.load(patient_id)
+        record = existing or PatientMemoryRecord(patient_id=patient_id, policy=active_policy)
+        record.policy = active_policy
+        merged: dict[str, PatientMemoryFact] = {
+            (fact.fact_id or f"{fact.category}:{fact.key}"): fact
+            for fact in record.active_facts()
+        }
+        for fact in normalized:
+            merged[fact.fact_id or f"{fact.category}:{fact.key}"] = fact
+        record.facts = list(merged.values())[-active_policy.max_facts:]
+        record.updated_at = __import__("time").time()
+        record.metadata["last_write_provenance"] = provenance
+        self._patient_memory_store.save(record)
+        return record
 
     @staticmethod
     def remember_turn(
@@ -61,6 +157,7 @@ class QueryService:
             patient_id=patient_id,
             structured=structured,
             session_context=self.load_session_context(session_id),
+            patient_memory=self.load_patient_memory(patient_id),
             context_limit=self.context_limit(top_k),
         )
         self.remember_turn(session_id, question, result, patient_id)
@@ -81,6 +178,7 @@ class QueryService:
             patient_id,
             structured=structured,
             session_context=self.load_session_context(session_id),
+            patient_memory=self.load_patient_memory(patient_id),
             context_limit=self.context_limit(top_k),
         ):
             if kind == "result":
