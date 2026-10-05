@@ -1,0 +1,11 @@
+# Copy to values-dev.local.yaml (gitignored) and replace every value.
+agent-service:
+  secrets:
+    DATABRICKS_TOKEN: "replace-with-local-token"
+    NEO4J_PASSWORD: "replace-with-local-password"
+    MCP_AUTH_TOKEN: "replace-with-random-high-entropy-token"
+  config:
+    LANGGRAPH_CHECKPOINT_POSTGRES_URI: "postgresql://patient_memory:replace-with-postgres-password@patient-memory-postgres:5432/patient_memory"
+    PATIENT_MEMORY_DATABASE_URL: "postgresql://patient_memory:replace-with-postgres-password@patient-memory-postgres:5432/patient_memory"
+patientMemoryPostgres:
+  password: "replace-with-postgres-password"

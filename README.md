@@ -33,6 +33,8 @@ Choose the path that matches your goal:
 - End-to-end realtime knowledge ingestion from streaming healthcare and supply-chain events into a live knowledge base
 - LangGraph orchestration for multi-agent reasoning, specialist delegation, confidence evaluation, and human-in-the-loop review
 - Embedded MCP server patterns for governed tool access, skills, and role-aware execution
+- Fail-closed patient-scope authorization shared by HTTP and MCP patient tools
+- Durable SQLite coordination for Neo4j-to-Qdrant replay with leases, retries, and idempotency
 - Layered runtime architecture that separates UI, API/BFF, orchestration, domain agents, tools, and data platforms
 - Separate session memory for short-lived conversational continuity and governed durable patient memory with consent, provenance, retention, and expiry controls
 - Unified delivery model across development and production with containerized services and infrastructure-as-code deployment patterns

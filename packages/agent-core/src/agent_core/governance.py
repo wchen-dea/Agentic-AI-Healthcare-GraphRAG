@@ -54,7 +54,7 @@ class ToolGovernance:
         )
 
     def _on_audit_failure(self, event: AuditEvent, exc: Exception) -> None:
-        # Requests continue, but a lost audit event must be visible to operators.
+        # The caller decides whether this failure is fail-open or fail-closed.
         self._metrics.record_audit_failure(event.tool_name)
         logger.error("audit write failed trace_id=%s tool=%s: %s", event.trace_id, event.tool_name, exc)
 
@@ -81,8 +81,8 @@ class ToolGovernance:
         response_size_bytes: int,
         trace_id: str,
         error: str | None = None,
-    ) -> None:
-        self._sink.write(
+    ) -> bool:
+        return self._sink.write(
             AuditEvent(
                 trace_id=trace_id,
                 tool_name=tool_name,
@@ -110,7 +110,7 @@ class ToolGovernance:
         try:
             return self.authorize(tool_name=tool_name, caller_role=caller_role)
         except AuthorizationError:
-            self.audit(
+            if not self.audit(
                 tool_name=tool_name,
                 caller_id=f"role:{caller_role}",
                 request_payload=request_payload,
@@ -120,7 +120,8 @@ class ToolGovernance:
                 response_size_bytes=0,
                 trace_id=trace_id,
                 error=f"unauthorized: role '{caller_role}' for tool '{tool_name}'",
-            )
+            ) and self._settings.audit_fail_closed:
+                raise RuntimeError("Audit sink unavailable; authorization denied closed")
             raise
 
     def observe(self, tool_name: str, outcome: str, started_at: float) -> None:
@@ -150,7 +151,7 @@ class ToolGovernance:
         try:
             response = fn(trace_id)
             outcome = "success"
-            self.audit(
+            audit_ok = self.audit(
                 tool_name=tool_name,
                 caller_id=caller_id,
                 request_payload=request_payload,
@@ -160,9 +161,11 @@ class ToolGovernance:
                 response_size_bytes=len(json.dumps(response, separators=(",", ":")).encode("utf-8")),
                 trace_id=trace_id,
             )
+            if not audit_ok and self._settings.audit_fail_closed:
+                raise RuntimeError("Audit sink unavailable; privileged operation denied closed")
             return response
         except Exception as exc:
-            self.audit(
+            audit_ok = self.audit(
                 tool_name=tool_name,
                 caller_id=caller_id,
                 request_payload=request_payload,
@@ -173,6 +176,8 @@ class ToolGovernance:
                 trace_id=trace_id,
                 error=str(exc),
             )
+            if not audit_ok and self._settings.audit_fail_closed:
+                raise RuntimeError("Audit sink unavailable; operation denied closed") from exc
             raise
         finally:
             self.observe(tool_name, outcome, started_at)

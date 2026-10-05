@@ -175,7 +175,8 @@ The answer is never persisted automatically. This review step prevents an AI-gen
 - When confidence is below `HITL_CONFIDENCE_THRESHOLD` (default 0.75), `human_review` calls LangGraph `interrupt`. The response then has `status: "pending_review"`, a `thread_id`, and a `human_review` payload. The payload holds counts and routing metadata only, never raw evidence.
 - A reviewer calls `POST /query/resume` with the `thread_id`, a `decision` (`approve` or `reject`) and an optional `note`. An unknown thread returns `404`.
 - `HITL_MAX_PENDING` (default 1000) caps the number of open reviews.
-- The checkpointer is LangGraph's `InMemorySaver`, so pending reviews only exist in the process that created them. Multi-replica deployments need a shared checkpointer or sticky routing.
+- Every graph transition is checkpointed. Configure `LANGGRAPH_CHECKPOINT_POSTGRES_URI` to use the shared PostgreSQL saver; Docker deployments default to the patient-memory PostgreSQL service. Local tests fall back to `InMemorySaver` unless `LANGGRAPH_CHECKPOINT_REQUIRED=true`.
+- Completed and paused runs retain checkpoint history. The orchestration facade supports history, state inspection, controlled editing, rewind, and resume-from-checkpoint operations. Historical listings include initial/input checkpoints, which may not contain the final state fields; edits are limited to approved non-identity fields.
 
 ## 8. HTTP API
 
@@ -216,6 +217,13 @@ Errors: `401` for an unauthorized role, `400` for invalid input, `503` when a ba
 ## 9. MCP tools and skills
 
 The MCP server is built with `agent_core.mcp_server.build_mcp_server` and mounted at `/mcp` using Streamable HTTP. Its name comes from `MCP_SERVER_NAME` (default `HealthcareGraphRAG MCP`). Every tool call goes through `ToolGovernance`, which checks the role policy, writes an audit event with hashed arguments, and runs blocking work off the event loop. The design is in [ADR 0005](adrs/0005-embed-fastmcp-in-rag-api.md).
+
+When `PATIENT_SCOPE_AUTH_REQUIRED=true`, every patient-scoped MCP call also passes
+through `PatientScopeAuthorizer`. The caller identity is derived from the trusted
+request context (`X-Caller-Id` as populated by the trusted gateway), not from a
+tool argument. The entitlement map is fail-closed: a missing identity, missing
+patient ID, or unauthorized patient is rejected before retrieval or memory access.
+HTTP patient-scoped routes and MCP tools use the same rule.
 
 | Tool | Role needed |
 | --- | --- |
@@ -333,6 +341,8 @@ The service settings are Pydantic `BaseSettings` classes (`config/settings.py`, 
 | `HITL_ENABLED`, `HITL_CONFIDENCE_THRESHOLD`, `HITL_MAX_PENDING` | off, `0.75`, `1000` | Human review |
 | `SESSION_STORE_BACKEND`, `REDIS_URL`, `SESSION_TTL_SECONDS` | `memory`, —, `3600` | Session memory |
 | `PATIENT_MEMORY_STORE_BACKEND` | `memory` | Durable patient-memory adapter (`memory` or `redis`) |
+| `PATIENT_SCOPE_AUTH_REQUIRED` | `false` | Require identity-to-patient authorization for patient-scoped routes and MCP tools |
+| `PATIENT_SCOPE_ENTITLEMENTS` | empty | Semicolon-separated map, e.g. `clinician-a=patient-0001,patient-0002;clinician-b=patient-0003` |
 | `PATIENT_MEMORY_RETENTION_SECONDS` | `2592000` | Maximum stored fact age |
 | `PATIENT_MEMORY_MAX_FACTS` | `100` | Per-patient fact cap |
 | `PATIENT_MEMORY_CONSENT_REQUIRED` | `true` | Require explicit consent for writes |
@@ -343,7 +353,10 @@ The service settings are Pydantic `BaseSettings` classes (`config/settings.py`, 
 | `AGENT_TOOL_POLICY_PATH`, `AGENT_SKILLS_LAYER_PATH` | bundled files | Policy and skills overrides |
 | `AGENT_ALLOW_ORIGINS` | `*` | CORS |
 
-Set `AGENT_ALLOW_ROLE_HEADER=false` and a narrow `AGENT_ALLOW_ORIGINS` in production. Supply secrets from the platform's secret store; see [07 — CI/CD Automation](07_cicd_automation.md).
+Set `AGENT_ALLOW_ROLE_HEADER=false`, `PATIENT_SCOPE_AUTH_REQUIRED=true`, and a
+narrow `AGENT_ALLOW_ORIGINS` in production. Inject `PATIENT_SCOPE_ENTITLEMENTS`
+from the platform Secret store. An empty entitlement map intentionally denies all
+patient-scoped access until configured.
 
 ## 12. Related
 

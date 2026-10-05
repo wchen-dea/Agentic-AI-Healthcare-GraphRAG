@@ -31,8 +31,7 @@ class HealthcareAgentSettings(AgentServiceSettings):
     qdrant_collection: str = Field(default="healthcare_events", validation_alias="QDRANT_COLLECTION")
     neo4j_uri: str = Field(default="bolt://neo4j:7687", validation_alias="NEO4J_URI")
     neo4j_user: str = Field(default="neo4j", validation_alias="NEO4J_USER")
-    # Local-development default only; deployments inject the real secret.
-    neo4j_password: SecretStr = Field(default=SecretStr("healthcare123"), validation_alias="NEO4J_PASSWORD")
+    neo4j_password: SecretStr = Field(default=SecretStr(""), validation_alias="NEO4J_PASSWORD")
 
     # Model gateway
     ollama_url: str = Field(default="http://ollama:11434", validation_alias="OLLAMA_URL")
@@ -64,6 +63,21 @@ class HealthcareAgentSettings(AgentServiceSettings):
 
     # Observability
     mlflow_tracking_uri: str = Field(default="", validation_alias="MLFLOW_TRACKING_URI")
+
+    # LangGraph durable execution
+    langgraph_checkpoint_postgres_uri: str = Field(
+        default="", validation_alias="LANGGRAPH_CHECKPOINT_POSTGRES_URI"
+    )
+    langgraph_checkpoint_required: bool = Field(
+        default=False, validation_alias="LANGGRAPH_CHECKPOINT_REQUIRED"
+    )
+
+    # Minikube-only identity-to-patient guard. This is deliberately disabled by
+    # default; production authentication belongs at the trusted gateway.
+    dev_patient_auth_enabled: bool = Field(default=False, validation_alias="DEV_PATIENT_AUTH_ENABLED")
+    dev_patient_entitlements: str = Field(default="", validation_alias="DEV_PATIENT_ENTITLEMENTS")
+    patient_scope_auth_required: bool = Field(default=False, validation_alias="PATIENT_SCOPE_AUTH_REQUIRED")
+    patient_scope_entitlements: str = Field(default="", validation_alias="PATIENT_SCOPE_ENTITLEMENTS")
 
     @field_validator("patient_memory_store_backend")
     @classmethod

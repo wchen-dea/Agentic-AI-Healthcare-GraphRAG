@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from typing import Any, Literal, Protocol, cast
-
-from healthcare_agent.orchestration.memory import PatientMemoryRecord
 from uuid import uuid4
 
 from langgraph.types import Command
@@ -31,6 +29,7 @@ from healthcare_agent.orchestration.hitl import (
     pending_reviews,
     release_thread,
 )
+from healthcare_agent.orchestration.memory import PatientMemoryRecord
 
 
 class CompiledGraph(Protocol):
@@ -75,7 +74,9 @@ class LangGraphOrchestrator:
             return final_state_to_response(
                 question, final_state, thread_id=thread_id, pending_review=interrupt_payload
             )
-        release_thread(self._checkpointer, thread_id)
+        # Completed runs remain checkpointed for audit, time travel, and
+        # controlled state editing. Pending-review eviction is still bounded
+        # and releases its thread in ``PendingReviews``.
         return final_state_to_response(question, final_state, thread_id=thread_id)
 
     def run(
@@ -146,6 +147,48 @@ class LangGraphOrchestrator:
     def pending(self, thread_id: str) -> dict[str, Any] | None:
         """Return the interrupt payload for a paused thread, if any."""
         return pending_reviews.get(thread_id)
+
+    def history(self, thread_id: str, *, limit: int = 100) -> list[Any]:
+        """Return checkpoint history, newest first."""
+        if not 1 <= limit <= 500:
+            raise ValueError("limit must be between 1 and 500")
+        return list(self._graph.get_state_history(_run_config(None, thread_id=thread_id), limit=limit))
+
+    def state(self, thread_id: str, *, checkpoint_id: str | None = None) -> Any:
+        """Read the latest state or a selected historical checkpoint."""
+        config = _run_config(None, thread_id=thread_id)
+        if checkpoint_id:
+            config["configurable"]["checkpoint_id"] = checkpoint_id
+        return self._graph.get_state(config)
+
+    def edit_state(self, thread_id: str, values: dict[str, Any], *, checkpoint_id: str | None = None) -> Any:
+        """Apply a controlled delta without allowing identity or trace edits."""
+        if not values:
+            raise ValueError("values must be a non-empty object")
+        allowed = {"structured", "session_context", "context_limit", "patient_memory_policy"}
+        forbidden = set(values) - allowed
+        if forbidden:
+            raise ValueError(f"state fields are not editable: {sorted(forbidden)}")
+        config = _run_config(None, thread_id=thread_id)
+        if checkpoint_id:
+            config["configurable"]["checkpoint_id"] = checkpoint_id
+        return self._graph.update_state(config, values)
+
+    def rewind(self, thread_id: str, checkpoint_id: str) -> Any:
+        """Select a historical checkpoint for inspection or subsequent editing."""
+        snapshot = self.state(thread_id, checkpoint_id=checkpoint_id)
+        if snapshot is None:
+            raise KeyError(checkpoint_id)
+        return snapshot
+
+    def resume_from_checkpoint(self, thread_id: str, checkpoint_id: str) -> dict[str, Any]:
+        """Resume execution from a selected checkpoint."""
+        snapshot = self.rewind(thread_id, checkpoint_id)
+        values = getattr(snapshot, "values", {})
+        config = _run_config(None, thread_id=thread_id)
+        config["configurable"]["checkpoint_id"] = checkpoint_id
+        final_state = self._graph.invoke(None, config=config)
+        return self._finish(str(values.get("question") or ""), final_state, thread_id, extract_interrupt(final_state))
 
     def resume(
         self,

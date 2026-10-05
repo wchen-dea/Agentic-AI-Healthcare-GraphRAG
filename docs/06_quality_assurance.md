@@ -9,8 +9,8 @@ Quality is layered from fast, hermetic tests to live-stack smoke checks. Every l
 ```mermaid
 flowchart LR
     U[Unit tests<br/>agent-core, HC, SC, Flink] --> I[Integration / contract tests<br/>TestClient, mocked stores]
-    I --> E[Offline evals<br/>planner fixtures, scorecards]
-    E --> G[Evaluation gate<br/>gates CLI, soft in CI]
+    I --> E[Offline evals<br/>planner, golden, adversarial, SC]
+    E --> G[Evaluation gate<br/>blocking in CI]
     G --> O[Ontology gates<br/>conformance, drift, coverage]
     O --> S[Live smoke tests<br/>MCP smoke, Cypher checks, validate_all_stacks]
 ```
@@ -19,7 +19,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Unit | Pure functions, agents, planner, memory, HITL, embeddings | None | CI + `make test-unit` |
 | Integration | HTTP/MCP contracts, MLflow tracing, ontology conformance | Mocked | CI + `make test-integration` |
-| Evals | Planner routing fixtures, evaluation stage 4 | None | CI + `make test-evals` |
+| Evals | Planner routing, golden questions, adversarial inputs, supply-chain scorecards | None | CI + `make test-evals` |
 | Ontology | Loader, runtime rules, seeds, drift, terminology coverage | None (bootstrap smoke uses fixtures) | CI `ontology-conformance` |
 | Smoke | End-to-end queries, MCP tools, graph content | Full local stack | Manual / `make validate` |
 
@@ -86,7 +86,7 @@ uv run --package healthcare-agent-service \
   --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
 ```
 
-In CI the gate runs with `--min-score 0.5` as a **soft gate** (`continue-on-error: true`): regressions are visible but do not block merges. MLflow runs and traces are browsed via `make mlflow` (see [05 — AI Agents](05_ai_agents.md#observability)).
+In CI the gate runs with `--min-score 0.5` as a **blocking gate**: regressions fail the job and block merges. MLflow runs and traces are browsed via `make mlflow` (see [05 — AI Agents](05_ai_agents.md#observability)).
 
 ## 6. Retrieval and embedding tests
 
@@ -163,10 +163,8 @@ python -m unittest discover -s domains/supply-chain/data-pipelines/flink-job/tes
 
 ## 11. Known gaps
 
-- No adversarial tests for prompt or Cypher injection through graph content.
-- No curated golden question set executed against a live LLM in CI.
-- The evaluation gate is soft; promoting it to a hard gate requires a stable baseline.
-- Supply-chain has no offline evaluation suite.
+- Live LLM golden evaluation remains opt-in (`RUN_LIVE_LLM_EVAL=1`); deterministic golden routing runs in CI.
+- CI evaluation gates are blocking and include healthcare and supply-chain offline suites.
 
 ## Related
 

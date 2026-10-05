@@ -188,8 +188,9 @@ def build_healthcare_graph(*, with_hitl: bool | None = None) -> Any:
     """Construct and compile the multi-agent healthcare LangGraph.
 
     ``with_hitl`` defaults to ``hitl_enabled()``. When true, a ``human_review``
-    node sits between the confidence gate and synthesis and the graph is
-    compiled with a checkpointer so interrupted runs can be resumed.
+    node sits between the confidence gate and synthesis. The graph is always
+    compiled with a checkpointer so completed and interrupted runs support
+    history, inspection, controlled edits, and time-travel resume.
 
     Graph topology::
 
@@ -325,9 +326,7 @@ def build_healthcare_graph(*, with_hitl: bool | None = None) -> Any:
     graph.add_edge("synthesis", "output_guardrail")
     graph.add_edge("output_guardrail", END)
 
-    if with_hitl:
-        return graph.compile(checkpointer=get_checkpointer())
-    return graph.compile()
+    return graph.compile(checkpointer=get_checkpointer())
 
 
 @lru_cache(maxsize=4)

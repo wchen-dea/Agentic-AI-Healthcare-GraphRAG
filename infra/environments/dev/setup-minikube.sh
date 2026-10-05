@@ -41,7 +41,17 @@ echo "Images built."
 echo "Installing Helm chart..."
 LOCAL_VALUES="$INFRA_DIR/helm/values-dev.local.yaml"
 LOCAL_ARGS=""
-[ -f "$LOCAL_VALUES" ] && LOCAL_ARGS="-f $LOCAL_VALUES"
+if [ ! -f "$LOCAL_VALUES" ]; then
+  echo "Missing $LOCAL_VALUES; create it with NEO4J_PASSWORD, DATABRICKS_TOKEN, and MCP_AUTH_TOKEN." >&2
+  exit 1
+fi
+LOCAL_ARGS="-f $LOCAL_VALUES"
+for required in 'DATABRICKS_TOKEN' 'NEO4J_PASSWORD' 'MCP_AUTH_TOKEN'; do
+  if ! grep -Eq "^[[:space:]]+$required:[[:space:]]*[^\"']+[^[:space:]]" "$LOCAL_VALUES"; then
+    echo "$required must be set in $LOCAL_VALUES" >&2
+    exit 1
+  fi
+done
 helm upgrade --install "$RELEASE_NAME" "$HELM_CHART" \
   -f "$VALUES_FILE" $LOCAL_ARGS \
   -n "$NAMESPACE" --create-namespace
@@ -56,7 +66,7 @@ kubectl -n "$NAMESPACE" wait --for=condition=Ready pod -l app=agent-service --ti
 echo
 echo "=== Dev Environment Ready ==="
 echo
-echo "NOTE: agent-service.secrets.DATABRICKS_TOKEN in $VALUES_FILE is a placeholder — set a real token before querying."
+echo "Credentials are loaded from the untracked values-dev.local.yaml file."
 echo
 echo "Access services (port-forward):"
 echo "  kubectl -n $NAMESPACE port-forward svc/agent-service 8000:8000"

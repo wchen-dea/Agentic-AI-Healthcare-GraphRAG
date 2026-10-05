@@ -161,8 +161,25 @@ docker exec healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
 ```bash
 curl -s -X POST localhost:8000/query \
   -H 'Content-Type: application/json' \
+  -H 'X-Caller-Id: dev-clinician' \
+  -H 'X-Caller-Role: generation' \
   -d '{"question":"Summarize recent adverse events for this patient","patient_id":"patient-0001"}'
 ```
+
+The Minikube profile enables a synthetic patient-entitlement guard. Patient-scoped
+requests must include `X-Caller-Id`; the configured `dev-clinician` identity is
+limited to the synthetic patients listed in `infra/helm/values-dev.yaml`.
+
+In production, set `PATIENT_SCOPE_AUTH_REQUIRED=true` and inject
+`PATIENT_SCOPE_ENTITLEMENTS` through a Kubernetes Secret or trusted gateway
+configuration. The value uses this format:
+
+```text
+caller-a=patient-0001,patient-0002;caller-b=patient-0003
+```
+
+Requests with no trusted `X-Caller-Id`, no `patient_id`, or no matching entitlement
+are denied with HTTP 403. An empty entitlement map is fail-closed.
 
 The response holds `answer`, `vector_context`, `graph_context`, `patients`, `trace_id`, `retrieved_at`, `guardrails` and `langgraph` (`enabled`, `iterations`, `final_reason`, `confidence`, `agent_trace`). The full field list is in [05 — AI Agents](05_ai_agents.md#8-http-api).
 
@@ -247,10 +264,13 @@ After any change to these settings, re-index:
   ```bash
   curl -s -X POST localhost:8000/query/resume \
     -H 'Content-Type: application/json' \
+    -H 'X-Caller-Id: dev-clinician' \
+    -H 'X-Caller-Role: generation' \
     -d '{"thread_id":"<thread-id>","decision":"approve","note":"checked"}'
   ```
 
-- Pending reviews live in LangGraph's in-memory checkpointer and are lost on restart. Run one agent replica, or use sticky routing, while HITL is enabled. `HITL_MAX_PENDING` (default 1000) caps open reviews.
+- The Minikube profile enables HITL and configures PostgreSQL-backed, restart-safe LangGraph checkpoints with `LANGGRAPH_CHECKPOINT_REQUIRED=true`. This is a dev-path validation; production deployment changes remain future work. `HITL_MAX_PENDING` (default 1000) caps open reviews.
+- Completed and paused graph runs retain checkpoint history for audit and time-travel operations. The oldest history entry may be the input checkpoint and can lack final-state fields such as `question`.
 
 ## 9. Kubernetes and Helm
 
@@ -271,6 +291,7 @@ Production deployment requires:
 - GitHub Actions variable `DATABRICKS_HOST`.
 - GitHub Actions secrets `DATABRICKS_TOKEN`, `NEO4J_PASSWORD`, and any configured LLM credentials.
 - A Kubernetes Secret named `databricks-credentials` with key `token` for Flink.
+- A Secret-backed `PATIENT_SCOPE_ENTITLEMENTS` mapping for patient-scoped access.
 
 The production workflow creates or updates the Databricks Secret, injects the Databricks host into both agent and Flink workloads, and waits for agent, web, and Flink rollouts. Use the same `EMBEDDING_PROVIDER=databricks`, `DATABRICKS_EMBEDDING_ENDPOINT=databricks-gte-large-en`, and `EMBEDDING_DIM=1024` for ingestion and query. Re-index Qdrant before switching from local 384-dimensional vectors.
 
@@ -289,6 +310,7 @@ helm upgrade --install healthcare infra/helm \
   --set agent-service.config.DATABRICKS_HOST="$DATABRICKS_HOST" \
   --set agent-service.secrets.NEO4J_PASSWORD="$NEO4J_PASSWORD" \
   --set agent-service.secrets.ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+   --set agent-service.secrets.PATIENT_SCOPE_ENTITLEMENTS="$PATIENT_SCOPE_ENTITLEMENTS" \
   --set flink.config.DATABRICKS_HOST="$DATABRICKS_HOST" \
   --wait --timeout 5m
 

@@ -57,7 +57,7 @@ AuditFailureHandler = Callable[[AuditEvent, Exception], None]
 
 
 class JsonlAuditSink:
-    """Appends one JSON object per line. Write failures are reported, not raised.
+    """Appends one JSON object per line. Write failures are reported to callers.
 
     Requests must not crash because the audit volume is unavailable, but the
     failure must be visible: ``on_failure`` should emit a metric and an error log.

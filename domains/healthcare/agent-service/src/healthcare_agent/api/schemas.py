@@ -7,7 +7,7 @@ time, so the models stay static and importable without a settings instance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 

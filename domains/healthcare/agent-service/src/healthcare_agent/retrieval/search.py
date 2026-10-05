@@ -9,10 +9,9 @@ import os
 import re
 from typing import Any
 
+from knowledge_core.embedding import EmbeddingDomain, stable_embedding
 from neo4j import Query
 from qdrant_client.http.exceptions import UnexpectedResponse
-
-from knowledge_core.embedding import EmbeddingDomain, stable_embedding
 
 _CLAIMS_PATTERNS = re.compile(
     r"\b(claim|billed|payer|reimburse|denied|appeal|copay|deductible|coverage|insurance|cpt|hcpcs)\b",
