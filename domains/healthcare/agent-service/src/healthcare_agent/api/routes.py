@@ -28,6 +28,32 @@ from healthcare_agent.orchestration.query_service import QueryService
 from healthcare_agent.tools.skills import SkillsLayerError, build_skill_plan
 
 CALLER_ROLE_HEADER = Header(default=None, alias="X-Caller-Role")
+CALLER_ID_HEADER = Header(default=None, alias="X-Caller-Id")
+
+
+def _dev_entitlements(raw: str) -> dict[str, set[str]]:
+    """Parse ``caller=patient,patient`` entries used only by Minikube dev."""
+    entitlements: dict[str, set[str]] = {}
+    for entry in raw.split(";"):
+        caller, separator, patients = entry.partition("=")
+        if separator and caller.strip():
+            entitlements[caller.strip()] = {item.strip() for item in patients.split(",") if item.strip()}
+    return entitlements
+
+
+def _authorize_dev_patient(
+    *, settings: HealthcareAgentSettings, patient_id: str | None, caller_id: str | None
+) -> None:
+    """Enforce the Minikube identity-to-patient mapping when enabled."""
+    if not settings.dev_patient_auth_enabled:
+        return
+    if not caller_id:
+        raise HTTPException(status_code=401, detail="X-Caller-Id is required in the dev environment.")
+    if not patient_id:
+        raise HTTPException(status_code=403, detail="A patient_id is required for this dev caller.")
+    allowed = _dev_entitlements(settings.dev_patient_entitlements).get(caller_id, set())
+    if patient_id not in allowed:
+        raise HTTPException(status_code=403, detail="Caller is not entitled to this patient.")
 
 
 def build_router(
@@ -119,7 +145,9 @@ def build_router(
     def patient_memory_write(
         req: PatientMemoryWriteRequest,
         x_caller_role: str | None = CALLER_ROLE_HEADER,
+        x_caller_id: str | None = CALLER_ID_HEADER,
     ) -> dict[str, Any]:
+        _authorize_dev_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
         caller_role = governance.resolve_caller_role(x_caller_role)
         try:
             return governance.execute(
@@ -151,7 +179,12 @@ def build_router(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @router.post("/query")
-    def query(req: QueryRequest, x_caller_role: str | None = CALLER_ROLE_HEADER) -> dict[str, Any]:
+    def query(
+        req: QueryRequest,
+        x_caller_role: str | None = CALLER_ROLE_HEADER,
+        x_caller_id: str | None = CALLER_ID_HEADER,
+    ) -> dict[str, Any]:
+        _authorize_dev_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
         caller_role = governance.resolve_caller_role(x_caller_role)
         try:
             return governance.execute(
@@ -177,7 +210,11 @@ def build_router(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @router.post("/query/resume")
-    def query_resume(req: ResumeRequest, x_caller_role: str | None = CALLER_ROLE_HEADER) -> dict[str, Any]:
+    def query_resume(
+        req: ResumeRequest,
+        x_caller_role: str | None = CALLER_ROLE_HEADER,
+        x_caller_id: str | None = CALLER_ID_HEADER,
+    ) -> dict[str, Any]:
         """Approve or reject a run paused for human review (``status="pending_approval"``).
 
         Authorization is scoped to the paused run's patient, so a caller cannot
@@ -200,6 +237,9 @@ def build_router(
         pending = queries.pending_review(req.thread_id)
         if pending is None:
             raise HTTPException(status_code=404, detail="No pending review for this thread_id.")
+        _authorize_dev_patient(
+            settings=settings, patient_id=pending.get("patient_id"), caller_id=x_caller_id
+        )
 
         def run(trace_id: str) -> dict[str, Any]:
             try:
@@ -226,7 +266,11 @@ def build_router(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @router.post("/query/stream")
-    def query_stream(req: QueryRequest, x_caller_role: str | None = CALLER_ROLE_HEADER) -> StreamingResponse:
+    def query_stream(
+        req: QueryRequest,
+        x_caller_role: str | None = CALLER_ROLE_HEADER,
+        x_caller_id: str | None = CALLER_ID_HEADER,
+    ) -> StreamingResponse:
         """Stream LangGraph progress as SSE: ``meta``, ``step``*, then ``result`` or ``error``.
 
         Authorization runs before the stream opens so denied callers get a plain 401.
@@ -234,6 +278,7 @@ def build_router(
         event is the same role-sanitized, budgeted payload returned by ``/query``.
         """
         tool_name = "query"
+        _authorize_dev_patient(settings=settings, patient_id=req.patient_id, caller_id=x_caller_id)
         request_payload = req.model_dump(exclude_none=True)
         caller_role = governance.resolve_caller_role(x_caller_role)
         scope = scope_for(req.patient_id)

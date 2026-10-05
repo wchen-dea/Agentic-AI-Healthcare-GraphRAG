@@ -161,8 +161,14 @@ docker exec healthcare-neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
 ```bash
 curl -s -X POST localhost:8000/query \
   -H 'Content-Type: application/json' \
+  -H 'X-Caller-Id: dev-clinician' \
+  -H 'X-Caller-Role: generation' \
   -d '{"question":"Summarize recent adverse events for this patient","patient_id":"patient-0001"}'
 ```
+
+The Minikube profile enables a synthetic patient-entitlement guard. Patient-scoped
+requests must include `X-Caller-Id`; the configured `dev-clinician` identity is
+limited to the synthetic patients listed in `infra/helm/values-dev.yaml`.
 
 The response holds `answer`, `vector_context`, `graph_context`, `patients`, `trace_id`, `retrieved_at`, `guardrails` and `langgraph` (`enabled`, `iterations`, `final_reason`, `confidence`, `agent_trace`). The full field list is in [05 — AI Agents](05_ai_agents.md#8-http-api).
 
@@ -247,10 +253,12 @@ After any change to these settings, re-index:
   ```bash
   curl -s -X POST localhost:8000/query/resume \
     -H 'Content-Type: application/json' \
+    -H 'X-Caller-Id: dev-clinician' \
+    -H 'X-Caller-Role: generation' \
     -d '{"thread_id":"<thread-id>","decision":"approve","note":"checked"}'
   ```
 
-- Configure `LANGGRAPH_CHECKPOINT_POSTGRES_URI` for shared, restart-safe LangGraph checkpoints. Set `LANGGRAPH_CHECKPOINT_REQUIRED=true` in production so startup fails instead of silently falling back to process-local memory. `HITL_MAX_PENDING` (default 1000) caps open reviews.
+- The Minikube profile enables HITL and configures PostgreSQL-backed, restart-safe LangGraph checkpoints with `LANGGRAPH_CHECKPOINT_REQUIRED=true`. This is a dev-path validation; production deployment changes remain future work. `HITL_MAX_PENDING` (default 1000) caps open reviews.
 - Completed and paused graph runs retain checkpoint history for audit and time-travel operations. The oldest history entry may be the input checkpoint and can lack final-state fields such as `question`.
 
 ## 9. Kubernetes and Helm

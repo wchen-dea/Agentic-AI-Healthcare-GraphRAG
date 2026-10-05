@@ -30,6 +30,15 @@ agent-service:
     MLFLOW_TRACKING_URI: "http://mlflow:5000"
     MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag-dev"
     AGENT_ALLOW_ROLE_HEADER: "true"
+    # Minikube-only synthetic identity-to-patient entitlement guard.
+    DEV_PATIENT_AUTH_ENABLED: "true"
+    DEV_PATIENT_ENTITLEMENTS: "dev-clinician=patient-0001,patient-0002,patient-0003,patient-0004,patient-0050,patient-0082"
+    HITL_ENABLED: "true"
+    HITL_MAX_PENDING: "1000"
+    LANGGRAPH_CHECKPOINT_POSTGRES_URI: "postgresql://patient_memory:change_me@patient-memory-postgres:5432/patient_memory"
+    LANGGRAPH_CHECKPOINT_REQUIRED: "true"
+    PATIENT_MEMORY_STORE_BACKEND: "postgres"
+    PATIENT_MEMORY_DATABASE_URL: "postgresql://patient_memory:change_me@patient-memory-postgres:5432/patient_memory"
   secrets:
     NEO4J_PASSWORD: "healthcare123"
     DATABRICKS_TOKEN: "change_me"

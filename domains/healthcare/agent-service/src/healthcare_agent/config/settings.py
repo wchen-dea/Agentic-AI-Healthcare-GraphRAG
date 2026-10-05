@@ -73,6 +73,11 @@ class HealthcareAgentSettings(AgentServiceSettings):
         default=False, validation_alias="LANGGRAPH_CHECKPOINT_REQUIRED"
     )
 
+    # Minikube-only identity-to-patient guard. This is deliberately disabled by
+    # default; production authentication belongs at the trusted gateway.
+    dev_patient_auth_enabled: bool = Field(default=False, validation_alias="DEV_PATIENT_AUTH_ENABLED")
+    dev_patient_entitlements: str = Field(default="", validation_alias="DEV_PATIENT_ENTITLEMENTS")
+
     @field_validator("patient_memory_store_backend")
     @classmethod
     def _validate_patient_memory_backend(cls, value: str) -> str:
