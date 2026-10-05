@@ -38,7 +38,7 @@ Path filters include `pyproject.toml`, `uv.lock`, `packages/**`, both agent serv
 
 ## 3. Ontology conformance workflow
 
-This workflow guards the ontology, seed Cypher, and the healthcare Flink job. Every job installs the healthcare Flink `requirements.txt` and `./packages/knowledge-core`.
+This workflow guards the ontology, seed Cypher, and the healthcare Flink job. Every job installs the healthcare Flink `pyproject.toml` and `./packages/knowledge-core`.
 
 | Job | Runs |
 | --- | --- |
