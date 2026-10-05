@@ -28,8 +28,8 @@ class AgentServiceSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore", frozen=True, populate_by_name=True)
 
     # LLM gateway
-    llm_provider: str = Field(default="ollama", validation_alias="LLM_PROVIDER")
-    llm_model: str = Field(default="llama3.1", validation_alias="LLM_MODEL")
+    llm_provider: str = Field(default="databricks", validation_alias="LLM_PROVIDER")
+    llm_model: str = Field(default="databricks-gpt-5-6-luna", validation_alias="LLM_MODEL")
     llm_fallback_provider: str = Field(default="", validation_alias="LLM_FALLBACK_PROVIDER")
     llm_fallback_model: str = Field(default="", validation_alias="LLM_FALLBACK_MODEL")
     llm_timeout_seconds: int = Field(default=120, ge=1, validation_alias="LLM_TIMEOUT_SECONDS")
