@@ -1,8 +1,30 @@
 # Agentic AI Healthcare + Supply Chain GraphRAG
 
-This repository implements a modern AI system for healthcare and supply-chain workloads built on the leading edge of enterprise GenAI architecture: multi-model LLM orchestration, graph-grounded retrieval, live knowledge ingestion, and governed agent execution. The platform is organized as a uv workspace with shared runtime packages, domain-specific agent services, realtime streaming pipelines, knowledge assets, and web applications.
+This repository is a provider-neutral reference platform for governed GraphRAG applications in healthcare and supply-chain domains. It combines realtime event ingestion, graph and vector retrieval, multi-agent orchestration, and cited responses into one local-first workspace.
 
-The system is designed for modern healthcare AI use cases that need high-trust reasoning across fragmented clinical, claims, and operational data. It combines Databricks-hosted foundation models with local-first development workflows, and it remains model-flexible so the runtime can also leverage AWS Bedrock-hosted foundation models and other provider-backed deployments without changing the application contract. The platform pairs those model choices with dual persistent data stores for semantic and relational retrieval, and a shared orchestration layer built around LangGraph and MCP tool servers. The runtime is intentionally provider-neutral and modular: it can run locally with Ollama and MiniLM in development and switch to Databricks AI, AWS Bedrock, or other enterprise model services in production without changing the application contract.
+## Start here
+
+Choose the path that matches your goal:
+
+| Goal | Start with |
+| --- | --- |
+| Run the platform locally | [Quickstart](#quickstart) |
+| Understand the system boundary and runtime flow | [Architecture](#architecture) |
+| Deploy with Compose, Minikube, or EKS | [03 — Platform Blueprint](docs/03_platform_blueprint.md) |
+| Operate, troubleshoot, or re-index services | [08 — Operations Runbook](docs/08_operation_runbook.md) |
+| Add or extend a domain | [09 — Supply Chain Domain](docs/09_supply_chain_domain.md) |
+| Review the business scope and safety constraints | [01 — Business Requirements](docs/01_business_requirements.md) |
+
+## Scope and boundaries
+
+- **Purpose:** demonstrate an auditable, grounded agent runtime over synthetic healthcare
+  and supply-chain data.
+- **Supported providers:** local Ollama/MiniLM development plus Databricks AI, AWS
+  Bedrock, and other provider-backed deployments through the same application contract.
+- **Core stores:** Neo4j for explicit relationships and Qdrant for semantic retrieval.
+- **Safety boundary:** this is not a medical device, EHR, clinical data repository, or
+  source of clinical decisions. Answers are advisory, synthetic, and subject to the
+  repository's guardrails and human-review paths.
 
 ## Modern AI platform capabilities
 
@@ -14,26 +36,6 @@ The system is designed for modern healthcare AI use cases that need high-trust r
 - Layered runtime architecture that separates UI, API/BFF, orchestration, domain agents, tools, and data platforms
 - Separate session memory for short-lived conversational continuity and governed durable patient memory with consent, provenance, retention, and expiry controls
 - Unified delivery model across development and production with containerized services and infrastructure-as-code deployment patterns
-
-## Architecture
-
-```mermaid
-flowchart LR
-    UI[Healthcare / supply-chain web apps] --> API[FastAPI agent service]
-    API --> ORCH[LangGraph orchestration]
-    ORCH --> SM[Session memory]
-    ORCH --> PM[Governed patient memory]
-    ORCH --> RETR[Vector + graph retrieval]
-    RETR --> NEO4J[(Neo4j)]
-    RETR --> QDRANT[(Qdrant)]
-    ORCH --> MCP[MCP tools + skills]
-    ORCH --> GEN[LLM provider router]
-    KAFKA[Kafka topics] --> FLINK[Flink enrichment]
-    FLINK --> QDRANT
-    FLINK --> NEO4J
-    MON[MLflow / Grafana / Prometheus] --> API
-    MON --> ORCH
-```
 
 ## Quickstart
 
@@ -55,6 +57,26 @@ Common targets:
 - `make validate-docs` runs markdownlint.
 - `make test-unit` runs unit tests across the workspace.
 - `make lint` runs Ruff checks.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[Healthcare / supply-chain web apps] --> API[FastAPI agent service]
+    API --> ORCH[LangGraph orchestration]
+    ORCH --> SM[Session memory]
+    ORCH --> PM[Governed patient memory]
+    ORCH --> RETR[Vector + graph retrieval]
+    RETR --> NEO4J[(Neo4j)]
+    RETR --> QDRANT[(Qdrant)]
+    ORCH --> MCP[MCP tools + skills]
+    ORCH --> GEN[LLM provider router]
+    KAFKA[Kafka topics] --> FLINK[Flink enrichment]
+    FLINK --> QDRANT
+    FLINK --> NEO4J
+    MON[MLflow / Grafana / Prometheus] --> API
+    MON --> ORCH
+```
 
 ## Domains
 
