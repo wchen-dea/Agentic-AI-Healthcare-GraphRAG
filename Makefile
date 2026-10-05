@@ -196,7 +196,8 @@ test-core: ## Run agent-core tests
 	cd packages/agent-core && uv run --package agent-core pytest --tb=short
 
 test-hc: ## Run healthcare tests
-	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short
+\tcd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/evals tests/unit/test_adversarial_inputs.py
+\tcd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/evals
 
 test-sc: ## Run supply-chain tests
 	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short
@@ -211,7 +212,8 @@ test-integration: ## Run integration tests
 	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/integration
 
 test-evals: ## Run evaluation tests
-	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/evals
+	cd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/evals tests/unit/test_adversarial_inputs.py
+	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/evals
 
 build-wheels: ## Build workspace wheels
 	uv build --wheel --package agent-core --out-dir dist

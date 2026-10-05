@@ -250,7 +250,7 @@ After any change to these settings, re-index:
     -d '{"thread_id":"<thread-id>","decision":"approve","note":"checked"}'
   ```
 
-- Pending reviews live in LangGraph's in-memory checkpointer and are lost on restart. Run one agent replica, or use sticky routing, while HITL is enabled. `HITL_MAX_PENDING` (default 1000) caps open reviews.
+- Configure `LANGGRAPH_CHECKPOINT_POSTGRES_URI` for shared, restart-safe LangGraph checkpoints. Set `LANGGRAPH_CHECKPOINT_REQUIRED=true` in production so startup fails instead of silently falling back to process-local memory. `HITL_MAX_PENDING` (default 1000) caps open reviews.
 
 ## 9. Kubernetes and Helm
 

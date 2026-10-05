@@ -103,7 +103,7 @@ uv run --package healthcare-agent-service python -m healthcare_agent.evaluation.
   --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
 ```
 
-It is a soft gate (`continue-on-error: true`). A failing score shows in the job log but does not block a merge. To make it blocking, remove `continue-on-error` and raise `--min-score` once the fixtures are stable. Metric definitions are in [06 — Quality Assurance](06_quality_assurance.md#5-evaluation-gates-and-mlflow-evaluation).
+It is a blocking gate. A failing score fails the job and blocks a merge. Metric definitions are in [06 — Quality Assurance](06_quality_assurance.md#5-evaluation-gates-and-mlflow-evaluation).
 
 ## 6. Branch and release flow
 

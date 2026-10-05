@@ -45,6 +45,10 @@ RequestType = Literal[
     "cohort_triage",
 ]
 
+JsonScalar = str | int | float | bool | None
+JsonValue = JsonScalar | list[JsonScalar] | dict[str, JsonScalar]
+JsonObject = dict[str, JsonValue]
+
 
 class HealthcareAgentState(TypedDict, total=False):
     # ── immutable inputs ────────────────────────────────────────────────
@@ -56,14 +60,14 @@ class HealthcareAgentState(TypedDict, total=False):
     # Governed, patient-scoped durable memory; never used as session history.
     patient_memory_context: Annotated[list[dict[str, Any]], merge_unique]
     patient_memory_facts: Annotated[list[dict[str, Any]], merge_unique]
-    patient_memory_policy: dict[str, Any]
-    patient_memory_metadata: dict[str, Any]
+    patient_memory_policy: JsonObject
+    patient_memory_metadata: JsonObject
     # Internal application-to-graph handoff; never exposed as prompt text.
     _patient_memory_record: Any
     context_limit: int  # upper bound on retrieved evidence items for this request
 
     # ── guardrails (input/output policy nodes) ──────────────────────────
-    guardrails: dict[str, Any]
+    guardrails: JsonObject
 
     # ── routing / planning ──────────────────────────────────────────────
     request_type: RequestType
@@ -85,9 +89,9 @@ class HealthcareAgentState(TypedDict, total=False):
 
     # ── synthesis ───────────────────────────────────────────────────────
     answer: str
-    structured_response: dict[str, Any]
+    structured_response: JsonObject
     confidence: float
     iteration: int
     final_reason: str
     review_required: bool
-    human_review: dict[str, Any]
+    human_review: JsonObject

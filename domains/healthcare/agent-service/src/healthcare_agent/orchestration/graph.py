@@ -325,9 +325,7 @@ def build_healthcare_graph(*, with_hitl: bool | None = None) -> Any:
     graph.add_edge("synthesis", "output_guardrail")
     graph.add_edge("output_guardrail", END)
 
-    if with_hitl:
-        return graph.compile(checkpointer=get_checkpointer())
-    return graph.compile()
+    return graph.compile(checkpointer=get_checkpointer())
 
 
 @lru_cache(maxsize=4)

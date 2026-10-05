@@ -135,14 +135,14 @@ jobs:
           (cd domains/healthcare/agent-service && uv run --frozen --package healthcare-agent-service pytest -q tests/integration)
           (cd domains/supply-chain/agent-service && uv run --frozen --package supply-chain-agent-service pytest -q tests/integration)
 
-      - name: Evaluation suites (offline planner and quality fixtures)
-        run: uv run --frozen --package healthcare-agent-service pytest -q tests/evals
-        working-directory: domains/healthcare/agent-service
+      - name: Evaluation suites (offline planner, golden, adversarial and quality fixtures)
+        run: |
+          (cd domains/healthcare/agent-service && uv run --frozen --package healthcare-agent-service pytest -q tests/evals tests/unit/test_adversarial_inputs.py)
+          (cd domains/supply-chain/agent-service && uv run --frozen --package supply-chain-agent-service pytest -q tests/evals)
 
       - name: Run evaluation quality gates (offline, from fixtures)
         run: uv run --frozen --package healthcare-agent-service python -m healthcare_agent.evaluation.gates --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
         working-directory: domains/healthcare/agent-service
-        continue-on-error: true
 
   container-build:
     runs-on: ubuntu-latest

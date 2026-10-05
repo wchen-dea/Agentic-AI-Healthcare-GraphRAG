@@ -72,6 +72,7 @@ def test_compiled_graph_is_cached_and_clearable() -> None:
 
 def test_cache_is_keyed_by_hitl_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     plain = graph_module.get_compiled_graph()
+    assert getattr(plain, "checkpointer", None) is get_checkpointer()
     monkeypatch.setenv("HITL_ENABLED", "true")
     with_hitl = graph_module.get_compiled_graph()
     assert with_hitl is not plain
@@ -85,6 +86,20 @@ def test_hitl_disabled_completes_with_thread_id(medication_request) -> None:
     assert result["status"] == "completed"
     assert result["thread_id"]
     assert result["answer"].startswith("Advisory")
+
+
+def test_checkpoint_history_and_controlled_edit(medication_request) -> None:
+    orchestrator = LangGraphOrchestrator.build()
+    result = orchestrator.run("Check medication interactions", "P-001")
+    thread_id = result["thread_id"]
+
+    history = orchestrator.history(thread_id)
+    assert history
+    assert orchestrator.state(thread_id).values["question"] == "Check medication interactions"
+    orchestrator.edit_state(thread_id, {"structured": True})
+    assert orchestrator.state(thread_id).values["structured"] is True
+    with pytest.raises(ValueError, match="not editable"):
+        orchestrator.edit_state(thread_id, {"question": "tamper"})
 
 
 # ── HITL enabled ────────────────────────────────────────────────────────────

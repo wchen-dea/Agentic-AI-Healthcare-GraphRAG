@@ -65,6 +65,14 @@ class HealthcareAgentSettings(AgentServiceSettings):
     # Observability
     mlflow_tracking_uri: str = Field(default="", validation_alias="MLFLOW_TRACKING_URI")
 
+    # LangGraph durable execution
+    langgraph_checkpoint_postgres_uri: str = Field(
+        default="", validation_alias="LANGGRAPH_CHECKPOINT_POSTGRES_URI"
+    )
+    langgraph_checkpoint_required: bool = Field(
+        default=False, validation_alias="LANGGRAPH_CHECKPOINT_REQUIRED"
+    )
+
     @field_validator("patient_memory_store_backend")
     @classmethod
     def _validate_patient_memory_backend(cls, value: str) -> str:

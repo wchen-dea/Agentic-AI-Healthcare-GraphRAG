@@ -175,7 +175,8 @@ The answer is never persisted automatically. This review step prevents an AI-gen
 - When confidence is below `HITL_CONFIDENCE_THRESHOLD` (default 0.75), `human_review` calls LangGraph `interrupt`. The response then has `status: "pending_review"`, a `thread_id`, and a `human_review` payload. The payload holds counts and routing metadata only, never raw evidence.
 - A reviewer calls `POST /query/resume` with the `thread_id`, a `decision` (`approve` or `reject`) and an optional `note`. An unknown thread returns `404`.
 - `HITL_MAX_PENDING` (default 1000) caps the number of open reviews.
-- The checkpointer is LangGraph's `InMemorySaver`, so pending reviews only exist in the process that created them. Multi-replica deployments need a shared checkpointer or sticky routing.
+- Every graph transition is checkpointed. Configure `LANGGRAPH_CHECKPOINT_POSTGRES_URI` to use the shared PostgreSQL saver; Docker deployments default to the patient-memory PostgreSQL service. Local tests fall back to `InMemorySaver` unless `LANGGRAPH_CHECKPOINT_REQUIRED=true`.
+- The orchestration facade supports checkpoint history, state inspection, controlled state editing, rewind, and resume-from-checkpoint operations. Edits are limited to approved non-identity fields.
 
 ## 8. HTTP API
 

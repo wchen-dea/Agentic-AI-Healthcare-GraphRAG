@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
+from contextlib import AbstractContextManager
 from functools import lru_cache
 from typing import Any
 
@@ -49,6 +50,20 @@ def _max_pending() -> int:
 
 @lru_cache(maxsize=1)
 def get_checkpointer() -> Any:
+    uri = os.getenv("LANGGRAPH_CHECKPOINT_POSTGRES_URI", "").strip()
+    if uri:
+        try:
+            from langgraph.checkpoint.postgres import PostgresSaver
+
+            context: AbstractContextManager[Any] = PostgresSaver.from_conn_string(uri)
+            saver = context.__enter__()
+            saver.setup()
+            setattr(saver, "_healthcare_connection_context", context)
+            return saver
+        except Exception:
+            if os.getenv("LANGGRAPH_CHECKPOINT_REQUIRED", "").strip().lower() in _TRUTHY:
+                raise
+
     from langgraph.checkpoint.memory import InMemorySaver
 
     return InMemorySaver()
