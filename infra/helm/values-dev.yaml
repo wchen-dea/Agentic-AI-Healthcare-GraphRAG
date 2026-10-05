@@ -17,6 +17,10 @@ agent-service:
     SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
     LLM_PROVIDER: "databricks"
     LLM_MODEL: "databricks-gpt-5-6-luna"
+    EMBEDDING_PROVIDER: "local"
+    EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_DIM: "384"
+    EMBEDDING_REQUIRE_MODEL: "true"
     LLM_TIMEOUT_SECONDS: "300"
     LLM_MAX_TOKENS: "4096"
     DATABRICKS_HOST: "change_me"
@@ -36,6 +40,11 @@ provider-web:
 flink:
   taskmanager:
     replicas: 1
+  config:
+    EMBEDDING_PROVIDER: "local"
+    EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_DIM: "384"
+    EMBEDDING_REQUIRE_MODEL: "true"
 mlflow:
   persistence:
     enabled: false

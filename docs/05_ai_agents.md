@@ -256,7 +256,51 @@ The `guardrails` block in each response reports the redaction level, access leve
 
 ## Observability
 
-- **Tracing**: when `MLFLOW_TRACKING_URI` is set, `observability/tracing.py` enables MLflow tracing for the LangGraph run and the LLM calls. Otherwise a no-op tracer is used. Every response carries a `trace_id`. See [ADR 0008](adrs/0008-mlflow-tracing-and-evaluation.md).
+MLflow tracing is optional and is independent from Prometheus metrics and the governance audit log.
+
+### Enable tracing locally
+
+Start the infrastructure and healthcare services, then set the tracking configuration before starting the agent service:
+
+```bash
+make up
+export MLFLOW_TRACKING_URI=http://localhost:5000
+export MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
+make query-hc
+```
+
+Open [http://localhost:5000](http://localhost:5000) to view the experiment. The MLflow health check is:
+
+```bash
+make mlflow
+```
+
+In Docker Compose, the healthcare overlay already supplies `http://mlflow:5000` as the service-to-service URI. In Kubernetes, use the same cluster service name. The browser URL is different from the URI used inside the agent container: use `http://localhost:5000` from the host and `http://mlflow:5000` from the cluster network.
+
+### What is traced
+
+`healthcare_agent.observability.tracing` creates the following spans:
+
+| Span | Type | Contents |
+| --- | --- | --- |
+| `healthcare_query_<mode>` | `CHAIN` | Query mode, request type, latency, patient/vector/graph counts, answer length |
+| `agent:<name>` | `AGENT` | Agent name, iteration, action, message count, latency |
+| `vector_search` / `graph_search` | `RETRIEVER` | Bounded inputs/results, result count and latency |
+| `llm_generate` | `LLM` | Context counts, model-routing attributes, answer length, latency and error state |
+| `@mlflow_trace` functions | Configured type | Bounded inputs/outputs, outcome, latency and error type |
+
+Use the API response `trace_id` to correlate the request with application logs and audit records. The MLflow span name is the operation name; `trace_id` is the platform correlation identifier and may not be the MLflow UI's internal trace identifier.
+
+### Privacy and data handling
+
+Tracing is observability, not authorization. Existing response guardrails still apply, but MLflow is an additional data store. Do not add raw patient records, access tokens, credentials, or unrestricted prompts to span attributes. The tracing helpers bound collections and strings, but `_safe_repr` does **not** de-identify data. Prefer counts, classifications, IDs that are already approved for observability, and hashes where correlation is required.
+
+Disable tracing by leaving `MLFLOW_TRACKING_URI` empty. The wrappers then call the original functions directly and do not contact MLflow. This mode is used by unit tests and offline evaluation.
+
+### Failure behavior
+
+Span failures are recorded with `outcome=error`, `error_type`, a bounded error message, and `latency_ms`; the original exception is re-raised. Successful spans include `outcome=success`. A tracing failure must not convert a successful agent response into a different response contract.
+
 - **Metrics**: `GET /metrics` exposes Prometheus counters and histograms for HTTP method, path, status and duration.
 - **Audit**: tool calls are appended as JSON lines to `AGENT_AUDIT_LOG_PATH` (default `logs/agent_audit.log`). Arguments are hashed, not stored.
 
@@ -283,7 +327,8 @@ The service settings are Pydantic `BaseSettings` classes (`config/settings.py`, 
 | `PATIENT_MEMORY_MAX_FACTS` | `100` | Per-patient fact cap |
 | `PATIENT_MEMORY_CONSENT_REQUIRED` | `true` | Require explicit consent for writes |
 | `MCP_SERVER_NAME` and `MCP_*` transport options | see [section 9](#9-mcp-tools-and-skills) | MCP server |
-| `MLFLOW_TRACKING_URI` | empty | Tracing |
+| `MLFLOW_TRACKING_URI` | empty | MLflow tracking server URL; non-empty enables tracing |
+| `MLFLOW_EXPERIMENT_NAME` | `healthcare-graphrag` | Experiment selected by the tracing and evaluation helpers |
 | `AGENT_DEFAULT_CALLER_ROLE`, `AGENT_ALLOW_ROLE_HEADER` | `generation`, `true` | Caller role |
 | `AGENT_TOOL_POLICY_PATH`, `AGENT_SKILLS_LAYER_PATH` | bundled files | Policy and skills overrides |
 | `AGENT_ALLOW_ORIGINS` | `*` | CORS |
