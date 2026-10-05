@@ -160,10 +160,10 @@ build-wheels: ## Build agent service wheels (+ agent-core, knowledge-core) into 
 	uv build --wheel --package healthcare-agent-service --out-dir dist
 	uv build --wheel --package supply-chain-agent-service --out-dir dist
 
-pull-model: ## Pull Ollama LLM model
+pull-model: ## (Optional) Pull Ollama model (needs --profile ollama)
 	docker exec infra-ollama ollama pull llama3.1
 
-fresh: clean up pull-model ## Full fresh start with both domains
+fresh: clean up ## Full fresh start with both domains
 
 # ── Helm / Minikube ───────────────────────────────────────────────────────────
 
