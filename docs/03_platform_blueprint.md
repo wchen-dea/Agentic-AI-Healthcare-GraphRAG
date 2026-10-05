@@ -22,7 +22,43 @@ flowchart LR
     eks --> bedrock[Amazon Bedrock]
 ```
 
-## 2. Local compose
+## 2. Local deployment paths
+
+Local development has two separate deployment paths. Do not run both against the same host ports or shared data volumes at the same time.
+
+### Path A: Docker Compose only
+
+This path runs every service as a Docker container. It does not create Kubernetes resources or require Minikube.
+
+```bash
+cp .env.example .env
+make compose-up        # infra + healthcare + supply-chain
+make compose-up-hc     # infra + healthcare only
+make compose-down
+```
+
+Services communicate over the external Docker network `graphrag-net`. Host access uses the ports in [08 — Operation Runbook](08_operation_runbook.md#1-prerequisites-and-host-ports). Use `make compose-up` for the fastest full local stack and `make ps` or `make validate` for checks.
+
+### Path B: Minikube with the Docker driver
+
+This path runs Kubernetes inside a Minikube node backed by Docker. Services are Kubernetes pods, not Compose containers. It requires Docker, Minikube, kubectl, and Helm.
+
+```bash
+make minikube-up
+make minikube-ports
+make minikube-ports-stop
+make minikube-down
+```
+
+`make minikube-up` starts Minikube with `MINIKUBE_DRIVER=docker`, builds healthcare images inside the Minikube Docker daemon, and installs the Helm release `healthcare-dev` in namespace `healthcare-ai-dev`. It uses `values-dev.yaml`, including local MiniLM embeddings with 384 dimensions. Override resources when needed:
+
+```bash
+MINIKUBE_CPUS=4 MINIKUBE_MEMORY=20480 make minikube-up
+```
+
+Use `kubectl -n healthcare-ai-dev get pods` and `kubectl -n healthcare-ai-dev logs` for Kubernetes diagnostics. `make minikube-down` removes the Helm release; `minikube delete` removes the cluster and its node-local images.
+
+The legacy aliases `make up` and `make up-hc` remain Compose aliases; `make helm-dev` remains a Minikube alias.
 
 ### Stacks
 

@@ -86,6 +86,17 @@ Common targets:
 └── docs/adrs/
 ```
 
+## Local deployment paths
+
+Choose one path for local development:
+
+| Path | Start | Stop | Runtime |
+| --- | --- | --- | --- |
+| Docker Compose only | `make compose-up` | `make compose-down` | Docker containers on `graphrag-net` |
+| Minikube with Docker driver | `make minikube-up` | `make minikube-down` | Kubernetes pods inside a Docker-backed Minikube node |
+
+For Minikube service access, run `make minikube-ports`. See [03 — Platform Blueprint](docs/03_platform_blueprint.md#2-local-deployment-paths) for prerequisites and details. The existing `make up` and `make up-hc` commands remain Compose aliases.
+
 ## Documentation index
 
 | Document | Purpose |
