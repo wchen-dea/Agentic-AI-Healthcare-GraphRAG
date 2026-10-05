@@ -99,6 +99,15 @@ alerts and linked to the patient.
 
 Request types are described in [05 — AI Agents](05_ai_agents.md#request-types).
 
+### 5.1 Example clinical scenarios
+
+All examples are synthetic and use US healthcare terminology. They are decision-support demonstrations, not clinical advice.
+
+| ID | Scenario | Governed memory example | Expected workflow |
+| --- | --- | --- | --- |
+| US-CLIN-01 | A primary-care clinician reviews a patient with a documented penicillin allergy before prescribing an antibiotic. | Store the consented fact `allergy: penicillin` with clinician-note provenance and a retention policy. | Patient snapshot and medication-safety review surface the trusted allergy context alongside graph evidence; clinician confirmation remains required. |
+| US-CLIN-02 | A care manager follows up with a synthetic US patient recently discharged after diabetes-related admission. | Store consented facts such as `condition: type 2 diabetes` and `follow_up: post-discharge within 7 days` with discharge-summary provenance. | The agent prepares a longitudinal follow-up summary using patient memory, labs, medications, and claims evidence; the care team validates the plan. |
+
 ## 6. Business rules
 
 | ID | Rule |

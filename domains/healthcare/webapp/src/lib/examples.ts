@@ -6,6 +6,18 @@ export interface ExampleQuery {
 
 export const EXAMPLE_QUERIES: ExampleQuery[] = [
   {
+    title: "Penicillin allergy memory review",
+    patientId: "demo-us-001",
+    question:
+      "Use the governed patient memory and source evidence to review this patient's documented penicillin allergy before considering antibiotic therapy. Identify safety concerns and state that clinician confirmation is required.",
+  },
+  {
+    title: "Post-discharge diabetes memory review",
+    patientId: "demo-us-002",
+    question:
+      "Use the governed patient memory and source evidence to prepare a post-discharge follow-up summary for this synthetic US patient with type 2 diabetes. Check recent labs, medications, claims, and follow-up needs; clinician review is required.",
+  },
+  {
     title: "Polypharmacy safety review",
     patientId: "patient-0001",
     question:

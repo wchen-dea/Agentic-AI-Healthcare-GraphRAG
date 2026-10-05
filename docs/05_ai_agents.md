@@ -159,6 +159,16 @@ Authorization runs before the stream opens, so a denied caller gets a plain `401
 - The graph loads durable facts through `patient_memory_retrieval` into separate trusted state fields. Patient memory is not concatenated into session history and is available to synthesis only as an explicitly labeled context channel.
 - Patient memory is not a replacement for the source graph/vector evidence or a clinician decision; retention and consent policy remain authoritative.
 
+**Web UI clinical activity workflow:**
+
+1. A clinician selects or enters a patient and runs an example or custom clinical query.
+2. When the answer completes, the Web UI copies the patient ID and answer into the governed-memory panel as a reviewable `clinical_summary` draft.
+3. The clinician edits the fact, selects provenance, and explicitly confirms patient consent.
+4. The **Save governed memory** action remains disabled until consent is confirmed, then calls `POST /patient-memory` with `X-Caller-Role: memory_write`.
+5. The API validates consent, provenance, patient scope, retention, and fact limits before persisting to the configured patient-memory store.
+
+The answer is never persisted automatically. This review step prevents an AI-generated answer from becoming longitudinal memory without clinician approval and explicit consent.
+
 **Human-in-the-loop** (`orchestration/hitl.py`):
 
 - Enable it with `HITL_ENABLED=true`.

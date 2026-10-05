@@ -92,6 +92,8 @@ Authorized write surfaces:
 - `POST /patient-memory` requires the `patient_memory_write` tool permission and patient scope.
 - MCP `patient_memory_write` requires the `memory_write` role.
 - Both require explicit consent and provenance and emit governance audit events.
+- The provider Web UI offers a governed-memory panel in the clinical activity sidebar. After a query completes, it pre-fills a reviewable `clinical_summary` draft from the answer and patient ID; it does not save automatically.
+- The clinician must edit or confirm the fact, select provenance, and check patient consent before **Save governed memory** is enabled. The UI then calls `POST /patient-memory` with `X-Caller-Role: memory_write`.
 
 ## 4. LangGraph state and topology
 
@@ -162,7 +164,7 @@ Configuration:
 
 | Variable | Default | Purpose |
 |---|---:|---|
-| `PATIENT_MEMORY_STORE_BACKEND` | `memory` | `memory` or `redis` |
+| `PATIENT_MEMORY_STORE_BACKEND` | `memory` | `memory`, `redis`, or `postgres` |
 | `PATIENT_MEMORY_RETENTION_SECONDS` | `2592000` | Maximum fact age |
 | `PATIENT_MEMORY_MAX_FACTS` | `100` | Per-patient fact cap |
 | `PATIENT_MEMORY_CONSENT_REQUIRED` | `true` | Require explicit write consent |
