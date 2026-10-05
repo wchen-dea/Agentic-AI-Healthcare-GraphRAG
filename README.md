@@ -97,6 +97,8 @@ Choose one path for local development:
 
 For Minikube service access, run `make minikube-ports`. See [03 — Platform Blueprint](docs/03_platform_blueprint.md#2-local-deployment-paths) for prerequisites and details. The existing `make up` and `make up-hc` commands remain Compose aliases.
 
+Put your real `DATABRICKS_TOKEN` in the gitignored `infra/helm/values-dev.local.yaml`; `make minikube-up` applies it automatically. Never commit it.
+
 ## Documentation index
 
 | Document | Purpose |

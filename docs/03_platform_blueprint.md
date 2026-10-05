@@ -127,7 +127,7 @@ Agent and web services are ClusterIP by default with CPU-based HPAs. The agent c
 3. Runs `helm upgrade --install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace`.
 4. Waits for Kafka, Neo4j, Qdrant and agent-service pods.
 
-Then `make helm-ports` forwards:
+Then `make minikube-ports` forwards:
 
 | Local URL | Service |
 | --- | --- |
@@ -137,7 +137,7 @@ Then `make helm-ports` forwards:
 | `http://localhost:6333/dashboard` | Qdrant |
 | `http://localhost:9080` | Conduktor |
 
-`make helm-ports-stop` kills the forwards; `make helm-dev-down` uninstalls the release.
+`make minikube-ports-stop` kills the forwards; `make minikube-down` uninstalls the release.
 
 ### Production (EKS)
 

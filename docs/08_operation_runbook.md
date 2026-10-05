@@ -259,8 +259,8 @@ The umbrella chart is `infra/helm` with sub-charts under `infra/helm/charts`. De
 | Task | Command |
 | --- | --- |
 | Deploy to minikube | `make helm-dev` (runs `infra/environments/dev/setup-minikube.sh`) |
-| Port-forward services | `make helm-ports`; stop with `make helm-ports-stop` |
-| Tear down dev | `make helm-dev-down` |
+| Port-forward services | `make minikube-ports`; stop with `make minikube-ports-stop` |
+| Tear down dev | `make minikube-down` |
 | Lint and render | `make helm-lint`, `make helm-prd` (dry-run only) |
 | Pull the model in-cluster | `kubectl -n healthcare-ai-dev exec deploy/ollama -- ollama pull llama3.1` |
 
@@ -347,7 +347,18 @@ kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000
 | Ollama `OOMKilled` | Not enough memory | `MINIKUBE_MEMORY=20480 make helm-dev` |
 | `ImagePullBackOff` | Image built outside minikube's Docker | `eval $(minikube docker-env)` and rebuild; the setup script does this |
 | Flink task manager cannot register | RPC port blocked | Check port 6124 in the network policy |
-| Port-forward drops | `kubectl` limit on long connections | Re-run `make helm-ports` |
+| Port-forward drops | `kubectl` limit on long connections | Re-run `make minikube-ports` |
+
+### Minikube credentials, reboot and troubleshooting
+
+- Put real credentials in the gitignored `infra/helm/values-dev.local.yaml` (`agent-service.secrets.DATABRICKS_TOKEN`). `setup-minikube.sh` applies it automatically; for manual upgrades pass `-f infra/helm/values-dev.yaml -f infra/helm/values-dev.local.yaml`. Never commit tokens (GitHub push protection will block them).
+- Reboot: `minikube stop && minikube start`, wait for pods to be Ready, then `make minikube-ports`.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| localhost:5000 down, mlflow `OOMKilled` | Dev memory too low / persistence | Dev values disable persistence and raise limits; re-run helm upgrade |
+| Agent UI "Request timed out after 120s" | mlflow down (agent retries) or `Permission denied: /mlflow` | Ensure mlflow runs with `--serve-artifacts`; restart agent-service |
+| "LLM error: unable to reach Databricks AI Gateway" | `DATABRICKS_HOST/TOKEN` still `change_me` | Fill `values-dev.local.yaml`, helm upgrade, restart agent-service |
 
 ### Conduktor
 

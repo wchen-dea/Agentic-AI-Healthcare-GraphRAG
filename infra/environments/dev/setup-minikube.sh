@@ -39,8 +39,11 @@ echo "Images built."
 
 # Install or upgrade via Helm
 echo "Installing Helm chart..."
+LOCAL_VALUES="$INFRA_DIR/helm/values-dev.local.yaml"
+LOCAL_ARGS=""
+[ -f "$LOCAL_VALUES" ] && LOCAL_ARGS="-f $LOCAL_VALUES"
 helm upgrade --install "$RELEASE_NAME" "$HELM_CHART" \
-  -f "$VALUES_FILE" \
+  -f "$VALUES_FILE" $LOCAL_ARGS \
   -n "$NAMESPACE" --create-namespace
 
 # Wait for core services
