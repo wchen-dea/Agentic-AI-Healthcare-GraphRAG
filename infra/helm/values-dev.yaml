@@ -23,7 +23,7 @@ agent-service:
     EMBEDDING_REQUIRE_MODEL: "true"
     LLM_TIMEOUT_SECONDS: "300"
     LLM_MAX_TOKENS: "4096"
-    DATABRICKS_HOST: "change_me"
+    DATABRICKS_HOST: "https://dbc-baff2b7f-4402.cloud.databricks.com"
     OLLAMA_URL: ""
     MCP_SERVER_NAME: "HealthcareGraphRAG MCP (dev)"
     LANGGRAPH_MAX_ITERATIONS: "3"
@@ -48,6 +48,13 @@ flink:
 mlflow:
   persistence:
     enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1536Mi
 kafka:
   enabled: true
 neo4j:
