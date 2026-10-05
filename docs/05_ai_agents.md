@@ -176,7 +176,7 @@ The answer is never persisted automatically. This review step prevents an AI-gen
 - A reviewer calls `POST /query/resume` with the `thread_id`, a `decision` (`approve` or `reject`) and an optional `note`. An unknown thread returns `404`.
 - `HITL_MAX_PENDING` (default 1000) caps the number of open reviews.
 - Every graph transition is checkpointed. Configure `LANGGRAPH_CHECKPOINT_POSTGRES_URI` to use the shared PostgreSQL saver; Docker deployments default to the patient-memory PostgreSQL service. Local tests fall back to `InMemorySaver` unless `LANGGRAPH_CHECKPOINT_REQUIRED=true`.
-- The orchestration facade supports checkpoint history, state inspection, controlled state editing, rewind, and resume-from-checkpoint operations. Edits are limited to approved non-identity fields.
+- Completed and paused runs retain checkpoint history. The orchestration facade supports history, state inspection, controlled editing, rewind, and resume-from-checkpoint operations. Historical listings include initial/input checkpoints, which may not contain the final state fields; edits are limited to approved non-identity fields.
 
 ## 8. HTTP API
 

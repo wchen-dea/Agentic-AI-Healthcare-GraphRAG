@@ -251,6 +251,7 @@ After any change to these settings, re-index:
   ```
 
 - Configure `LANGGRAPH_CHECKPOINT_POSTGRES_URI` for shared, restart-safe LangGraph checkpoints. Set `LANGGRAPH_CHECKPOINT_REQUIRED=true` in production so startup fails instead of silently falling back to process-local memory. `HITL_MAX_PENDING` (default 1000) caps open reviews.
+- Completed and paused graph runs retain checkpoint history for audit and time-travel operations. The oldest history entry may be the input checkpoint and can lack final-state fields such as `question`.
 
 ## 9. Kubernetes and Helm
 

@@ -6,11 +6,12 @@ synthesis for medication-safety requests or low-confidence evidence. The
 paused run is persisted per ``thread_id`` until a reviewer resumes it with an
 approve/reject decision.
 
-Conversation memory stays in ``SessionStore``; the checkpointer only holds
-in-flight graph state for paused runs and is cleared once a run completes.
+Conversation memory stays in ``SessionStore``; the checkpointer retains graph
+state for completed and paused runs so callers can audit history, inspect
+state, and perform controlled time-travel operations.
 
-The default ``InMemorySaver`` is process-local: use a shared checkpointer
-(for example Postgres or Redis) when running more than one replica.
+The default ``InMemorySaver`` is process-local: use PostgreSQL when running
+more than one replica or when checkpoints must survive process restarts.
 """
 from __future__ import annotations
 
