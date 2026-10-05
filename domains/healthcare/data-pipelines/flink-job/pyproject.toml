@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "healthcare-flink-job"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "apache-flink==1.20.5",
+  "confluent-kafka==2.5.3",
+  "fastavro==1.9.7",
+  "neo4j==5.24.0",
+  "qdrant-client==1.11.3",
+  "requests==2.32.3",
+  "PyYAML==6.0.2",
+  "sentence-transformers==3.0.1",
+]
+
+[tool.setuptools]
+py-modules = ["healthcare_graph_rag_job", "healthcare_graph_rag_pyflink_job"]

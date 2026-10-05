@@ -27,8 +27,9 @@ ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} \
 	SENTENCE_TRANSFORMERS_HOME=/opt/hf-cache
 WORKDIR /app
 RUN pip3 install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-COPY domains/supply-chain/data-pipelines/flink-job/requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+COPY domains/supply-chain/data-pipelines/flink-job/pyproject.toml .
+RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
+	uv pip install --system --break-system-packages --no-cache -r pyproject.toml
 COPY domains/supply-chain/data-pipelines/flink-job/app /app/app
 COPY domains/supply-chain/data-pipelines/flink-job/supplychain_graph_rag_job.py /app/supplychain_graph_rag_job.py
 COPY domains/supply-chain/data-pipelines/flink-job/supplychain_graph_rag_pyflink_job.py /app/supplychain_graph_rag_pyflink_job.py

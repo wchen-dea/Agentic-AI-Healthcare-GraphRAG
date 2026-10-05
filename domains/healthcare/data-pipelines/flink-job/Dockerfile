@@ -30,8 +30,9 @@ WORKDIR /app
 # apache-flink's large transitive dependency graph (notably on ARM64).
 RUN python3 -m pip install --no-cache-dir --upgrade "pip<26"
 RUN pip3 install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-COPY domains/healthcare/data-pipelines/flink-job/requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+COPY domains/healthcare/data-pipelines/flink-job/pyproject.toml .
+RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
+	uv pip install --system --break-system-packages --no-cache -r pyproject.toml
 COPY domains/healthcare/data-pipelines/flink-job/app /app/app
 COPY domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_job.py /app/healthcare_graph_rag_job.py
 COPY domains/healthcare/data-pipelines/flink-job/healthcare_graph_rag_pyflink_job.py /app/healthcare_graph_rag_pyflink_job.py
