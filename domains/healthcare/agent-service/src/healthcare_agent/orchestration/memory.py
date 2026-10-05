@@ -3,8 +3,10 @@
 Provides pluggable session stores for multi-turn conversations:
 - InMemorySessionStore (default): fast, no dependencies, lost on restart
 - RedisSessionStore: persistent cross-session memory via Redis
+- PostgresPatientMemoryStore: durable JSONB-backed patient memory
 
-Set SESSION_STORE_BACKEND=redis and REDIS_URL to enable Redis persistence.
+Set ``PATIENT_MEMORY_STORE_BACKEND=postgres`` and ``PATIENT_MEMORY_DATABASE_URL``
+to enable PostgreSQL persistence.
 """
 from __future__ import annotations
 
@@ -261,6 +263,13 @@ def get_patient_memory_store() -> "PatientMemoryStore":
         return RedisPatientMemoryStore(
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0")
         )
+    if backend == "postgres":
+        return PostgresPatientMemoryStore(
+            database_url=os.getenv(
+                "PATIENT_MEMORY_DATABASE_URL",
+                "postgresql://patient_memory:patient_memory@patient-memory-postgres:5432/patient_memory",
+            )
+        )
     if backend != "memory":
         raise ValueError(f"Unsupported patient memory backend: {backend}")
     return InMemoryPatientMemoryStore()
@@ -419,6 +428,101 @@ class InMemoryPatientMemoryStore:
 
     def delete(self, patient_id: str) -> None:
         self._records.pop(patient_id, None)
+
+
+class PostgresPatientMemoryStore:
+    """PostgreSQL-backed patient memory store using one JSONB record per patient."""
+
+    _TABLE = "governed_patient_memory"
+
+    def __init__(self, database_url: str) -> None:
+        try:
+            import psycopg
+        except ImportError as exc:
+            raise ImportError("psycopg package required: pip install psycopg[binary]") from exc
+        self._psycopg = psycopg
+        self._database_url = database_url
+        self._ensure_schema()
+
+    def _connect(self):
+        return self._psycopg.connect(self._database_url)
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self._TABLE} (
+                        patient_id TEXT PRIMARY KEY,
+                        record JSONB NOT NULL,
+                        updated_at DOUBLE PRECISION NOT NULL
+                    )
+                    """
+                )
+
+    def load(self, patient_id: str) -> PatientMemoryRecord | None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT record FROM {self._TABLE} WHERE patient_id = %s",
+                    (patient_id,),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            return None
+        obj = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+        policy_data = obj.get("policy", {})
+        record = PatientMemoryRecord(
+            patient_id=obj["patient_id"],
+            facts=[PatientMemoryFact.from_dict(item) for item in obj.get("facts", [])],
+            policy=PatientMemoryPolicy(
+                consent_required=policy_data.get("consent_required", True),
+                consent_granted=policy_data.get("consent_granted", False),
+                retention_seconds=int(policy_data.get("retention_seconds", 30 * 24 * 60 * 60)),
+                max_facts=int(policy_data.get("max_facts", 100)),
+                allowed_categories=set(policy_data.get("allowed_categories", [])),
+            ),
+            created_at=float(obj.get("created_at", time.time())),
+            updated_at=float(obj.get("updated_at", time.time())),
+            metadata=dict(obj.get("metadata") or {}),
+        )
+        record.facts = record.active_facts()
+        return record
+
+    def save(self, record: PatientMemoryRecord) -> None:
+        payload = {
+            "patient_id": record.patient_id,
+            "facts": [fact.to_dict() for fact in record.facts],
+            "policy": {
+                "consent_required": record.policy.consent_required,
+                "consent_granted": record.policy.consent_granted,
+                "retention_seconds": record.policy.retention_seconds,
+                "max_facts": record.policy.max_facts,
+                "allowed_categories": sorted(record.policy.allowed_categories),
+            },
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "metadata": record.metadata,
+        }
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {self._TABLE} (patient_id, record, updated_at)
+                    VALUES (%s, %s::jsonb, %s)
+                    ON CONFLICT (patient_id) DO UPDATE
+                    SET record = EXCLUDED.record, updated_at = EXCLUDED.updated_at
+                    """,
+                    (record.patient_id, json.dumps(payload), record.updated_at),
+                )
+
+    def delete(self, patient_id: str) -> None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"DELETE FROM {self._TABLE} WHERE patient_id = %s",
+                    (patient_id,),
+                )
 
 
 class RedisPatientMemoryStore:

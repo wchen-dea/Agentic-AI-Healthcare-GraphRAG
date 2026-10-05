@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: patient-memory-postgres
+  labels:
+    {{- include "agent-service.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  POSTGRES_DB: {{ .Values.patientMemoryPostgres.database | quote }}
+  POSTGRES_USER: {{ .Values.patientMemoryPostgres.user | quote }}
+  POSTGRES_PASSWORD: {{ .Values.patientMemoryPostgres.password | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: patient-memory-postgres
+  labels:
+    {{- include "agent-service.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.patientMemoryPostgres.storage.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.patientMemoryPostgres.storage.size }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-memory-postgres
+  labels:
+    {{- include "agent-service.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: patient-memory-postgres
+  template:
+    metadata:
+      labels:
+        app: patient-memory-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.patientMemoryPostgres.image.repository }}:{{ .Values.patientMemoryPostgres.image.tag }}"
+          imagePullPolicy: {{ .Values.patientMemoryPostgres.image.pullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: patient-memory-postgres
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.patientMemoryPostgres.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: patient-memory-postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-memory-postgres
+  labels:
+    {{- include "agent-service.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: patient-memory-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

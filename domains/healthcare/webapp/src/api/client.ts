@@ -6,6 +6,24 @@ import type { AgentCard, AgentProgressStep, HealthStatus, QueryRequest, QueryRes
 
 export type ApiErrorKind = "http" | "timeout" | "cancelled" | "network" | "protocol";
 
+export interface PatientMemoryWritePayload {
+  patient_id: string;
+  facts: Array<{
+    key: string;
+    value: string;
+    source_type: string;
+  }>;
+  provenance: Record<string, string>;
+  consent: boolean;
+}
+
+export interface PatientMemoryWriteResponse {
+  patient_id: string;
+  fact_count: number;
+  trace_id: string;
+  status: string;
+}
+
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status?: number;
@@ -169,6 +187,25 @@ export function runRagQueryStreaming(
       current.cancel();
     },
   };
+}
+
+export function writePatientMemory(
+  apiBase: string,
+  payload: PatientMemoryWritePayload,
+): RequestHandle<PatientMemoryWriteResponse> {
+  return withAbort(async (signal) => {
+    const response = await fetch(`${normalizeBaseUrl(apiBase)}/patient-memory`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Caller-Role": "memory_write",
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+    await ensureOk(response);
+    return (await response.json()) as PatientMemoryWriteResponse;
+  });
 }
 
 export function checkHealth(apiBase: string): RequestHandle<HealthStatus> {

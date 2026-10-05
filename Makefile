@@ -244,12 +244,14 @@ helm-ports: ## Start Minikube service port-forwards
 	@kubectl -n $(KUBE_NAMESPACE) port-forward svc/provider-web 8088:80 >/dev/null 2>&1 &
 	@kubectl -n $(KUBE_NAMESPACE) port-forward svc/neo4j 7474:7474 7687:7687 >/dev/null 2>&1 &
 	@kubectl -n $(KUBE_NAMESPACE) port-forward svc/qdrant 6333:6333 >/dev/null 2>&1 &
+	@kubectl -n $(KUBE_NAMESPACE) port-forward svc/patient-memory-postgres 5432:5432 >/dev/null 2>&1 &
 	@kubectl -n $(KUBE_NAMESPACE) port-forward svc/conduktor-console 9080:8080 >/dev/null 2>&1 &
 	@sleep 2
 	@echo "Agent API: http://localhost:8000"
 	@echo "Web UI: http://localhost:8088"
 	@echo "Neo4j: http://localhost:7474"
 	@echo "Qdrant: http://localhost:6333/dashboard"
+	@echo "Patient memory PostgreSQL: postgresql://patient_memory:change_me@localhost:5432/patient_memory"
 	@echo "Conduktor: http://localhost:9080"
 
 helm-ports-stop: ## Stop Minikube service port-forwards

@@ -486,6 +486,139 @@ PATIENT_MEDICATION_STATE: dict[str, dict[str, str | int | list[str]]] = {}
 PENDING_FOLLOWUPS: list[tuple[str, dict]] = []
 
 
+DEMO_PATIENT_EVENTS = [
+    {
+        "patient_id": "demo-us-001",
+        "name": "Synthetic US Patient One",
+        "sex": "F",
+        "age": 46,
+        "risk_tier": "medium",
+        "diagnosis": "Asthma",
+        "symptom": "wheezing",
+        "allergen": "Penicillin",
+        "reaction": "hives",
+        "medication": "Albuterol",
+        "medication_class": "Bronchodilator",
+        "dose": "2.5mg",
+        "lab_name": "eGFR",
+        "lab_value": 92,
+        "lab_unit": "mL/min",
+        "claim_code": "99213",
+        "claim_description": "Office visit, established patient, moderate",
+    },
+    {
+        "patient_id": "demo-us-002",
+        "name": "Synthetic US Patient Two",
+        "sex": "M",
+        "age": 68,
+        "risk_tier": "high",
+        "diagnosis": "Type 2 Diabetes Mellitus",
+        "symptom": "fatigue",
+        "allergen": "Sulfa drugs",
+        "reaction": "rash",
+        "medication": "Metformin",
+        "medication_class": "Antidiabetic",
+        "dose": "500mg",
+        "lab_name": "HbA1c",
+        "lab_value": 8.4,
+        "lab_unit": "%",
+        "claim_code": "99223",
+        "claim_description": "Initial hospital care, high complexity",
+    },
+]
+
+
+def _demo_event_envelope(source_type: str, event_type: str, patient: dict, payload: dict) -> dict:
+    return event_envelope(
+        "SyntheticDemo",
+        source_type,
+        event_type,
+        patient["patient_id"],
+        f"demo-enc-{patient['patient_id']}",
+        "provider-001",
+        payload,
+    )
+
+
+def demo_patient_events() -> list[tuple[str, dict]]:
+    events: list[tuple[str, dict]] = []
+    for patient in DEMO_PATIENT_EVENTS:
+        pid = patient["patient_id"]
+        events.extend([
+            (
+                REFERENCE_TOPICS["PATIENTS"],
+                _demo_event_envelope("REFERENCE", "PATIENT_MASTER_UPSERT", patient, {
+                    "patient_id": pid,
+                    "name": patient["name"],
+                    "sex": patient["sex"],
+                    "age": patient["age"],
+                    "risk_tier": patient["risk_tier"],
+                }),
+            ),
+            (
+                TOPICS["EHR"],
+                _demo_event_envelope("EHR", "CLINICAL_NOTE", patient, {
+                    "diagnosis": patient["diagnosis"],
+                    "symptom": patient["symptom"],
+                    "note": f"Synthetic US clinical note: {patient['diagnosis']} with {patient['symptom']}.",
+                    "system": "Epic",
+                    "icd10_code": icd10_for(patient["diagnosis"]),
+                }),
+            ),
+            (
+                TOPICS["EHR"],
+                _demo_event_envelope("EHR", "CLINICAL_NOTE", patient, {
+                    "diagnosis": "Allergy",
+                    "symptom": patient["reaction"],
+                    "note": f"Synthetic allergy record: {patient['allergen']} causes {patient['reaction']}.",
+                    "system": "Epic",
+                    "icd10_code": icd10_for("Allergy"),
+                    "event_family": "ALLERGY_INTOLERANCE",
+                    "allergen": patient["allergen"],
+                    "reaction_severity": "moderate",
+                }),
+            ),
+            (
+                TOPICS["LIS"],
+                _demo_event_envelope("LAB", "LAB_RESULT", patient, {
+                    "lab_name": patient["lab_name"],
+                    "value": patient["lab_value"],
+                    "unit": patient["lab_unit"],
+                    "abnormal": True,
+                    "lab_panel": "CMP" if patient["lab_name"] == "eGFR" else "Diabetes",
+                    "specimen_type": "serum",
+                }),
+            ),
+            (
+                TOPICS["PHARMACY"],
+                _demo_event_envelope("PHARMACY", "MEDICATION_ORDER", patient, {
+                    "medication": patient["medication"],
+                    "drug_class": patient["medication_class"],
+                    "dose": patient["dose"],
+                    "route": "oral",
+                    "order_type": "ordered",
+                    "status": "active",
+                }),
+            ),
+            (
+                TOPICS["CLAIMS"],
+                _demo_event_envelope("CLAIMS", "CLAIM_STATUS", patient, {
+                    "claim_id": f"demo-claim-{pid}",
+                    "payer": "Medicare" if patient["age"] >= 65 else "Aetna",
+                    "procedure_code": patient["claim_code"],
+                    "procedure_description": patient["claim_description"],
+                    "diagnosis_code": icd10_for(patient["diagnosis"]),
+                    "billed_amount": 2500.0,
+                    "allowed_amount": 1800.0,
+                    "status": "approved",
+                    "claim_type": "institutional",
+                    "service_date": datetime.now(timezone.utc).date().isoformat(),
+                }),
+            ),
+        ])
+    return events
+
+
 def adt_event():
     patient = choose_patient_id()
     provider = choose_provider_id()
@@ -977,7 +1110,6 @@ wait_for_schema_registry()
 register_schema()
 avro_serializer = build_avro_serializer()
 
-
 def _on_delivery(err, msg):
     if err is not None:
         print(f"Delivery failed for {msg.topic() if msg else '?'}: {err}")
@@ -998,6 +1130,11 @@ def _emit_event(topic: str, event: dict):
     avro_payload = avro_serializer(event, SerializationContext(topic, MessageField.VALUE))
     producer.produce(topic, key=key.encode("utf-8"), value=avro_payload, on_delivery=_on_delivery)
     print(f"Produced {event['event_type']} to {topic}: {event['event_id']}")
+
+
+for _demo_topic, _demo_event in demo_patient_events():
+    _emit_event(_demo_topic, _demo_event)
+producer.flush()
 
 
 while True:

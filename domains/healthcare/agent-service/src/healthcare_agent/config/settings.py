@@ -69,8 +69,10 @@ class HealthcareAgentSettings(AgentServiceSettings):
     @classmethod
     def _validate_patient_memory_backend(cls, value: str) -> str:
         backend = value.strip().lower()
-        if backend not in {"memory", "redis"}:
-            raise ValueError("PATIENT_MEMORY_STORE_BACKEND must be 'memory' or 'redis'")
+        if backend not in {"memory", "redis", "postgres"}:
+            raise ValueError(
+                "PATIENT_MEMORY_STORE_BACKEND must be 'memory', 'redis', or 'postgres'"
+            )
         return backend
 
     @field_validator("tool_policy_path", mode="after")

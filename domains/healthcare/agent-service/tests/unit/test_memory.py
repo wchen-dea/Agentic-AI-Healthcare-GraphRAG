@@ -10,6 +10,8 @@ from healthcare_agent.orchestration.memory import (
     PatientMemoryFact,
     PatientMemoryPolicy,
     PatientMemoryRecord,
+    PostgresPatientMemoryStore,
+    RedisPatientMemoryStore,
     RedisSessionStore,
     SessionStore,
     _deserialize_session,
@@ -144,6 +146,121 @@ class GenerateSessionIdTests(unittest.TestCase):
         id1 = generate_session_id("user1", "127.0.0.1")
         id2 = generate_session_id("user2", "127.0.0.1")
         self.assertNotEqual(id1, id2)
+
+
+class PostgresPatientMemoryStoreTests(unittest.TestCase):
+    def _make_store(self, connection):
+        import types
+
+        mock_psycopg = types.ModuleType("psycopg")
+        mock_psycopg.connect = MagicMock(return_value=connection)
+        with patch.dict("sys.modules", {"psycopg": mock_psycopg}):
+            return PostgresPatientMemoryStore("postgresql://test")
+
+    def test_save_uses_transactional_upsert(self):
+        cursor = MagicMock()
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.cursor.return_value.__enter__.return_value = cursor
+        store = self._make_store(connection)
+        record = PatientMemoryRecord(
+            patient_id="p1",
+            policy=PatientMemoryPolicy(consent_granted=True),
+            facts=[PatientMemoryFact(fact_id="f1", key="risk", value="stable")],
+        )
+
+        store.save(record)
+
+        self.assertGreaterEqual(cursor.execute.call_count, 2)
+        upsert_sql = cursor.execute.call_args_list[-1].args[0]
+        self.assertIn("ON CONFLICT (patient_id) DO UPDATE", upsert_sql)
+        self.assertEqual(cursor.execute.call_args_list[-1].args[1][0], "p1")
+
+    def test_load_rehydrates_json_record(self):
+        cursor = MagicMock()
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchone.return_value = ({
+            "patient_id": "p1",
+            "facts": [{"fact_id": "f1", "key": "risk", "value": "stable"}],
+            "policy": {"consent_granted": True},
+        },)
+        store = self._make_store(connection)
+
+        loaded = store.load("p1")
+
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded.patient_id, "p1")
+        self.assertEqual(loaded.facts[0].value, "stable")
+
+    def test_delete_targets_patient_id(self):
+        cursor = MagicMock()
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.cursor.return_value.__enter__.return_value = cursor
+        store = self._make_store(connection)
+
+        store.delete("p1")
+
+        self.assertEqual(cursor.execute.call_args.args[1], ("p1",))
+
+
+class RedisPatientMemoryStoreTests(unittest.TestCase):
+    def _make_store(self, mock_client):
+        import types
+
+        mock_redis = types.ModuleType("redis")
+        mock_redis.Redis = MagicMock()
+        mock_redis.Redis.from_url = MagicMock(return_value=mock_client)
+        with patch.dict("sys.modules", {"redis": mock_redis}):
+            return RedisPatientMemoryStore(redis_url="redis://localhost:6379/0")
+
+    def test_round_trip_serializes_governed_record(self):
+        mock_client = MagicMock()
+        store = self._make_store(mock_client)
+        record = PatientMemoryRecord(
+            patient_id="p1",
+            policy=PatientMemoryPolicy(consent_granted=True),
+            facts=[
+                PatientMemoryFact(
+                    fact_id="f1",
+                    key="allergies",
+                    value="penicillin",
+                    source_type="clinician_note",
+                )
+            ],
+        )
+
+        store.save(record)
+
+        mock_client.set.assert_called_once()
+        key, payload = mock_client.set.call_args.args
+        self.assertEqual(key, "patient-memory:p1")
+
+        mock_client.get.return_value = payload
+        loaded = store.load("p1")
+
+        self.assertEqual(loaded.patient_id, "p1")
+        self.assertEqual(loaded.facts[0].fact_id, "f1")
+        self.assertEqual(loaded.facts[0].value, "penicillin")
+        self.assertTrue(loaded.policy.consent_granted)
+
+    def test_missing_record_returns_none(self):
+        mock_client = MagicMock()
+        mock_client.get.return_value = None
+        store = self._make_store(mock_client)
+
+        self.assertIsNone(store.load("unknown"))
+        mock_client.get.assert_called_once_with("patient-memory:unknown")
+
+    def test_delete_removes_patient_key(self):
+        mock_client = MagicMock()
+        store = self._make_store(mock_client)
+
+        store.delete("p1")
+
+        mock_client.delete.assert_called_once_with("patient-memory:p1")
 
 
 class DurablePatientMemoryTests(unittest.TestCase):

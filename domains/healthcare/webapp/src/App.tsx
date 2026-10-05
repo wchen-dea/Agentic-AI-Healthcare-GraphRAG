@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { config, normalizeBaseUrl } from "./config";
 import { QueryPanel } from "./components/QueryPanel";
+import { PatientMemoryPanel } from "./components/PatientMemoryPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { TurnCard } from "./components/TurnCard";
 import { useAgents } from "./hooks/useAgents";
@@ -33,6 +34,7 @@ export function App() {
   }, [theme]);
 
   const turnCount = state.turns.length;
+  const latestTurn = state.turns[turnCount - 1];
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [turnCount]);
@@ -82,6 +84,16 @@ export function App() {
           <section className="panel">
             <ErrorBoundary label="Query form">
               <QueryPanel busy={busy} onSubmit={submit} onCancel={cancelAll} />
+            </ErrorBoundary>
+          </section>
+
+          <section className="panel">
+            <ErrorBoundary label="Governed patient memory">
+              <PatientMemoryPanel
+                apiBase={apiBase}
+                patientId={latestTurn?.request.patientId}
+                answer={latestTurn?.response?.answer}
+              />
             </ErrorBoundary>
           </section>
 

@@ -59,7 +59,29 @@ config:
   MLFLOW_TRACKING_URI: "http://mlflow:5000"
   MLFLOW_EXPERIMENT_NAME: "healthcare-graphrag"
   AGENT_ALLOW_ROLE_HEADER: "false"
+  PATIENT_MEMORY_STORE_BACKEND: "postgres"
+  PATIENT_MEMORY_DATABASE_URL: "postgresql://patient_memory:change_me@patient-memory-postgres:5432/patient_memory"
 secrets: {}
+patientMemoryPostgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  database: patient_memory
+  user: patient_memory
+  password: change_me
+  storage:
+    size: 1Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 # NEO4J_PASSWORD: ""
 # OPENAI_API_KEY: ""
 # DATABRICKS_TOKEN: ""
