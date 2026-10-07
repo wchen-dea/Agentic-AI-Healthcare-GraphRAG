@@ -225,6 +225,9 @@ services:
     build:
       context: ../..
       dockerfile: domains/healthcare/webapp/Dockerfile
+      args:
+        VITE_CALLER_ID: ${VITE_CALLER_ID:-dev-clinician}
+        VITE_CALLER_ROLE: ${VITE_CALLER_ROLE:-generation}
     container_name: healthcare-webapp
     depends_on:
       - agent-service

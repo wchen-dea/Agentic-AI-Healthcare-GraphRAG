@@ -8,7 +8,11 @@ COPY domains/healthcare/webapp/ ./
 COPY domains/healthcare/agent-service/src/healthcare_agent/config/skills_layer.json /src/domains/healthcare/agent-service/src/healthcare_agent/config/skills_layer.json
 # Default API base baked into the bundle; users can override it at runtime in the UI settings.
 ARG VITE_API_BASE_URL=http://localhost:8000
+ARG VITE_CALLER_ID=dev-clinician
+ARG VITE_CALLER_ROLE=generation
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_CALLER_ID=${VITE_CALLER_ID}
+ENV VITE_CALLER_ROLE=${VITE_CALLER_ROLE}
 RUN npm test && npm run build
 
 FROM nginx:alpine

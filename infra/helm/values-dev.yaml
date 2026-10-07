@@ -61,6 +61,8 @@ flink:
     EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
     EMBEDDING_DIM: "384"
     EMBEDDING_REQUIRE_MODEL: "true"
+    QDRANT_OUTBOX_PATH: "/tmp/qdrant-outbox.sqlite3"
+
 mlflow:
   persistence:
     enabled: false
