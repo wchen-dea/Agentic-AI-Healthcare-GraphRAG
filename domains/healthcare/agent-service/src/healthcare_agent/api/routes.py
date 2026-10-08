@@ -45,7 +45,12 @@ def _dev_entitlements(raw: str) -> dict[str, set[str]]:
 def _authorize_dev_patient(
     *, settings: HealthcareAgentSettings, patient_id: str | None, caller_id: str | None
 ) -> None:
-    """Enforce the Minikube identity-to-patient mapping when enabled."""
+    """Enforce the Minikube identity-to-patient mapping when enabled.
+
+    ``*`` is supported only in this explicitly dev-only compatibility path so
+    synthetic test identities can access every patient without changing the
+    production, fail-closed entitlement authorizer.
+    """
     if not settings.dev_patient_auth_enabled:
         return
     if not caller_id:
@@ -53,7 +58,7 @@ def _authorize_dev_patient(
     if not patient_id:
         raise HTTPException(status_code=403, detail="A patient_id is required for this dev caller.")
     allowed = _dev_entitlements(settings.dev_patient_entitlements).get(caller_id, set())
-    if patient_id not in allowed:
+    if "*" not in allowed and patient_id not in allowed:
         raise HTTPException(status_code=403, detail="Caller is not entitled to this patient.")
 
 

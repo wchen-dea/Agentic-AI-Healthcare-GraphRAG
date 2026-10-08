@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import { ApiError, runRagQuery, runRagQueryStreaming, type RequestHandle } from "../api/client";
+import { ApiError, resumeRagQuery, runRagQuery, runRagQueryStreaming, type RequestHandle, type ReviewDecision } from "../api/client";
 import type { QueryRequest, QueryResponse } from "../api/types";
 import { conversationReducer, initialConversation, isBusy, type TurnRequest } from "../lib/conversation";
 
@@ -81,5 +81,26 @@ export function useConversation(apiBase: string, { stream }: ConversationOptions
     dispatch({ type: "remove", id });
   }, []);
 
-  return { state, busy: isBusy(state), submit, cancelAll, reset, remove };
+  const review = useCallback((id: string, decision: ReviewDecision) => {
+    const turn = state.turns.find((candidate) => candidate.id === id);
+    const threadId = turn?.response?.thread_id;
+    if (!turn || turn.status !== "review" || !threadId) return;
+    dispatch({ type: "review-start", id });
+    const handle = resumeRagQuery(apiBase, {
+      thread_id: threadId,
+      decision,
+      session_id: state.sessionId.slice(0, 64),
+    });
+    inflight.current.set(id, handle);
+    handle.promise
+      .then((response) => dispatch({ type: "review-succeed", id, response, at: Date.now() }))
+      .catch((error: unknown) => dispatch({
+        type: "review-fail",
+        id,
+        error: error instanceof Error ? error.message : "Review request failed.",
+      }))
+      .finally(() => inflight.current.delete(id));
+  }, [apiBase, state.sessionId, state.turns]);
+
+  return { state, busy: isBusy(state), submit, review, cancelAll, reset, remove };
 }

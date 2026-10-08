@@ -23,8 +23,8 @@ KUBE_SETUP := infra/environments/dev/setup-minikube.sh
 HC_WEB := domains/healthcare/webapp
 
 .PHONY: help \
-	compose-up compose-up-hc compose-up-sc compose-down up up-hc up-sc down \
-	build build-hc build-sc build-all restart restart-sc clean fresh pull-model \
+	compose-up compose-up-hc compose-up-sc compose-down \
+	build-hc build-sc build-all restart restart-sc clean fresh pull-model \
 	ps logs logs-sc neo4j-hc neo4j-sc qdrant-hc qdrant-sc api-hc api-sc \
 	query-hc query-sc flink-hc flink-sc mlflow topics shell-kafka \
 	web-hc-dev web-hc-test web-hc-build \
@@ -32,7 +32,7 @@ HC_WEB := domains/healthcare/webapp
 	sync lint test-core test-hc test-sc test-unit test-integration test-evals \
 	build-wheels \
 	minikube-up minikube-down minikube-ports minikube-ports-stop \
-	helm-dev helm-dev-down helm-ports helm-ports-stop helm-lint helm-prd \
+	helm-lint helm-prd \
 	kube-status kube-pods kube-logs
 
 # ---------------------------------------------------------------------------
@@ -65,12 +65,6 @@ compose-down: ## Stop Compose stacks and remove the shared network
 	$(DC_INFRA) down --remove-orphans
 	docker network rm $(NET) 2>/dev/null || true
 
-up: compose-up ## Alias for compose-up
-up-hc: compose-up-hc ## Alias for compose-up-hc
-up-sc: compose-up-sc ## Alias for compose-up-sc
-down: compose-down ## Alias for compose-down
-
-build: build-hc ## Build healthcare images
 build-hc: ## Build healthcare images
 	$(DC_HC) build
 
@@ -196,8 +190,7 @@ test-core: ## Run agent-core tests
 	cd packages/agent-core && uv run --package agent-core pytest --tb=short
 
 test-hc: ## Run healthcare tests
-\tcd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short tests/evals tests/unit/test_adversarial_inputs.py
-\tcd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short tests/evals
+\tcd domains/healthcare/agent-service && uv run --package healthcare-agent-service pytest --tb=short
 
 test-sc: ## Run supply-chain tests
 	cd domains/supply-chain/agent-service && uv run --package supply-chain-agent-service pytest --tb=short
@@ -232,15 +225,6 @@ minikube-down: ## Remove the development Helm release
 	helm uninstall $(KUBE_RELEASE) -n $(KUBE_NAMESPACE) || true
 
 minikube-ports: ## Start Minikube service port-forwards
-	$(MAKE) helm-ports
-
-minikube-ports-stop: ## Stop Minikube service port-forwards
-	$(MAKE) helm-ports-stop
-
-helm-dev: minikube-up ## Alias for minikube-up
-helm-dev-down: minikube-down ## Alias for minikube-down
-
-helm-ports: ## Start Minikube service port-forwards
 	@pkill -f "port-forward" 2>/dev/null || true
 	@kubectl -n $(KUBE_NAMESPACE) port-forward svc/agent-service 8000:8000 >/dev/null 2>&1 &
 	@kubectl -n $(KUBE_NAMESPACE) port-forward svc/provider-web 8088:80 >/dev/null 2>&1 &
@@ -256,7 +240,7 @@ helm-ports: ## Start Minikube service port-forwards
 	@echo "Patient memory PostgreSQL: postgresql://patient_memory:change_me@localhost:5432/patient_memory"
 	@echo "Conduktor: http://localhost:9080"
 
-helm-ports-stop: ## Stop Minikube service port-forwards
+minikube-ports-stop: ## Stop Minikube service port-forwards
 	@pkill -f "port-forward" 2>/dev/null || true
 	@echo "Port-forwards stopped."
 

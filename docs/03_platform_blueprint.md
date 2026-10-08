@@ -8,15 +8,15 @@ For what the components do, see [Architecture](02_architecture.md). For data flo
 
 | Mode | Entry point | Use for | Data stores |
 | --- | --- | --- | --- |
-| Local compose | `make up`, `make up-hc`, `make up-sc` | Development and demos on one machine | Containers on `graphrag-net` |
-| Minikube + Helm | `make helm-dev` | Rehearsing the Kubernetes deployment | In-cluster Kafka, Neo4j, Qdrant |
+| Local compose | `make compose-up`, `make compose-up-hc`, `make compose-up-sc` | Development and demos on one machine | Containers on `graphrag-net` |
+| Minikube + Helm | `make minikube-up` | Rehearsing the Kubernetes deployment | In-cluster Kafka, Neo4j, Qdrant |
 | Production compose | `infra/environments/production/docker-compose.ai.yml` | Single-host agent + web deployment | External Qdrant and Neo4j |
 | EKS + Helm | `.github/workflows/deploy-ai-prd.yml` | Production | External Qdrant and Neo4j |
 
 ```mermaid
 flowchart LR
-    dev[Developer laptop] -->|make up| compose[Docker Compose<br/>infra + healthcare + supply-chain]
-    dev -->|make helm-dev| mk[Minikube<br/>values-dev.yaml]
+    dev[Developer laptop] -->|make compose-up| compose[Docker Compose<br/>infra + healthcare + supply-chain]
+    dev -->|make minikube-up| mk[Minikube<br/>values-dev.yaml]
     prd[Push to prd branch] -->|deploy-ai-prd.yml| eks[EKS<br/>values-production.yaml]
     eks --> ext[(External Qdrant / Neo4j)]
     eks --> bedrock[Amazon Bedrock]
@@ -58,11 +58,9 @@ MINIKUBE_CPUS=4 MINIKUBE_MEMORY=20480 make minikube-up
 
 Use `kubectl -n healthcare-ai-dev get pods` and `kubectl -n healthcare-ai-dev logs` for Kubernetes diagnostics. `make minikube-down` removes the Helm release; `minikube delete` removes the cluster and its node-local images.
 
-The legacy aliases `make up` and `make up-hc` remain Compose aliases; `make helm-dev` remains a Minikube alias.
-
 ### Stacks
 
-The Makefile runs three compose projects on one external Docker network, `graphrag-net`, which `make up` creates and `make down` removes.
+The Makefile runs three compose projects on one external Docker network, `graphrag-net`, which `make compose-up` creates and `make compose-down` removes.
 
 | Project | Compose file | Contents |
 | --- | --- | --- |
@@ -74,13 +72,13 @@ Common targets:
 
 | Target | Effect |
 | --- | --- |
-| `make up` | Infra + both domains |
-| `make up-hc` / `make up-sc` | Infra + one domain |
+| `make compose-up` | Infra + both domains |
+| `make compose-up-hc` / `make compose-up-sc` | Infra + one domain |
 | `make build-hc` / `make build-sc` / `make build-all` | Build domain images |
 | `make restart` / `make restart-sc` | Recreate one domain |
-| `make down` | Stop everything and remove the network |
+| `make compose-down` | Stop everything and remove the network |
 | `make clean` | Stop everything, remove volumes, prune Docker |
-| `make fresh` | `clean`, `up`, then `pull-model` (Ollama `llama3.1`) |
+| `make fresh` | `clean`, `compose-up`, then `pull-model` (Ollama `llama3.1`) |
 
 ### Startup order
 
@@ -120,7 +118,7 @@ Agent and web services are ClusterIP by default with CPU-based HPAs. The agent c
 
 ### Minikube (dev)
 
-`make helm-dev` runs `infra/environments/dev/setup-minikube.sh`:
+`make minikube-up` runs `infra/environments/dev/setup-minikube.sh`:
 
 1. Starts Minikube (`MINIKUBE_CPUS=4`, `MINIKUBE_MEMORY=16384`, `MINIKUBE_DRIVER=docker`).
 2. Builds four images in the Minikube Docker daemon: agent-service, producer, Flink, provider-web.

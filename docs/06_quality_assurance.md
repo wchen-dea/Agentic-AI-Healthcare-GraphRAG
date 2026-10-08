@@ -130,7 +130,7 @@ Answers must be grounded in retrieved evidence and cite it. `score_grounding` is
 
 ## 9. Live smoke tests
 
-With the stack running (`make up` — see [08 — Operation Runbook](08_operation_runbook.md)):
+With the stack running (`make compose-up` — see [08 — Operation Runbook](08_operation_runbook.md)):
 
 ```bash
 make validate                                   # cross-domain stack validation

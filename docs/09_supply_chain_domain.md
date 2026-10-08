@@ -203,7 +203,7 @@ The embedded MCP server is named `SupplyChainGraphRAG MCP` and serves streamable
 ## 8. Quick start
 
 ```bash
-make up-sc        # infra + supply chain; `make up` starts both domains
+make compose-up-sc        # infra + supply chain; `make compose-up` starts both domains
 ```
 
 Without the Makefile:

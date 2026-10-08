@@ -41,6 +41,15 @@ export interface RequestHandle<T> {
   cancel: () => void;
 }
 
+function requestHeaders(accept?: string): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    ...(accept ? { Accept: accept } : {}),
+    ...(config.callerId ? { "X-Caller-Id": config.callerId } : {}),
+    ...(config.callerRole ? { "X-Caller-Role": config.callerRole } : {}),
+  };
+}
+
 /** One AbortController backs both the timeout and user cancellation. */
 function withAbort<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs = config.requestTimeoutMs): RequestHandle<T> {
   const controller = new AbortController();
@@ -87,11 +96,21 @@ async function ensureOk(response: Response): Promise<void> {
   throw new ApiError("http", `HTTP ${response.status}${detail ? `: ${detail}` : ""}`, response.status);
 }
 
+export type ReviewDecision = "approve" | "reject";
+export interface ResumeRequest { thread_id: string; decision: ReviewDecision; note?: string; session_id?: string; }
+export function resumeRagQuery(apiBase: string, payload: ResumeRequest): RequestHandle<QueryResponse> {
+  return withAbort(async (signal) => {
+    const response = await fetch(`${normalizeBaseUrl(apiBase)}/query/resume`, { method: "POST", headers: requestHeaders(), body: JSON.stringify(payload), signal });
+    await ensureOk(response);
+    return parseQueryResponse(await readJsonSafe(response));
+  });
+}
+
 export function runRagQuery(apiBase: string, payload: QueryRequest): RequestHandle<QueryResponse> {
   return withAbort(async (signal) => {
     const response = await fetch(`${normalizeBaseUrl(apiBase)}/query`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: requestHeaders(),
       body: JSON.stringify(payload),
       signal,
     });
@@ -151,7 +170,7 @@ export function streamRagQuery(apiBase: string, payload: QueryRequest, onStep: S
   return withAbort(async (signal) => {
     const response = await fetch(`${normalizeBaseUrl(apiBase)}/query/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      headers: requestHeaders("text/event-stream"),
       body: JSON.stringify(payload),
       signal,
     });
@@ -197,7 +216,7 @@ export function writePatientMemory(
     const response = await fetch(`${normalizeBaseUrl(apiBase)}/patient-memory`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        ...requestHeaders(),
         "X-Caller-Role": "memory_write",
       },
       body: JSON.stringify(payload),

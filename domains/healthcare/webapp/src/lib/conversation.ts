@@ -1,7 +1,7 @@
 // Pure state for the multi-turn conversation. No I/O here.
 import type { AgentProgressStep, ApiMode, QueryResponse } from "../api/types";
 
-export type TurnStatus = "pending" | "success" | "error" | "cancelled" | "timeout";
+export type TurnStatus = "pending" | "review" | "reviewing" | "success" | "error" | "cancelled" | "timeout";
 
 export interface TurnRequest {
   mode: ApiMode;
@@ -34,7 +34,10 @@ export type ConversationAction =
   | { type: "start"; id: string; request: TurnRequest; at: number }
   | { type: "progress"; id: string; step: AgentProgressStep }
   | { type: "succeed"; id: string; response: QueryResponse; at: number }
-  | { type: "fail"; id: string; status: Exclude<TurnStatus, "pending" | "success">; error: string; at: number }
+  | { type: "review-start"; id: string }
+  | { type: "review-fail"; id: string; error: string }
+  | { type: "review-succeed"; id: string; response: QueryResponse; at: number }
+  | { type: "fail"; id: string; status: Exclude<TurnStatus, "pending" | "review" | "reviewing" | "success">; error: string; at: number }
   | { type: "remove"; id: string }
   | { type: "reset"; sessionId: string };
 
@@ -42,11 +45,11 @@ export function initialConversation(sessionId: string): ConversationState {
   return { sessionId, turns: [] };
 }
 
-function update(state: ConversationState, id: string, patch: (t: Turn) => Turn): ConversationState {
+function update(state: ConversationState, id: string, patch: (t: Turn) => Turn, allowed: TurnStatus[] = ["pending"]): ConversationState {
   let changed = false;
   const turns = state.turns.map((t) => {
     // Only pending turns can transition; late results for cancelled turns are ignored.
-    if (t.id !== id || t.status !== "pending") return t;
+    if (t.id !== id || !allowed.includes(t.status)) return t;
     changed = true;
     return patch(t);
   });
@@ -63,7 +66,24 @@ export function conversationReducer(state: ConversationState, action: Conversati
     case "progress":
       return update(state, action.id, (t) => ({ ...t, steps: [...(t.steps ?? []), action.step] }));
     case "succeed":
-      return update(state, action.id, (t) => ({ ...t, status: "success", response: action.response, finishedAt: action.at }));
+      return update(state, action.id, (t) => ({
+        ...t,
+        status: action.response.status === "pending_review" || action.response.status === "pending_approval" ? "review" : "success",
+        response: action.response,
+        finishedAt: action.at,
+      }));
+    case "review-start":
+      return update(state, action.id, (t) => ({ ...t, status: "reviewing", error: undefined }), ["review"]);
+    case "review-fail":
+      return update(state, action.id, (t) => ({ ...t, status: "review", error: action.error }), ["reviewing"]);
+    case "review-succeed":
+      return update(state, action.id, (t) => ({
+        ...t,
+        status: "success",
+        response: action.response,
+        finishedAt: action.at,
+        error: undefined,
+      }), ["reviewing"]);
     case "fail":
       return update(state, action.id, (t) => ({ ...t, status: action.status, error: action.error, finishedAt: action.at }));
     case "remove":
@@ -74,5 +94,5 @@ export function conversationReducer(state: ConversationState, action: Conversati
 }
 
 export function isBusy(state: ConversationState): boolean {
-  return state.turns.some((t) => t.status === "pending");
+  return state.turns.some((t) => t.status === "pending" || t.status === "reviewing");
 }
