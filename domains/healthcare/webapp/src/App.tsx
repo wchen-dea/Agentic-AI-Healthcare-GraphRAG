@@ -26,7 +26,7 @@ export function App() {
   const [apiDraft, setApiDraft] = useState(apiBase);
   const { health, checking, refresh } = useHealth(apiBase);
   const { agents } = useAgents(apiBase);
-  const { state, busy, submit, cancelAll, reset, remove } = useConversation(apiBase, { stream: streaming === "on" });
+  const { state, busy, submit, review, cancelAll, reset, remove } = useConversation(apiBase, { stream: streaming === "on" });
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -163,7 +163,7 @@ export function App() {
             state.turns.map((turn, i) => (
               <div key={turn.id} ref={i === turnCount - 1 ? endRef : undefined}>
                 <ErrorBoundary label="This result">
-                  <TurnCard turn={turn} onRemove={() => remove(turn.id)} onRetry={() => submit(turn.request)} />
+                  <TurnCard turn={turn} onRemove={() => remove(turn.id)} onRetry={() => submit(turn.request)} onReview={(decision) => review(turn.id, decision)} />
                 </ErrorBoundary>
               </div>
             ))

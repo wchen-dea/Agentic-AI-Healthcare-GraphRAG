@@ -15,8 +15,8 @@ agent-service:
     NEO4J_USER: "neo4j"
     KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
     SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
-    LLM_PROVIDER: "databricks"
-    LLM_MODEL: "databricks-gpt-5-6-luna"
+    LLM_PROVIDER: "ollama"
+    LLM_MODEL: "llama3.1"
     EMBEDDING_PROVIDER: "local"
     EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
     EMBEDDING_DIM: "384"
@@ -24,7 +24,7 @@ agent-service:
     LLM_TIMEOUT_SECONDS: "300"
     LLM_MAX_TOKENS: "4096"
     DATABRICKS_HOST: "https://dbc-baff2b7f-4402.cloud.databricks.com"
-    OLLAMA_URL: ""
+    OLLAMA_URL: "http://ollama:11434"
     MCP_SERVER_NAME: "HealthcareGraphRAG MCP (dev)"
     LANGGRAPH_MAX_ITERATIONS: "3"
     MLFLOW_TRACKING_URI: "http://mlflow:5000"
@@ -34,7 +34,8 @@ agent-service:
     MCP_AUTH_REQUIRED: "true"
     # Minikube-only synthetic identity-to-patient entitlement guard.
     DEV_PATIENT_AUTH_ENABLED: "true"
-    DEV_PATIENT_ENTITLEMENTS: "dev-clinician=patient-0001,patient-0002,patient-0003,patient-0004,patient-0050,patient-0082"
+    # Dev-only test identity: '*' grants access to all synthetic patients.
+    DEV_PATIENT_ENTITLEMENTS: "dev-clinician=*"
     HITL_ENABLED: "true"
     HITL_MAX_PENDING: "1000"
     LANGGRAPH_CHECKPOINT_POSTGRES_URI: ""
@@ -82,7 +83,7 @@ neo4j:
 qdrant:
   enabled: true
 ollama:
-  enabled: false
+  enabled: true
 conduktor:
   enabled: true
   service:

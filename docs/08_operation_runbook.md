@@ -167,8 +167,9 @@ curl -s -X POST localhost:8000/query \
 ```
 
 The Minikube profile enables a synthetic patient-entitlement guard. Patient-scoped
-requests must include `X-Caller-Id`; the configured `dev-clinician` identity is
-limited to the synthetic patients listed in `infra/helm/values-dev.yaml`.
+requests must include `X-Caller-Id`; the configured `dev-clinician` identity uses
+the dev-only `*` entitlement for all synthetic patients. Replace it with an
+explicit patient list when narrower test scope is required.
 
 In production, set `PATIENT_SCOPE_AUTH_REQUIRED=true` and inject
 `PATIENT_SCOPE_ENTITLEMENTS` through a Kubernetes Secret or trusted gateway
@@ -273,6 +274,30 @@ After any change to these settings, re-index:
 - Completed and paused graph runs retain checkpoint history for audit and time-travel operations. The oldest history entry may be the input checkpoint and can lack final-state fields such as `question`.
 
 ## 9. Kubernetes and Helm
+
+### Current implementation status
+
+The Kubernetes development path now supports the end-to-end clinical testing
+workflow. HITL approval is expected to resume a paused run from
+`human_review` through `synthesis` and `output_guardrail`; retrieval and review
+should not run again. The Minikube profile enables HITL and uses the patient-memory
+PostgreSQL service for restart-safe LangGraph checkpoints.
+
+For development testing only, `dev-clinician` has the dev-only `*` patient
+entitlement and can query all synthetic patients. This is configured through
+`DEV_PATIENT_AUTH_ENABLED=true` and `DEV_PATIENT_ENTITLEMENTS` in
+`infra/helm/values-dev.yaml`. Production continues to use the separate,
+fail-closed `PATIENT_SCOPE_ENTITLEMENTS` configuration.
+
+If approval resume returns `ResponseHandlingException` or appears to execute a
+query repeatedly, first collect the complete `/query/resume` response and
+agent-service logs. Then verify that the frontend and backend image revisions
+match, that the PostgreSQL checkpoint configuration is active, and that all
+requests reach a service replica with access to the shared checkpoint store.
+After code or Helm-value changes, rebuild the Minikube images and run
+`make helm-dev`; do not treat existing healthy pods as proof that the new
+revision is deployed. Confirm the Helm revision and deployment rollouts before
+testing the UI.
 
 The umbrella chart is `infra/helm` with sub-charts under `infra/helm/charts`. Dev uses namespace `healthcare-ai-dev` (release `healthcare-dev`); production uses `healthcare-ai` (release `healthcare`). See [03 — Platform Blueprint](03_platform_blueprint.md#3-kubernetes-with-helm).
 

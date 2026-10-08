@@ -156,6 +156,9 @@ export function parseAgents(value: unknown): AgentCard[] {
 
 const KNOWN_KEYS = new Set([
   "answer",
+  "status",
+  "thread_id",
+  "human_review",
   "question",
   "request_type",
   "retrieval_plan",
@@ -181,6 +184,9 @@ export function parseQueryResponse(value: unknown): QueryResponse {
   const answer = str(data.answer) ?? str(data.summary) ?? "";
   return {
     answer,
+    status: str(data.status),
+    thread_id: str(data.thread_id),
+    human_review: isRecord(data.human_review) ? data.human_review : undefined,
     question: str(data.question),
     request_type: str(data.request_type),
     retrieval_plan: parsePlan(data.retrieval_plan),

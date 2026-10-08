@@ -12,6 +12,8 @@ type Tab = "answer" | "evidence" | "graph" | "trace" | "tool" | "raw";
 
 const STATUS_LABEL: Record<Turn["status"], string> = {
   pending: "Running…",
+  review: "Clinical review required",
+  reviewing: "Submitting review…",
   success: "Done",
   error: "Error",
   cancelled: "Cancelled",
@@ -47,7 +49,7 @@ function AgentSteps({ steps }: { steps: AgentProgressStep[] }) {
   );
 }
 
-export function TurnCard({ turn, onRemove, onRetry }: { turn: Turn; onRemove: () => void; onRetry: () => void }) {
+export function TurnCard({ turn, onRemove, onRetry, onReview }: { turn: Turn; onRemove: () => void; onRetry: () => void; onReview?: (decision: "approve" | "reject") => void }) {
   const [selectedTab, setTab] = useState<Tab | null>(null);
   const r = turn.response;
   const hasExtra = r !== undefined && Object.keys(r.extra).length > 0;
@@ -76,7 +78,17 @@ export function TurnCard({ turn, onRemove, onRetry }: { turn: Turn; onRemove: ()
         <div className="turn-actions">
           <span className={`status-pill status-${turn.status}`}>{STATUS_LABEL[turn.status]}</span>
           <Elapsed turn={turn} />
-          {turn.status !== "pending" && (
+          {turn.status === "review" && turn.response?.thread_id && onReview && (
+            <>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => onReview("approve")}>
+                Approve
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => onReview("reject")}>
+                Reject
+              </button>
+            </>
+          )}
+          {turn.status !== "pending" && turn.status !== "reviewing" && (
             <>
               <button type="button" className="btn btn-ghost btn-sm" onClick={onRetry}>
                 Re-run
@@ -98,7 +110,7 @@ export function TurnCard({ turn, onRemove, onRetry }: { turn: Turn; onRemove: ()
             </>
           )}
           <button type="button" className="btn btn-ghost btn-sm" onClick={onRemove} aria-label="Remove result">
-            {turn.status === "pending" ? "Cancel" : "✕"}
+            {turn.status === "pending" || turn.status === "reviewing" ? "Cancel" : "✕"}
           </button>
         </div>
       </header>
@@ -110,6 +122,14 @@ export function TurnCard({ turn, onRemove, onRetry }: { turn: Turn; onRemove: ()
           <div />
           <div />
           <div />
+        </div>
+      )}
+
+      {turn.status === "review" && (
+        <div className="alert alert-warn" role="status">
+          <strong>Review required before synthesis.</strong>
+          {r?.human_review?.reason ? <span> Reason: {r.human_review.reason}.</span> : null}
+          <div className="small muted">Review the retrieved evidence, then approve or reject this assessment.</div>
         </div>
       )}
 

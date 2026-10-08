@@ -127,6 +127,9 @@ export interface StructuredClinicalResponse {
 
 export interface QueryResponse {
   answer: string;
+  status?: string;
+  thread_id?: string;
+  human_review?: { reason?: string; decision?: string; note?: string; [key: string]: unknown };
   question?: string;
   request_type?: string;
   retrieval_plan?: RetrievalPlan;
