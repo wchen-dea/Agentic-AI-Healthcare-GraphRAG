@@ -34,7 +34,7 @@ eval $(minikube docker-env)
 docker build -q -f "$REPO_ROOT/domains/healthcare/agent-service/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-agent-service:latest "$REPO_ROOT"
 docker build -q -f "$REPO_ROOT/domains/healthcare/data-pipelines/producer/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-producer:latest "$REPO_ROOT"
 docker build -q -f "$REPO_ROOT/domains/healthcare/data-pipelines/flink-job/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-flink-healthcare:latest "$REPO_ROOT"
-docker build -q --build-arg VITE_CALLER_ID="${VITE_CALLER_ID:-dev-clinician}" --build-arg VITE_CALLER_ROLE="${VITE_CALLER_ROLE:-generation}" -f "$REPO_ROOT/domains/healthcare/webapp/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest "$REPO_ROOT"
+docker build -q --build-arg VITE_CALLER_ID="${VITE_CALLER_ID:-dev-clinician}" --build-arg VITE_CALLER_ROLE="${VITE_CALLER_ROLE:-generation}" --build-arg VITE_REQUEST_TIMEOUT_MS="${VITE_REQUEST_TIMEOUT_MS:-360000}" -f "$REPO_ROOT/domains/healthcare/webapp/Dockerfile" -t ghcr.io/wchen-dea/agentic-ai-healthcare-graphrag-provider-web:latest "$REPO_ROOT"
 echo "Images built."
 
 # Install or upgrade via Helm

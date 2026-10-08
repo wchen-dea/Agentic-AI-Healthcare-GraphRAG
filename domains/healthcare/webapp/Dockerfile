@@ -10,9 +10,11 @@ COPY domains/healthcare/agent-service/src/healthcare_agent/config/skills_layer.j
 ARG VITE_API_BASE_URL=http://localhost:8000
 ARG VITE_CALLER_ID=dev-clinician
 ARG VITE_CALLER_ROLE=generation
+ARG VITE_REQUEST_TIMEOUT_MS=360000
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_CALLER_ID=${VITE_CALLER_ID}
 ENV VITE_CALLER_ROLE=${VITE_CALLER_ROLE}
+ENV VITE_REQUEST_TIMEOUT_MS=${VITE_REQUEST_TIMEOUT_MS}
 RUN npm test && npm run build
 
 FROM nginx:alpine
