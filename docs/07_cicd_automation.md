@@ -140,8 +140,8 @@ Ontology changes change graph semantics for every consumer, so they need an expl
 
 | Environment | Entry point | Release / namespace | Notes |
 | --- | --- | --- | --- |
-| Local compose | `make up`, `make up-hc`, `make up-sc` | n/a | Full stack, local embeddings |
-| Minikube dev | `make helm-dev` (`infra/environments/dev/setup-minikube.sh`) | `healthcare-dev` / `healthcare-ai-dev` | `values-dev.yaml`, 1 replica, NodePort 30800 |
+| Local compose | `make compose-up`, `make compose-up-hc`, `make compose-up-sc` | n/a | Full stack, local embeddings |
+| Minikube dev | `make minikube-up` (`infra/environments/dev/setup-minikube.sh`) | `healthcare-dev` / `healthcare-ai-dev` | `values-dev.yaml`, 1 replica, NodePort 30800 |
 | Production (EKS) | `deploy-ai-prd.yml` (`make helm-prd` renders a dry-run) | `healthcare` / `healthcare-ai` | `values-production.yaml`, HPA, external Neo4j/Qdrant, Bedrock |
 | Production compose | `infra/environments/production/docker-compose.ai.yml` | n/a | Single-host AI tier plus monitoring compose |
 

@@ -44,7 +44,7 @@ Choose the path that matches your goal:
 Use the Makefile for the default local workflow.
 
 ```bash
-make up
+make compose-up
 make api-hc
 make query-hc
 make validate-docs
@@ -52,9 +52,9 @@ make validate-docs
 
 Common targets:
 
-- `make up` starts the shared infra plus both domains.
-- `make up-hc` starts the healthcare domain.
-- `make up-sc` starts the supply-chain domain.
+- `make compose-up` starts the shared infra plus both domains.
+- `make compose-up-hc` starts the healthcare domain.
+- `make compose-up-sc` starts the supply-chain domain.
 - `make validate` runs stack validation.
 - `make validate-docs` runs markdownlint.
 - `make test-unit` runs unit tests across the workspace.
@@ -119,7 +119,7 @@ Choose one path for local development:
 | Docker Compose only | `make compose-up` | `make compose-down` | Docker containers on `graphrag-net` |
 | Minikube with Docker driver | `make minikube-up` | `make minikube-down` | Kubernetes pods inside a Docker-backed Minikube node |
 
-For Minikube service access, run `make minikube-ports`. See [03 — Platform Blueprint](docs/03_platform_blueprint.md#2-local-deployment-paths) for prerequisites and details. The existing `make up` and `make up-hc` commands remain Compose aliases.
+For Minikube service access, run `make minikube-ports`. See [03 — Platform Blueprint](docs/03_platform_blueprint.md#2-local-deployment-paths) for prerequisites and details.
 
 Put your real `DATABRICKS_TOKEN` in the gitignored `infra/helm/values-dev.local.yaml`; `make minikube-up` applies it automatically. Never commit it.
 

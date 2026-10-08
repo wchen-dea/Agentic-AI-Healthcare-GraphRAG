@@ -87,22 +87,22 @@ Use `minikube delete` for a full cluster reset. Do not use `make compose-down` t
 
 | Task | Command |
 | --- | --- |
-| Start infra and both domains | `make up` |
-| Start infra and one domain | `make up-hc` or `make up-sc` |
+| Start infra and both domains | `make compose-up` |
+| Start infra and one domain | `make compose-up-hc` or `make compose-up-sc` |
 | Pull the local LLM | `make pull-model` (`llama3.1` into `infra-ollama`) |
-| Build images | `make build` (healthcare), `make build-sc`, `make build-all` |
+| Build images | `make build-hc`, `make build-sc`, `make build-all` |
 | Restart one domain | `make restart` (healthcare) or `make restart-sc` |
-| Stop everything | `make down` (uses `--remove-orphans`) |
+| Stop everything | `make compose-down` (uses `--remove-orphans`) |
 | Wipe volumes and prune | `make clean` |
-| Rebuild from scratch | `make fresh` (`clean`, `up`, `pull-model`) |
+| Rebuild from scratch | `make fresh` (`clean`, `compose-up`, `pull-model`) |
 | Container status | `make ps` |
 | Follow logs | `make logs` (healthcare) or `make logs-sc` |
 | List Kafka topics | `make topics` |
 
 Resets:
 
-- **Soft reset** keeps data: `make down && make up`.
-- **Hard reset** deletes Neo4j, Qdrant, Kafka and MLflow volumes: `make clean && make up && make pull-model`. The `neo4j-init` containers re-seed the ontology and the producers repopulate the stores.
+- **Soft reset** keeps data: `make compose-down && make compose-up`.
+- **Hard reset** deletes Neo4j, Qdrant, Kafka and MLflow volumes: `make clean && make compose-up && make pull-model`. The `neo4j-init` containers re-seed the ontology and the producers repopulate the stores.
 
 ## 3. Health checklist
 
@@ -295,7 +295,7 @@ agent-service logs. Then verify that the frontend and backend image revisions
 match, that the PostgreSQL checkpoint configuration is active, and that all
 requests reach a service replica with access to the shared checkpoint store.
 After code or Helm-value changes, rebuild the Minikube images and run
-`make helm-dev`; do not treat existing healthy pods as proof that the new
+`make minikube-up`; do not treat existing healthy pods as proof that the new
 revision is deployed. Confirm the Helm revision and deployment rollouts before
 testing the UI.
 
@@ -303,7 +303,7 @@ The umbrella chart is `infra/helm` with sub-charts under `infra/helm/charts`. De
 
 | Task | Command |
 | --- | --- |
-| Deploy to minikube | `make helm-dev` (runs `infra/environments/dev/setup-minikube.sh`) |
+| Deploy to minikube | `make minikube-up` (runs `infra/environments/dev/setup-minikube.sh`) |
 | Port-forward services | `make minikube-ports`; stop with `make minikube-ports-stop` |
 | Tear down dev | `make minikube-down` |
 | Lint and render | `make helm-lint`, `make helm-prd` (dry-run only) |
@@ -360,10 +360,10 @@ kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| "Found orphan containers" | Old services from earlier layouts | `make down` (uses `--remove-orphans`) |
+| "Found orphan containers" | Old services from earlier layouts | `make compose-down` (uses `--remove-orphans`) |
 | Agent `503` | Neo4j or Qdrant not ready | Wait for health checks; check `make ps` |
 | LLM calls fail on first start | Ollama model not pulled | `make pull-model` |
-| Network `graphrag-net` not found | Domain started without infra | `make up` or `make up-hc` |
+| Network `graphrag-net` not found | Domain started without infra | `make compose-up` or `make compose-up-hc` |
 
 ### Flink
 
@@ -389,9 +389,9 @@ kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `K8S_APISERVER_MISSING` | Stale cluster state | `minikube delete && make helm-dev` |
+| `K8S_APISERVER_MISSING` | Stale cluster state | `minikube delete && make minikube-up` |
 | Pods crash on env var collisions | Kubernetes service links | Charts set `enableServiceLinks: false`; keep it |
-| Ollama `OOMKilled` | Not enough memory | `MINIKUBE_MEMORY=20480 make helm-dev` |
+| Ollama `OOMKilled` | Not enough memory | `MINIKUBE_MEMORY=20480 make minikube-up` |
 | `ImagePullBackOff` | Image built outside minikube's Docker | `eval $(minikube docker-env)` and rebuild; the setup script does this |
 | Flink task manager cannot register | RPC port blocked | Check port 6124 in the network policy |
 | Port-forward drops | `kubectl` limit on long connections | Re-run `make minikube-ports` |

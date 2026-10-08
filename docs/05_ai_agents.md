@@ -281,7 +281,7 @@ MLflow tracing is optional and is independent from Prometheus metrics and the go
 Start the infrastructure and healthcare services, then set the tracking configuration before starting the agent service:
 
 ```bash
-make up
+make compose-up
 export MLFLOW_TRACKING_URI=http://localhost:5000
 export MLFLOW_EXPERIMENT_NAME=healthcare-graphrag
 make query-hc
