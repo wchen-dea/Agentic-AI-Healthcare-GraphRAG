@@ -85,7 +85,7 @@ Sources:
 | Inter-agent communication | Gap. Specialists write to shared graph state and don't exchange messages. |
 | Domain-specific tool planning | Implemented. `skills_layer.json` maps business goals to skills and tool chains. |
 | Verification checkpoints | Partial. `confidence_evaluator` gates synthesis and optional human review gates release. Specialist outputs are not cross-checked. |
-| Composite evaluation | Partial. MLflow has six scorers: routing, agent coverage, evidence completeness, answer quality, safety caveat and latency ([Evaluation gates](06_quality_assurance.md#5-evaluation-gates-and-mlflow-evaluation)). There is no factuality or ROUGE metric. |
+| Composite evaluation | Partial. MLflow has six scorers: routing, agent coverage, evidence completeness, answer quality, safety caveat and latency ([Evaluation gates](06_quality_assurance.md#5-evaluation-gates-and-mlflow-evaluation)). `factuality.py` adds a deterministic term-level factuality score gated offline; there is no ROUGE metric. |
 | Workflow integration | Gap. Nothing is integrated with Teams, Slack or EHR messaging. |
 
 ## 6. Extension roadmap

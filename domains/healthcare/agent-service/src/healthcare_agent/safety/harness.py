@@ -130,34 +130,21 @@ def check_input_safety(question: str) -> GuardResult:
 
 # ── Post-generation output guards ─────────────────────────────────────────────
 
-_UNSAFE_OUTPUT_PATTERNS = [
-    re.compile(r"\b(social\s+security\s+number|ssn)\b", re.IGNORECASE),
-    re.compile(r"\bcredit\s+card\s+number\b", re.IGNORECASE),
-    re.compile(r"\bpassword\b.*\b(is|:)\s*\S+", re.IGNORECASE),
-]
-
-_SAFETY_CAVEAT_PHRASES = [
-    "not medical advice",
-    "consult",
-    "clinical judgment",
-    "demo data",
-    "synthetic",
-    "safety caveat",
-    "not a substitute",
-    "healthcare professional",
-]
-
-
 def check_output_safety(answer: str) -> GuardResult:
-    """Validate that generated output doesn't contain unsafe content."""
-    reasons: list[str] = []
+    """Validate generated output with the shared clinical rule engine.
 
-    for pattern in _UNSAFE_OUTPUT_PATTERNS:
-        if pattern.search(answer):
-            reasons.append("sensitive_data_in_output")
-            break
+    Blocks fail the guard; ``caveat_required`` passes and is reported in reasons
+    so callers can append the standard caveat via ``apply_output_policy``.
+    """
+    from healthcare_agent.safety.clinical_rules import evaluate_output
 
-    return GuardResult(passed=len(reasons) == 0, reasons=tuple(reasons))
+    decision = evaluate_output(answer)
+    if decision.blocked:
+        reasons = ("sensitive_data_in_output",) if decision.category == "sensitive_data" else decision.reasons
+        return GuardResult(passed=False, reasons=reasons)
+    if decision.verdict == "caveat_required":
+        return GuardResult(passed=True, reasons=("caveat_required",))
+    return GuardResult(passed=True)
 
 
 def check_output_grounding(
@@ -172,8 +159,9 @@ def check_output_grounding(
         reasons.append("empty_answer")
         return GuardResult(passed=False, reasons=tuple(reasons))
 
-    has_safety = any(p in answer.lower() for p in _SAFETY_CAVEAT_PHRASES)
-    if not has_safety:
+    from healthcare_agent.safety.clinical_rules import has_safety_caveat
+
+    if not has_safety_caveat(answer):
         reasons.append("missing_safety_caveat")
 
     if not vector_context and not graph_context:

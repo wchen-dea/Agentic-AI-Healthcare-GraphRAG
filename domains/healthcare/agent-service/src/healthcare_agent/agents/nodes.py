@@ -378,22 +378,38 @@ def input_guardrail(state: HealthcareAgentState) -> dict[str, Any]:
 
 
 def output_guardrail(state: HealthcareAgentState) -> dict[str, Any]:
-    """Withhold unsafe generated answers before they leave the orchestrator."""
-    from healthcare_agent.safety.guardrails import classify_output
+    """Withhold unsafe answers and append the standard caveat when one is required.
 
-    check = classify_output(state.get("answer", ""))
+    Grounding is advisory: a low-grounding result is recorded in the
+    trace message but does not block, to avoid withholding valid answers.
+    """
+    from healthcare_agent.safety.clinical_rules import apply_output_policy
+    from healthcare_agent.safety.guardrails import classify_grounding
+
+    answer = state.get("answer", "")
+    evidence = [*state.get("vector_context", []), *state.get("graph_context", [])]
+    decision = apply_output_policy(answer, evidence=evidence)
     guardrails = dict(state.get("guardrails") or {})
-    if check.passed:
-        guardrails["output_blocked"] = False
+    if decision.blocked:
+        guardrails.update({"output_blocked": True, "category": decision.category})
         return {
             "guardrails": guardrails,
-            "messages": [{"agent": "output_guardrail", "action": "pass"}],
+            "answer": "Response withheld due to safety review.",
+            "structured_response": {},
+            "final_reason": "output_blocked",
+            "messages": [{"agent": "output_guardrail", "action": "block", "reason": decision.category}],
         }
-    guardrails.update({"output_blocked": True, "category": check.category})
-    return {
+
+    grounding = classify_grounding(answer, evidence)
+    guardrails["output_blocked"] = False
+    update: dict[str, Any] = {
         "guardrails": guardrails,
-        "answer": "Response withheld due to safety review.",
-        "structured_response": {},
-        "final_reason": "output_blocked",
-        "messages": [{"agent": "output_guardrail", "action": "block", "reason": check.category}],
+        "messages": [{
+            "agent": "output_guardrail",
+            "action": "caveat_appended" if decision.verdict == "caveat_required" else "pass",
+            **({} if grounding.passed else {"grounding": grounding.category}),
+        }],
     }
+    if decision.verdict == "caveat_required":
+        update["answer"] = decision.text
+    return update

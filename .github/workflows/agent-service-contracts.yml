@@ -140,8 +140,8 @@ jobs:
           (cd domains/healthcare/agent-service && uv run --frozen --package healthcare-agent-service pytest -q tests/evals tests/unit/test_adversarial_inputs.py)
           (cd domains/supply-chain/agent-service && uv run --frozen --package supply-chain-agent-service pytest -q tests/evals)
 
-      - name: Run evaluation quality gates (offline, from fixtures)
-        run: uv run --frozen --package healthcare-agent-service python -m healthcare_agent.evaluation.gates --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
+      - name: Run evaluation quality gates (offline fixtures through real guardrails)
+        run: uv run --frozen --package healthcare-agent-service python -m healthcare_agent.evaluation.gates --offline
         working-directory: domains/healthcare/agent-service
 
   container-build:

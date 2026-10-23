@@ -25,14 +25,6 @@ _OFFTOPIC_PATTERNS = [
     re.compile(r"(recipe|cook|bake)\s+", re.I),
 ]
 
-# Output safety patterns
-_OUTPUT_TOXIC_PATTERNS = [
-    re.compile(r"(kill|harm|hurt)\s+(yourself|the\s+patient|them)", re.I),
-    re.compile(r"stop\s+taking\s+(all|your)\s+medications?\s+(immediately|now|right\s+away)", re.I),
-    re.compile(r"you\s+(should|must|need\s+to)\s+die", re.I),
-]
-
-
 def classify_input(text: str) -> GuardrailResult:
     """Classify input text: injection first, then healthcare topic scope, then length."""
     if (injection := detect_prompt_injection(text)) is not None:
@@ -50,30 +42,14 @@ def classify_input(text: str) -> GuardrailResult:
 
 
 def classify_output(text: str) -> GuardrailResult:
-    """Classify output text for safety issues."""
-    for pattern in _OUTPUT_TOXIC_PATTERNS:
-        if pattern.search(text):
-            return GuardrailResult(
-                passed=False,
-                category="harmful_output",
-                reasons=[f"Detected harmful content: {pattern.pattern[:50]}"],
-                score=0.95,
-            )
+    """Classify output text via the shared clinical rule engine.
 
-    # Check if output contains clinical directives without safety caveat
-    directive_patterns = [
-        re.compile(r"(you\s+must|you\s+should\s+immediately|take\s+action\s+now)", re.I),
-    ]
-    for pattern in directive_patterns:
-        if pattern.search(text) and "advisory" not in text.lower() and "clinical review" not in text.lower():
-            return GuardrailResult(
-                passed=False,
-                category="missing_safety_caveat",
-                reasons=["Clinical directive without safety caveat"],
-                score=0.6,
-            )
+    A ``caveat_required`` verdict passes with its category set; callers that
+    can rewrite the answer use ``apply_output_policy`` to append the caveat.
+    """
+    from healthcare_agent.safety.clinical_rules import evaluate_output
 
-    return GuardrailResult(passed=True, score=0.0)
+    return evaluate_output(text).to_guardrail_result()
 
 
 def classify_grounding(answer: str, evidence: list[dict[str, Any]]) -> GuardrailResult:

@@ -142,12 +142,12 @@ def synthesize_answer(
     max_items: int = 5,
     use_harness: bool = True,
 ) -> str:
+    from healthcare_agent.safety.clinical_rules import apply_output_policy
     from healthcare_agent.safety.harness import (
         RetryPolicy,
         call_with_retry,
         check_input_safety,
         check_output_grounding,
-        check_output_safety,
         register_prompt,
     )
 
@@ -179,12 +179,14 @@ def synthesize_answer(
     if not result.success:
         return result.output
 
-    output_guard = check_output_safety(result.output)
-    if not output_guard.passed:
-        return f"Output blocked: {', '.join(output_guard.reasons)}"
+    decision = apply_output_policy(result.output, evidence=[*vector_ctx, *graph_ctx])
+    if decision.blocked:
+        sensitive = decision.category == "sensitive_data"
+        reasons = ("sensitive_data_in_output",) if sensitive else decision.reasons
+        return f"Output blocked: {', '.join(reasons)}"
 
     grounding = check_output_grounding(result.output, vector_ctx, graph_ctx)
     if not grounding.passed and "empty_answer" in grounding.reasons:
         return "Unable to generate a grounded answer from available evidence."
 
-    return result.output
+    return decision.text

@@ -71,11 +71,25 @@ The `healthcare_agent.evaluation` package scores agent runs offline.
 
 | Module | Responsibility |
 | --- | --- |
-| `gates.py` | `GateThresholds` (routing 0.6, evidence 0.5, answer 0.5, overall 0.55) and a CLI: `--results-file`, `--min-score` |
+| `gates.py` | `GateThresholds` (routing 0.6, evidence 0.5, answer 0.5, overall 0.55, factuality 0.9, safety caveat 0.9, safety 0.95, plus a hard must-block gate) and a CLI: `--offline`, `--results-file`, `--min-score` |
+| `offline_runner.py` | Runs the 70 synthetic cases in `tests/evals/fixtures/clinical_eval_cases.json` through the real LangGraph guardrails with a stub runtime |
+| `factuality.py` | `score_factuality` — deterministic check that drug, lab and condition terms in the answer appear in the retrieved evidence |
 | `agent_eval.py` | `run_evaluation_suite` over a case set |
 | `grounding_scorecard.py` | `score_grounding(answer, context_texts)` — overlap of answer claims with retrieved evidence |
 | `mlflow_eval.py` | Scorers for routing, coverage, evidence, answer, safety caveat and latency (30 s budget); `run_mlflow_evaluation`; `compare_modes` for A/B of agent modes |
 | `retrieval_benchmark.py` | `precision_at_k`, `recall_at_k`, `score_all` |
+
+Run the offline gate (the CI invocation, about 2 s):
+
+```bash
+cd domains/healthcare/agent-service
+uv run --package healthcare-agent-service \
+  python -m healthcare_agent.evaluation.gates --offline
+```
+
+The fixture set covers medication safety, contraindication, lab interpretation, coding review, patient summary, cohort triage, adversarial inputs and must-block outputs. Baseline on the initial 64 cases is 1.00 for every score. Six harder cases (paraphrased unsafe directives and negated near-misses) lowered routing to 0.98, so the 70-case baseline is 0.98 routing and 1.00 elsewhere; thresholds sit below it so one scripted case cannot fail the build by chance. Every must-block case has to be blocked, with no margin. Each gate has a failing scripted case in the tests, so a gate that stops detecting regressions is caught.
+
+Limits: the offline gate feeds scripted answers through the real guardrails, so it validates guardrail, routing and scoring logic. It does not measure live model quality. Factuality is a term-level check over a fixed vocabulary and does not catch paraphrased or numeric errors.
 
 Run the gate against stored results:
 
@@ -86,7 +100,7 @@ uv run --package healthcare-agent-service \
   --results-file tests/evals/fixtures/evaluation_results.json --min-score 0.5
 ```
 
-In CI the gate runs with `--min-score 0.5` as a **blocking gate**: regressions fail the job and block merges. MLflow runs and traces are browsed via `make mlflow` (see [05 — AI Agents](05_ai_agents.md#observability)).
+In CI the gate runs with `--offline` as a **blocking gate**: regressions fail the job and block merges. MLflow runs and traces are browsed via `make mlflow` (see [05 — AI Agents](05_ai_agents.md#observability)).
 
 ## 6. Retrieval and embedding tests
 

@@ -259,8 +259,8 @@ MCP transport options: `MCP_STATELESS_HTTP`, `MCP_JSON_RESPONSE`, `MCP_DNS_REBIN
 | Layer | Module | Checks |
 | --- | --- | --- |
 | Input | `safety/guardrails.py` | Prompt injection, length |
-| Output | `safety/guardrails.py` | Clinical directives must carry an "advisory" or "clinical review" caveat |
-| Grounding | `safety/harness.py` | The answer must cite retrieved evidence |
+| Output | `safety/clinical_rules.py` | One rule engine shared by `guardrails.py`, `harness.py` and the graph `output_guardrail`. Self-harm, stop-medication, dosing instructions and sensitive data (SSN, card, password) are blocked. Clinical directives without a caveat get one appended. An optional classifier can escalate to block but never relax a block |
+| Grounding | `safety/harness.py` | The answer should cite retrieved evidence. Advisory in the graph: recorded in the trace, not blocking |
 | Response policy | `safety/response_policy.py` | Role-based redaction, truncation, byte limits |
 
 The response policy limits are:
