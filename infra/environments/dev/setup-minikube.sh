@@ -14,17 +14,31 @@ MINIKUBE_DRIVER="${MINIKUBE_DRIVER:-docker}"
 
 echo "=== Minikube Dev Setup (Helm) ==="
 
-# Start minikube if not running
-if ! minikube status --format='{{.Host}}' 2>/dev/null | grep -q Running; then
+# Start minikube unless both the node and the API server are already running.
+# A running host with a stopped API server (for example after the minikube
+# container was removed outside minikube) needs a restart or a full reset.
+host_status="$(minikube status --format='{{.Host}}' 2>/dev/null || true)"
+apiserver_status="$(minikube status --format='{{.APIServer}}' 2>/dev/null || true)"
+if [ "$host_status" = "Running" ] && [ "$apiserver_status" = "Running" ]; then
+  echo "Minikube already running."
+else
   echo "Starting minikube (cpus=$MINIKUBE_CPUS, memory=${MINIKUBE_MEMORY}MB, driver=$MINIKUBE_DRIVER)..."
-  minikube start \
+  if ! minikube start \
     --cpus="$MINIKUBE_CPUS" \
     --memory="$MINIKUBE_MEMORY" \
     --driver="$MINIKUBE_DRIVER" \
     --wait=all \
-    --wait-timeout=5m0s
-else
-  echo "Minikube already running."
+    --wait-timeout=5m0s; then
+    cat >&2 <<'EOF'
+
+minikube failed to start. The existing profile is likely stale or broken, for
+example when the minikube container was deleted but its volume survived, or
+when the profile was created with different CPU or memory settings.
+Reset it with (this erases all in-cluster data):
+  minikube delete && make minikube-up
+EOF
+    exit 1
+  fi
 fi
 
 # Build images inside minikube's Docker daemon
@@ -52,6 +66,13 @@ for required in 'DATABRICKS_TOKEN' 'NEO4J_PASSWORD' 'MCP_AUTH_TOKEN'; do
     exit 1
   fi
 done
+pg_password_line="$(helm template "$RELEASE_NAME" "$HELM_CHART" -f "$VALUES_FILE" $LOCAL_ARGS \
+  -s charts/agent-service/templates/patient-memory-postgres.yaml 2>/dev/null | grep 'POSTGRES_PASSWORD:' || true)"
+if [ -z "$pg_password_line" ] || echo "$pg_password_line" | grep -Eq 'POSTGRES_PASSWORD:[[:space:]]*""'; then
+  echo "agent-service.patientMemoryPostgres.password must be set in $LOCAL_VALUES" >&2
+  echo "(nested under agent-service, matching the password in the database URLs)" >&2
+  exit 1
+fi
 helm upgrade --install "$RELEASE_NAME" "$HELM_CHART" \
   -f "$VALUES_FILE" $LOCAL_ARGS \
   -n "$NAMESPACE" --create-namespace

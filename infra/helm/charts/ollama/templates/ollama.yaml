@@ -18,6 +18,20 @@ spec:
       - name: ollama
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- with .Values.models }}
+        # Start the server, then pull each configured model so the agent never
+        # meets an empty model store. Pulls are skipped when already present.
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          ollama serve &
+          server_pid=$!
+          until ollama list >/dev/null 2>&1; do sleep 1; done
+          for model in {{ range . }}{{ . | quote }} {{ end }}; do
+            ollama pull "$model" || echo "ollama: failed to pull $model" >&2
+          done
+          wait "$server_pid"
+        {{- end }}
         ports:
         - containerPort: 11434
           name: http
@@ -28,7 +42,29 @@ spec:
           {{- toYaml .Values.resources | nindent 10 }}
       volumes:
       - name: models
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: ollama-models
+        {{- else }}
         emptyDir: {}
+        {{- end }}
+{{- if .Values.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  labels:
+    app: ollama
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

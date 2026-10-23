@@ -15,8 +15,8 @@ agent-service:
     NEO4J_USER: "neo4j"
     KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
     SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
-    LLM_PROVIDER: "ollama"
-    LLM_MODEL: "llama3.1"
+    LLM_PROVIDER: "databricks"
+    LLM_MODEL: "databricks-gpt-5-6-luna"
     EMBEDDING_PROVIDER: "local"
     EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
     EMBEDDING_DIM: "384"
@@ -24,7 +24,7 @@ agent-service:
     LLM_TIMEOUT_SECONDS: "300"
     LLM_MAX_TOKENS: "4096"
     DATABRICKS_HOST: "https://dbc-baff2b7f-4402.cloud.databricks.com"
-    OLLAMA_URL: "http://ollama:11434"
+    OLLAMA_URL: ""
     MCP_SERVER_NAME: "HealthcareGraphRAG MCP (dev)"
     LANGGRAPH_MAX_ITERATIONS: "3"
     MLFLOW_TRACKING_URI: "http://mlflow:5000"
@@ -48,8 +48,8 @@ agent-service:
     DATABRICKS_TOKEN: ""
     MCP_AUTH_TOKEN: ""
   # The local overlay must also set config database URLs and the Postgres password.
-patientMemoryPostgres:
-  password: ""
+  patientMemoryPostgres:
+    password: ""
 provider-web:
   replicaCount: 1
   autoscaling:
@@ -83,7 +83,15 @@ neo4j:
 qdrant:
   enabled: true
 ollama:
-  enabled: true
+  # Off by default: CPU-only Ollama in minikube is too slow for LLM_TIMEOUT_SECONDS.
+  # To use it, set enabled: true, LLM_PROVIDER "ollama", LLM_MODEL to a model below,
+  # and OLLAMA_URL "http://ollama:11434".
+  enabled: false
+  models:
+    - llama3.1
+  persistence:
+    enabled: true
+    size: 10Gi
 conduktor:
   enabled: true
   service:

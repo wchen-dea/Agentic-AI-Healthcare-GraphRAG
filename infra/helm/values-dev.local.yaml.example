@@ -7,5 +7,6 @@ agent-service:
   config:
     LANGGRAPH_CHECKPOINT_POSTGRES_URI: "postgresql://patient_memory:replace-with-postgres-password@patient-memory-postgres:5432/patient_memory"
     PATIENT_MEMORY_DATABASE_URL: "postgresql://patient_memory:replace-with-postgres-password@patient-memory-postgres:5432/patient_memory"
-patientMemoryPostgres:
-  password: "replace-with-postgres-password"
+  # Must match the password embedded in the two database URLs above.
+  patientMemoryPostgres:
+    password: "replace-with-postgres-password"

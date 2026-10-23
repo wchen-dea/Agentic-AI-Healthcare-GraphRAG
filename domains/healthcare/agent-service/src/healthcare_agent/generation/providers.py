@@ -61,7 +61,7 @@ class OllamaProvider:
         if not selected_model:
             return (
                 "LLM error: no Ollama models are installed. "
-                "Pull one with: docker exec -it healthcare-ollama ollama pull llama3.1"
+                f"Pull one with: ollama pull {(self.configured_model or '').strip() or 'llama3.1'}"
             )
 
         try:
@@ -92,7 +92,7 @@ class OllamaProvider:
             if "not found" in body.lower():
                 return (
                     f"LLM error: requested model '{selected_model}' was not found. "
-                    "Pull a model with: docker exec -it healthcare-ollama ollama pull llama3.1"
+                    f"Pull it with: ollama pull {selected_model}"
                 )
             return "LLM error: model returned a non-200 response."
 

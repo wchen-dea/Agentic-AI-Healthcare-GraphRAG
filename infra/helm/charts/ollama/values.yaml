@@ -3,6 +3,13 @@ image:
   repository: ollama/ollama
   tag: latest
   pullPolicy: IfNotPresent
+# Models pulled at container start; empty keeps the image's default entrypoint.
+models: []
+# Keep pulled models across pod restarts; otherwise they live in an emptyDir.
+persistence:
+  enabled: false
+  size: 10Gi
+  storageClassName: ""
 service:
   type: ClusterIP
 resources:
