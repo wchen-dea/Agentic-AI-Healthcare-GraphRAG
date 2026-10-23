@@ -31,7 +31,7 @@ HC_WEB := domains/healthcare/webapp
 	validate validate-docs validate-skills generate-skills validate-ontology \
 	sync lint test-core test-hc test-sc test-unit test-integration test-evals \
 	build-wheels \
-	minikube-up minikube-down minikube-ports minikube-ports-stop \
+	minikube-up minikube-down minikube-shutdown minikube-ports minikube-ports-stop \
 	helm-lint helm-prd \
 	kube-status kube-pods kube-logs
 
@@ -223,6 +223,9 @@ minikube-up: ## Start Minikube and deploy the development Helm release
 
 minikube-down: ## Remove the development Helm release
 	helm uninstall $(KUBE_RELEASE) -n $(KUBE_NAMESPACE) || true
+
+minikube-shutdown: minikube-ports-stop ## Stop port-forwards and shut down the Minikube cluster (keeps state)
+	minikube stop
 
 minikube-ports: ## Start Minikube service port-forwards
 	@pkill -f "port-forward" 2>/dev/null || true
