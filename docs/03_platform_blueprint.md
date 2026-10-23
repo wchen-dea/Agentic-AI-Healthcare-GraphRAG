@@ -120,10 +120,13 @@ Agent and web services are ClusterIP by default with CPU-based HPAs. The agent c
 
 `make minikube-up` runs `infra/environments/dev/setup-minikube.sh`:
 
-1. Starts Minikube (`MINIKUBE_CPUS=4`, `MINIKUBE_MEMORY=16384`, `MINIKUBE_DRIVER=docker`).
+1. Starts Minikube (`MINIKUBE_CPUS=4`, `MINIKUBE_MEMORY=16384`, `MINIKUBE_DRIVER=docker`) unless both the node and the API server are already running. If the start fails, it prints the reset command `minikube delete && make minikube-up`. CPU and memory apply only when a profile is created, so changing them needs that reset.
 2. Builds four images in the Minikube Docker daemon: agent-service, producer, Flink, provider-web.
-3. Runs `helm upgrade --install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -n healthcare-ai-dev --create-namespace`.
-4. Waits for Kafka, Neo4j, Qdrant and agent-service pods.
+3. Checks the gitignored `infra/helm/values-dev.local.yaml`: it stops when `DATABRICKS_TOKEN`, `NEO4J_PASSWORD`, `MCP_AUTH_TOKEN`, or `agent-service.patientMemoryPostgres.password` is empty.
+4. Runs `helm upgrade --install healthcare-dev infra/helm -f infra/helm/values-dev.yaml -f infra/helm/values-dev.local.yaml -n healthcare-ai-dev --create-namespace`.
+5. Waits for Kafka, Neo4j, Qdrant and agent-service pods.
+
+Dev answers with the Databricks foundation model (`LLM_PROVIDER=databricks`, `LLM_MODEL=databricks-gpt-5-6-luna`). In-cluster Ollama is opt-in: CPU-only inference in Minikube is too slow for `LLM_TIMEOUT_SECONDS`. When enabled, the `ollama` subchart pulls each model in `ollama.models` at start-up, keeps them on the `ollama-models` PVC when `ollama.persistence.enabled` is true, and stays un-Ready until every listed model is present.
 
 Then `make minikube-ports` forwards:
 

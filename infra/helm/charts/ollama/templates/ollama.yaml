@@ -21,17 +21,36 @@ spec:
         {{- with .Values.models }}
         # Start the server, then pull each configured model so the agent never
         # meets an empty model store. Pulls are skipped when already present.
+        # The readiness probe below keeps the pod un-Ready until every model exists.
         command: ["/bin/sh", "-c"]
         args:
         - |
           ollama serve &
           server_pid=$!
-          until ollama list >/dev/null 2>&1; do sleep 1; done
+          waited=0
+          until ollama list >/dev/null 2>&1; do
+            waited=$((waited + 1))
+            if [ "$waited" -ge 120 ]; then
+              echo "ollama: server did not start within 120s" >&2
+              exit 1
+            fi
+            sleep 1
+          done
           for model in {{ range . }}{{ . | quote }} {{ end }}; do
-            ollama pull "$model" || echo "ollama: failed to pull $model" >&2
+            ollama pull "$model" || echo "ollama: failed to pull $model; pod stays un-Ready" >&2
           done
           wait "$server_pid"
         {{- end }}
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - |
+              ollama list >/dev/null{{ range .Values.models }} && ollama show {{ . | quote }} >/dev/null{{ end }}
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         ports:
         - containerPort: 11434
           name: http

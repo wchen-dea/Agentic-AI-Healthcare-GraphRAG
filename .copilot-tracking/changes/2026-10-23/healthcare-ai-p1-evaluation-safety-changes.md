@@ -9,7 +9,7 @@
 
 ## Execution Status
 
-Implementation complete for the full plan. All nine tasks are checked. Healthcare `tests/unit` and `tests/evals`: 289 passed, 1 skipped. Review found RV-001, which is now fixed; RV-002 and RV-003 are routed as follow-ups.
+Implementation complete for the full plan. All nine tasks are checked. Healthcare `tests/unit` and `tests/evals`: 289 passed, 1 skipped. The first review's RV-001, RV-002 and RV-003 are implemented; only the CI step-time check from RV-003 remains as a follow-up. The second review's findings (dev environment documentation, Ollama readiness, and this status line) are also implemented.
 
 ## Execution Summary
 
@@ -91,6 +91,16 @@ A single deterministic clinical-rule engine now backs all three output-safety pa
 * Behavior: six harder cases were added (`hrd-01`..`hrd-06`): three negated or conditional near-misses that must pass, and three paraphrased unsafe directives that must be blocked. The suite is 70 cases. Routing is now 0.98 because three medication questions without a medication keyword route to `patient_summary`. Every other score is 1.00 and the gate passes.
 * Validation: the offline gate passed, and `tests/unit` plus `tests/evals` gave 289 passed, 1 skipped.
 
+### Second review findings: dev environment docs and Ollama readiness
+
+The second review (`healthcare-ai-p1-evaluation-safety-review-2.md`) found that the dev environment repairs in commit `bdf9193` were not in the docs, and that the Ollama chart reported Ready before it had a model. Both are outside the P1 plan tasks.
+
+* The runbook and the platform blueprint now describe Databricks as the dev LLM, with in-cluster Ollama as opt-in. They also cover the required local secrets (including `agent-service.patientMemoryPostgres.password`) and the setup script's start, reset, and secret checks.
+* The runbook's troubleshooting tables now cover a stale minikube profile, the Postgres password crash loop, "Failed to fetch" after agent-service restarts, missing Ollama models, and Ollama CPU timeouts.
+* The Ollama pod now stays un-Ready until every model in `ollama.models` exists (`ollama show` readiness probe). Its start-up wait for the server is capped at 120 s.
+* Files: [docs/08_operation_runbook.md](../../../docs/08_operation_runbook.md), [docs/03_platform_blueprint.md](../../../docs/03_platform_blueprint.md), [infra/helm/charts/ollama/templates/ollama.yaml](../../../infra/helm/charts/ollama/templates/ollama.yaml).
+* Validation: `helm lint` passed; `helm template` with Ollama on rendered the probe for the configured models and with no models; `kubectl apply --dry-run=client` passed; `ollama show` exits 0 for a present model and 1 for a missing one; `make validate-docs` result is in the Validation Summary.
+
 ## Implementation-Time Plan Updates
 
 * The classifier port is registered with a module-level `configure_output_classifier` rather than a `HealthcareAgentSettings` flag. The output paths have no settings access, and a flag with no implementation would mean nothing.
@@ -110,6 +120,8 @@ None.
 | `ruff` on new and edited files | Passed; 6 other pre-existing import-order findings in untouched test files were left alone |
 | `make validate-docs` | Passed |
 | Offline gate `--offline` | Passed, about 2 s |
+| `make validate-docs` (second review docs) | Passed: 55 files, 0 issues |
+| `helm lint` and `helm template` (Ollama readiness) | Passed |
 | CI workflow execution | Unavailable locally |
 
 ## Remaining Work and Follow-ups

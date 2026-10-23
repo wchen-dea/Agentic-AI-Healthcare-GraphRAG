@@ -307,7 +307,7 @@ The umbrella chart is `infra/helm` with sub-charts under `infra/helm/charts`. De
 | Port-forward services | `make minikube-ports`; stop with `make minikube-ports-stop` |
 | Tear down dev | `make minikube-down` |
 | Lint and render | `make helm-lint`, `make helm-prd` (dry-run only) |
-| Pull the model in-cluster | `kubectl -n healthcare-ai-dev exec deploy/ollama -- ollama pull llama3.1` |
+| Use in-cluster Ollama (opt-in) | Set `ollama.enabled: true`, `agent-service.config.LLM_PROVIDER: ollama`, `LLM_MODEL` to an entry in `ollama.models`, and `OLLAMA_URL: http://ollama:11434`. The pod pulls each model in `ollama.models` at start-up onto the `ollama-models` PVC and stays un-Ready until all are present. |
 
 Production deployment requires:
 
@@ -392,13 +392,16 @@ kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000
 | `K8S_APISERVER_MISSING` | Stale cluster state | `minikube delete && make minikube-up` |
 | Pods crash on env var collisions | Kubernetes service links | Charts set `enableServiceLinks: false`; keep it |
 | Ollama `OOMKilled` | Not enough memory | `MINIKUBE_MEMORY=20480 make minikube-up` |
+| `connection refused` on `localhost:8443`, `WaitNodeCondition: context deadline exceeded`, or "You cannot change the memory size" | The minikube container was removed outside minikube while its volume survived, or the profile has old CPU or memory settings | `minikube delete && make minikube-up` (erases in-cluster data). The setup script prints this hint when `minikube start` fails. |
+| `patient-memory-postgres` crash-loops and agent-service never becomes Ready | `agent-service.patientMemoryPostgres.password` is empty or placed at the top level of the values file | Nest it under `agent-service:` in `values-dev.local.yaml`, matching the password in both database URLs. The setup script stops before `helm upgrade` when it is empty. |
 | `ImagePullBackOff` | Image built outside minikube's Docker | `eval $(minikube docker-env)` and rebuild; the setup script does this |
 | Flink task manager cannot register | RPC port blocked | Check port 6124 in the network policy |
 | Port-forward drops | `kubectl` limit on long connections | Re-run `make minikube-ports` |
+| Web UI shows "Failed to fetch" immediately | The `localhost:8000` port-forward died; a port-forward is bound to one pod and stops when agent-service restarts | Re-run `make minikube-ports` after every agent-service restart or rollout |
 
 ### Minikube credentials, reboot and troubleshooting
 
-- Put real credentials in the gitignored `infra/helm/values-dev.local.yaml` (`agent-service.secrets.DATABRICKS_TOKEN`). `setup-minikube.sh` applies it automatically; for manual upgrades pass `-f infra/helm/values-dev.yaml -f infra/helm/values-dev.local.yaml`. Never commit tokens (GitHub push protection will block them).
+- Put real credentials in the gitignored `infra/helm/values-dev.local.yaml`, starting from `infra/helm/values-dev.local.yaml.example`: `agent-service.secrets.DATABRICKS_TOKEN`, `NEO4J_PASSWORD`, `MCP_AUTH_TOKEN`, the two database URLs, and `agent-service.patientMemoryPostgres.password`. `setup-minikube.sh` applies it automatically and stops before `helm upgrade` when a required secret or the Postgres password is empty; for manual upgrades pass `-f infra/helm/values-dev.yaml -f infra/helm/values-dev.local.yaml`. Never commit tokens (GitHub push protection will block them).
 - Reboot: `minikube stop && minikube start`, wait for pods to be Ready, then `make minikube-ports`.
 
 | Symptom | Cause | Fix |
@@ -406,6 +409,8 @@ kubectl -n healthcare-ai-dev exec deploy/agent-service -- curl -s localhost:8000
 | localhost:5000 down, mlflow `OOMKilled` | Dev memory too low / persistence | Dev values disable persistence and raise limits; re-run helm upgrade |
 | Agent UI "Request timed out after 120s" | mlflow down (agent retries) or `Permission denied: /mlflow` | Ensure mlflow runs with `--serve-artifacts`; restart agent-service |
 | "LLM error: unable to reach Databricks AI Gateway" | `DATABRICKS_HOST/TOKEN` still `change_me` | Fill `values-dev.local.yaml`, helm upgrade, restart agent-service |
+| "LLM error: no Ollama models are installed" | `LLM_PROVIDER` is `ollama` but the model store is empty or still downloading | Dev uses Databricks by default. When using Ollama on purpose, list the model in `ollama.models` and wait for the `ollama` pod to become Ready. |
+| Ollama returns `500` after exactly 5m0s; the UI times out | CPU-only inference in minikube exceeds `LLM_TIMEOUT_SECONDS` (Docker on macOS has no GPU) | Use the Databricks default, or a hosted provider; an 8B model on 4 shared CPUs is too slow for interactive answers |
 
 ### Conduktor
 
